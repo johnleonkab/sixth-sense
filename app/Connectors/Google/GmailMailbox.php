@@ -209,6 +209,7 @@ class GmailMailbox implements Mailbox
             $search->unreadOnly ? 'is:unread' : null,
             match ($search->folder) {
                 'inbox' => 'in:inbox',
+                'primary' => 'in:inbox category:primary',
                 'sent' => 'in:sent',
                 default => null,
             },

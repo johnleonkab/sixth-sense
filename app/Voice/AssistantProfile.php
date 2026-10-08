@@ -7,6 +7,7 @@ use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
 use App\Models\User;
 use App\Voice\Tools\Toolbox;
+use App\WorkContext\WorkDigest;
 use Carbon\CarbonImmutable;
 
 /**
@@ -37,7 +38,11 @@ final readonly class AssistantProfile
         ]));
 
         return new self(
-            instructions: trim($instructions."\n".($chats ? self::familiarChats($chats->familiar($user)) : '')),
+            instructions: trim(implode("\n", array_filter([
+                $instructions,
+                $chats ? self::familiarChats($chats->familiar($user)) : '',
+                self::workContext($user),
+            ]))),
             tools: $toolbox?->declarations() ?? [],
         );
     }
@@ -69,5 +74,20 @@ final readonly class AssistantProfile
             .'Si nombra a otro, búscalo con tus herramientas.'
             .($people !== '' ? "\nPersonas: {$people}." : '')
             .($conversations !== '' ? "\nCanales y grupos: {$conversations}." : '');
+    }
+
+    /**
+     * What the user is working on lately, built overnight, when they switched it
+     * on and it is recent. Already written: starting a conversation costs nothing more.
+     */
+    private static function workContext(User $user): string
+    {
+        $context = $user->workContext;
+
+        if ($context === null || ! $context->usable()) {
+            return '';
+        }
+
+        return WorkDigest::fromArray($context->digest ?? ['summary' => $context->summary])->forAssistant($context->generated_at);
     }
 }

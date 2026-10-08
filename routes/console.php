@@ -13,3 +13,4 @@ Schedule::command('alerts:check-replies')->everyTwoMinutes()->withoutOverlapping
 Schedule::command('alerts:plan-meetings')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('alerts:remind-meetings')->everyMinute()->withoutOverlapping();
 Schedule::command('chats:warm')->hourly()->withoutOverlapping();
+Schedule::command('context:build')->dailyAt(config('work_context.run_at'))->withoutOverlapping();

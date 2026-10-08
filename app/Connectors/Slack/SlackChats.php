@@ -519,7 +519,7 @@ class SlackChats implements Chats
     private function matchingPeople(ConnectedAccount $account, string $query, bool $retried = false): array
     {
         $query = ltrim($query, '@');
-        $activity = $this->activity($account)['people'];
+        $activity = $this->measuredActivity($account)['people'];
         $found = [];
 
         foreach ($this->directory($account, $retried ? self::MISSING_REFRESH_AFTER : self::DIRECTORY_MAX_AGE) as $id => $person) {
@@ -637,7 +637,7 @@ class SlackChats implements Chats
      *
      * @return array{people: array<string, int>, conversations: array<string, int>}
      */
-    private function activity(ConnectedAccount $account): array
+    private function measuredActivity(ConnectedAccount $account): array
     {
         return $this->stored("slack-activity:{$account->id}") ?? ['people' => [], 'conversations' => []];
     }
@@ -690,7 +690,7 @@ class SlackChats implements Chats
     private function conversationList(ConnectedAccount $account, int $maxAge = self::CONVERSATIONS_MAX_AGE): array
     {
         $directory = $this->directory($account);
-        $activity = $this->activity($account)['conversations'];
+        $activity = $this->measuredActivity($account)['conversations'];
         $conversations = [];
 
         foreach ($this->rawConversations($account, $maxAge) as $channel) {

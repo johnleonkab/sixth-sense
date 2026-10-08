@@ -24,7 +24,7 @@
 
 Sixth Sense no es un dashboard ni un chatbot con voz. Es una **pantalla compartida**: lo que se dice y lo que se ve se refieren a lo mismo. Le pides «enséñame mañana», «abre el email de Marta», «contesta a este» o «pasa a la página 3», y la IA habla y muestra el calendario, el email, el hilo de Slack o el PDF del que estáis hablando.
 
-Conecta con **Google Calendar, Gmail, Google Docs, Google Drive y Slack**, con todas las cuentas que quieras de cada uno.
+Conecta con **Google Calendar, Gmail, Google Docs, Google Drive, Slack y Notion**, con todas las cuentas que quieras de cada uno.
 
 ## Qué se le puede pedir
 
@@ -36,6 +36,7 @@ Conecta con **Google Calendar, Gmail, Google Docs, Google Drive y Slack**, con t
 | **Gmail** | Búsqueda con expresiones regulares («donde X dice Y»), resultados y detalle, adjuntos | Redactar, responder (a uno o a todos) y reenviar |
 | **Docs y Drive** | Buscar, abrir con formato, abrir los enlazados desde emails, eventos o Slack, archivos de Word | Proponer ediciones y comentarios |
 | **Slack** | Personas, canales y DMs, no leídos importantes, hilos, archivos | Mensajes en conversaciones o hilos, con menciones |
+| **Notion** | Buscar y abrir páginas, sus comentarios y enlaces | Crear y editar páginas, comentar y responder comentarios |
 | **Archivos** | Visor de PDF (páginas, zoom, leer en voz alta) e imágenes | — |
 
 ## Proactiva, con criterio
@@ -49,6 +50,16 @@ Sixth Sense vigila **Gmail y Slack** y solo te interrumpe cuando algo **espera t
 5. **Se cierra sola** cuando respondes, ya sea desde aquí o desde Gmail o Slack.
 
 También avisa antes de cada **reunión**: hasta 30 minutos antes si hay que preparar algo, y un par de minutos antes si no.
+
+## Sabe en qué estás
+
+Si activas **Configuración → Contexto**, cada noche Sixth Sense repasa tu semana **en modo solo lectura**:
+
+- **Slack**: los últimos 5 días de lo que escribes, lo que te escriben y donde te mencionan.
+- **Gmail**: 7 días de la bandeja principal y de enviados.
+- **Google Docs y Notion**: los documentos y páginas que se han creado, compartido o editado en 7 días.
+
+Con eso escribe un contexto breve: en qué procesos estás, por qué, con quién y dónde, y qué tienes pendiente. El asistente lo lee al empezar cada conversación, así que entiende «lo del prepago» o «lo de Marta» sin que se lo expliques, y no añade ninguna llamada ni retraso. En la misma pantalla ves su estado, lo que sabe el asistente y un botón para regenerarlo. Si tiene más de 3 días, el asistente deja de usarlo.
 
 ## Principios
 
@@ -73,10 +84,11 @@ flowchart LR
 
     subgraph Laravel
         Tools[POST /voice/tools] --> Toolbox
-        Toolbox --> Connectors[(Conectores<br/>Google · Slack)]
+        Toolbox --> Connectors[(Conectores<br/>Google · Slack · Notion)]
         Toolbox -- escritura --> Pending[PendingAction<br/>«sí» + deshacer]
         Watchers[Watchers<br/>Gmail · Slack] --> Judge[Juez IA] --> Inbox[(Alertas)]
         Inbox --> Planner[Motor de respuestas]
+        Nightly[Contexto nocturno<br/>solo lectura] --> Connectors
     end
 
     Tools -- output + canvas --> Canvas
@@ -88,25 +100,36 @@ flowchart LR
 - **Herramientas declaradas una sola vez** en `app/Voice/Tools` y traducidas al formato de cada proveedor. Cada una devuelve `output` para el modelo y, si procede, un **canvas**: una vista preconfigurada que el frontend sabe pintar (`calendar.day`, `mail.message`, `pdf.viewer`, `alerts.review`…).
 - **Toda la lógica de un servicio vive en su conector** (`app/Connectors`), cada uno con un `Fake` para los tests y para el **modo demo**.
 - **Motor de respuestas aislado** tras `ReplyPlanner`. Hoy usa Gemini Flash; se puede sustituir por otro agente con acceso a tu base de conocimiento.
+- **Contexto de trabajo** tras `ContextSummarizer`: un job nocturno lee la semana con los conectores (solo métodos de lectura), Gemini la resume, y el resultado se añade a las instrucciones de cada sesión de voz.
 
 ## Puesta en marcha
 
-**Requisitos:** PHP 8.5, Composer, Node y Docker.
+**Requisitos:** Docker y Node. PHP y Composer se ejecutan dentro del contenedor `app`, así que no hace falta instalarlos.
 
 ```bash
 git clone git@github.com:johnleonkab/sixth-sense.git && cd sixth-sense
-
 cp .env.example .env
-composer install
+
+docker compose build app
+docker compose run --rm app composer install
+docker compose run --rm app php artisan key:generate
 npm install
-php artisan key:generate
 
-docker compose up -d          # app en :8000, Postgres en :5433, Redis en :6380
-php artisan migrate
-php artisan app:create-user   # te pide nombre, email y contraseña
-
-composer dev                  # Horizon, Reverb, scheduler, logs y Vite
+docker compose up -d                                   # app :8000, Reverb :8080, Postgres :5433, Redis :6380
+docker compose exec app php artisan migrate
+docker compose exec app php artisan app:create-user    # te pide nombre, email y contraseña
 ```
+
+Para trabajar, en cuatro terminales:
+
+```bash
+docker compose exec app php artisan horizon            # colas
+docker compose exec app php artisan reverb:start       # avisos en tiempo real
+docker compose exec app php artisan schedule:work      # tareas programadas (avisos, contexto nocturno)
+npm run dev                                            # Vite, en tu máquina
+```
+
+> Con PHP 8.5 instalado en tu máquina puedes usar `php artisan …` y `composer dev` directamente, en vez de `docker compose exec app …`.
 
 Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
 
@@ -118,26 +141,30 @@ Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
 |---|---|
 | `GEMINI_API_KEY` | Voz (Gemini Live), juez de alertas y motor de respuestas. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
 | `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE` | Modelo y voz de la conversación. |
-| `ALERTS_GEMINI_MODEL` | Modelo del juez y del motor de respuestas. El nivel gratuito de Flash tiene un límite diario bajo. |
+| `ALERTS_GEMINI_MODEL` | Modelo del juez, del motor de respuestas y del contexto de trabajo. El nivel gratuito de Flash tiene un límite diario bajo. |
+| `WORK_CONTEXT_RUN_AT` | Hora a la que se genera el contexto de trabajo cada noche (por defecto `04:30`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Cliente OAuth web de Google Cloud, con las APIs de Calendar, Gmail, Docs y Drive activadas. |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | App de Slack con *user token scopes*. La redirección debe ser HTTPS, así que en local se usa un túnel. |
+| `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI` | Integración pública de Notion. |
 | `CONNECTORS_DEMO` | `true` para usar datos de ejemplo en lugar de las cuentas reales. |
 
-Las cuentas se conectan desde **Configuración → Conexiones**, y los avisos se activan por fuente en **Configuración → Notificaciones**.
+Las cuentas se conectan desde **Configuración → Conexiones**, los avisos se activan por fuente en **Configuración → Avisos**, y el contexto nocturno en **Configuración → Contexto**.
 
 ### Comandos útiles
 
 ```bash
-php artisan alerts:watch                 # comprueba Gmail y Slack ahora (el scheduler lo hace cada minuto)
-php artisan alerts:check-replies         # resuelve las alertas que ya has respondido
-php artisan alerts:test tu@email.com     # lanza una alerta de prueba en tu propio DM de Slack
-php artisan chats:warm                   # precarga personas y canales de Slack
+docker compose exec app php artisan alerts:watch                # comprueba Gmail y Slack ahora (el scheduler lo hace cada minuto)
+docker compose exec app php artisan alerts:check-replies        # resuelve las alertas que ya has respondido
+docker compose exec app php artisan alerts:test tu@email.com    # lanza una alerta de prueba en tu propio DM de Slack
+docker compose exec app php artisan chats:warm                  # precarga personas y canales de Slack
+docker compose exec app php artisan context:build               # genera ahora el contexto de trabajo (el scheduler lo hace cada noche)
 ```
 
 ## Tests
 
 ```bash
-php artisan test --compact
+npm run build                                   # los tests de páginas necesitan el manifest de Vite
+docker compose exec app php artisan test --compact
 ```
 
 Hay tests de Pest para cada herramienta, conector, alerta y acción. Ninguno llama a servicios reales: todos usan `Http::fake()` o el `Fake` del conector.
@@ -149,8 +176,9 @@ app/
 ├── Actions/        Cambios pendientes de confirmar: «sí», «cancela», «deshaz»
 ├── Alerts/         Watchers, juez, motor de respuestas, recordatorios de reuniones
 ├── Connections/    Cuentas conectadas, OAuth, capacidades y tokens
-├── Connectors/     Google (Calendar, Gmail, Docs, Drive) y Slack, con sus Fakes
-└── Voice/          Proveedor de voz, perfil del asistente y herramientas
+├── Connectors/     Google (Calendar, Gmail, Docs, Drive), Slack y Notion, con sus Fakes
+├── Voice/          Proveedor de voz, perfil del asistente y herramientas
+└── WorkContext/    Contexto nocturno: lectura de la semana y resumen
 resources/js/
 ├── canvas/         Una vista por tipo de contenido (calendario, email, Slack, PDF…)
 ├── voice/          Sesión de voz, transporte, memoria y audio
@@ -159,7 +187,7 @@ resources/js/
 
 ## Próximamente
 
-- Jira y Notion.
+- Jira.
 - Dos columnas de contenido a la vez.
 - Que la IA pueda ver las imágenes que se le muestran.
 - Un motor de respuestas con acceso a la base de conocimiento.

@@ -35,6 +35,9 @@ use App\Connectors\Wiki\Wiki;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
+use App\WorkContext\ContextSummarizer;
+use App\WorkContext\Summarizers\FakeContextSummarizer;
+use App\WorkContext\Summarizers\GeminiContextSummarizer;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -93,6 +96,17 @@ class AppServiceProvider extends ServiceProvider
             'gemini' => new GeminiMeetingAdvisor(self::lightGemini()),
             'fake' => new FakeMeetingAdvisor,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
+        });
+
+        // A week of activity is a long read: the capable model, with more time.
+        $this->app->bind(ContextSummarizer::class, fn (): ContextSummarizer => match (config('work_context.summarizer')) {
+            'gemini' => new GeminiContextSummarizer([
+                ...config('alerts.judges.gemini'),
+                'fallback_model' => config('alerts.judges.gemini.judge_model'),
+                'timeout' => config('work_context.timeout'),
+            ]),
+            'fake' => new FakeContextSummarizer,
+            default => throw new InvalidArgumentException('Unsupported work context summarizer ['.config('work_context.summarizer').'].'),
         });
 
         $this->app->singleton(VoiceProvider::class, fn (): VoiceProvider => match (config('voice.default')) {

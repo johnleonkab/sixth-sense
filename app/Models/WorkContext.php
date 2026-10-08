@@ -23,6 +23,9 @@ class WorkContext extends Model
     /** Older than this, it no longer describes the present: the assistant does not get it. */
     public const FRESH_FOR_HOURS = 72;
 
+    /** A build running longer than this died with its worker: it may be started again. */
+    public const BUILD_STALE_AFTER_MINUTES = 15;
+
     /**
      * @var array<string, mixed>
      */
@@ -64,5 +67,14 @@ class WorkContext extends Model
         return $this->enabled
             && filled($this->summary)
             && $this->generated_at?->greaterThan(now()->subHours(self::FRESH_FOR_HOURS)) === true;
+    }
+
+    /**
+     * Whether a build is under way right now.
+     */
+    public function building(): bool
+    {
+        return $this->status === WorkContextStatus::Running
+            && $this->started_at?->greaterThan(now()->subMinutes(self::BUILD_STALE_AFTER_MINUTES)) === true;
     }
 }

@@ -10,6 +10,8 @@ services:
                 GID: '${HOST_GID:-1000}'
         ports:
             - '${APP_PORT:-8000}:8000'
+            # Reverb, when it runs inside the container (php artisan reverb:start).
+            - '${REVERB_PORT:-8080}:8080'
         environment:
             DB_HOST: pgsql
             DB_PORT: 5432
