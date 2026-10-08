@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
@@ -12,7 +13,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('connected_accounts', function (Blueprint $table) {
-            $table->json('disabled_capabilities')->default('[]')->after('scopes');
+            // An expression: MySQL does not accept literal defaults on JSON columns.
+            $table->json('disabled_capabilities')->default(new Expression("('[]')"))->after('scopes');
         });
     }
 

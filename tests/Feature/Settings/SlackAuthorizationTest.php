@@ -62,7 +62,7 @@ test('the callback stores the workspace account even without the browser session
         ->and($account->email)->toBe('jhon@covermanager.com')
         ->and($account->access_token)->toBe('xoxp-1')
         ->and($account->expires_at)->toBeNull()
-        ->and($account->metadata)->toBe(['team_id' => 'T1', 'team_name' => 'CoverManager', 'user_id' => 'U1'])
+        ->and($account->metadata)->toEqual(['team_id' => 'T1', 'team_name' => 'CoverManager', 'user_id' => 'U1'])
         ->and($account->can(Capability::SlackSend))->toBeTrue();
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'oauth.v2.access') && $request['code'] === 'abc' && $request['client_secret'] === 'secret');

@@ -49,7 +49,7 @@ test('the callback stores the workspace account, with every capability, even wit
         ->and($account->external_account_id)->toBe('W1:U1')
         ->and($account->email)->toBe('jhon@cm.com')
         ->and($account->refresh_token)->toBe('nrt_1')
-        ->and($account->metadata)->toBe(['workspace_id' => 'W1', 'workspace_name' => 'CoverManager', 'bot_id' => 'B1', 'user_id' => 'U1'])
+        ->and($account->metadata)->toEqual(['workspace_id' => 'W1', 'workspace_name' => 'CoverManager', 'bot_id' => 'B1', 'user_id' => 'U1'])
         ->and($account->can(Capability::NotionEdit))->toBeTrue()
         ->and($account->can(Capability::NotionComment))->toBeTrue();
 

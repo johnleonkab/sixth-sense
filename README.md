@@ -146,6 +146,7 @@ Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Cliente OAuth web de Google Cloud, con las APIs de Calendar, Gmail, Docs y Drive activadas. |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | App de Slack con *user token scopes*. La redirección debe ser HTTPS, así que en local se usa un túnel. |
 | `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI` | Integración pública de Notion. |
+| `REGISTRATION_ENABLED` | `true` para que cualquiera pueda crearse una cuenta desde la pantalla de entrada. Por defecto está apagado y las cuentas se crean con `app:create-user`. |
 | `CONNECTORS_DEMO` | `true` para usar datos de ejemplo en lugar de las cuentas reales. |
 
 Las cuentas se conectan desde **Configuración → Conexiones**, los avisos se activan por fuente en **Configuración → Avisos**, y el contexto nocturno en **Configuración → Contexto**.

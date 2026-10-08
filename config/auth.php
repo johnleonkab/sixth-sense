@@ -114,4 +114,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registration
+    |--------------------------------------------------------------------------
+    |
+    | Whether anyone can create an account from the login screen. Off by
+    | default: accounts are then created with `php artisan app:create-user`.
+    |
+    */
+
+    'registration' => (bool) env('REGISTRATION_ENABLED', false),
+
 ];

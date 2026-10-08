@@ -1,4 +1,4 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 
 import Wordmark from '@/components/wordmark';
 
@@ -6,7 +6,7 @@ const inputClass =
     'w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] text-ink placeholder:text-faint ' +
     'transition-colors outline-none focus:border-accent aria-invalid:border-crit';
 
-export default function Login() {
+export default function Login({ canRegister = false }: { canRegister?: boolean }) {
     return (
         <>
             <Head title="Entrar" />
@@ -84,6 +84,15 @@ export default function Login() {
                             </div>
                         )}
                     </Form>
+
+                    {canRegister && (
+                        <p className="mt-5 text-center text-[13px] text-muted">
+                            ¿No tienes cuenta?{' '}
+                            <Link href="/register" className="font-medium text-ink underline underline-offset-2">
+                                Créala
+                            </Link>
+                        </p>
+                    )}
                 </div>
             </main>
         </>
