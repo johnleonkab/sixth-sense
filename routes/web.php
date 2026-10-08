@@ -8,6 +8,7 @@ use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
+use App\Http\Controllers\Settings\DisplayController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');
+        Route::get('display', [DisplayController::class, 'index'])->name('display.index');
+        Route::put('display', [DisplayController::class, 'update'])->name('display.update');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
         Route::put('alerts/{source}', [AlertController::class, 'update'])->name('alerts.update');
         Route::get('connections', [ConnectionController::class, 'index'])->name('connections.index');

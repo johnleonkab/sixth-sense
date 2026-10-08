@@ -15,9 +15,14 @@ class PlanAlertReply implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 2;
+    public int $tries = 3;
 
-    public int $backoff = 30;
+    /**
+     * The AI may be over its rate limit: wait before trying again.
+     *
+     * @var list<int>
+     */
+    public array $backoff = [60, 300];
 
     public int $timeout = 120;
 

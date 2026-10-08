@@ -105,8 +105,9 @@ const PdfViewer: CanvasComponent<PdfViewerProps> = ({ index, ...props }) => {
             const current = await pdf.getPage(page);
             const natural = current.getViewport({ scale: 1 });
             const viewport = current.getViewport({ scale: (width / natural.width) * zoom });
-            const ratio = window.devicePixelRatio || 1;
             const element = canvas.current;
+            // Sharp on retina screens and at the chosen display size (CSS zoom).
+            const ratio = (window.devicePixelRatio || 1) * ((element as HTMLElement & { currentCSSZoom?: number })?.currentCSSZoom ?? 1);
 
             if (cancelled || !element) {
                 return;

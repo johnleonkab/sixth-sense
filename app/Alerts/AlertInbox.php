@@ -2,12 +2,15 @@
 
 namespace App\Alerts;
 
+use App\Alerts\Judges\RuleRelevanceJudge;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\PlanAlertReply;
 use App\Models\ConnectedAccount;
 use App\Models\InboxItem;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The proactive path for one account of a source: find what is new, leave
@@ -16,10 +19,17 @@ use Illuminate\Support\Facades\Log;
  */
 class AlertInbox
 {
+    /** At most this many messages are judged per check; the rest wait for the next minute, within the AI's rate limit. */
+    private const MAX_JUDGED_PER_CHECK = 6;
+
+    /** A message the AI could not judge waits this long for it, then simple rules decide. */
+    private const WAIT_FOR_AI_SECONDS = 1800;
+
     public function __construct(
         private InboxWatchers $watchers,
         private NoiseFilter $noise,
         private RelevanceJudge $judge,
+        private RuleRelevanceJudge $rules,
     ) {}
 
     /**
@@ -29,9 +39,18 @@ class AlertInbox
     {
         $user = $account->user;
         $watcher = $this->watchers->for($source);
+        $waitingKey = "alerts-waiting:{$source->value}:{$account->id}";
         $alerts = [];
+        $judged = 0;
 
-        foreach ($watcher->newMessages($account) as $candidate) {
+        // Messages from earlier checks still waiting to be judged go first.
+        $queue = [
+            ...Cache::get($waitingKey, []),
+            ...array_map(fn (InboxCandidate $candidate): array => ['candidate' => $candidate, 'since' => now()->getTimestamp()], $watcher->newMessages($account)),
+        ];
+        $waiting = [];
+
+        foreach ($queue as ['candidate' => $candidate, 'since' => $since]) {
             if ($user->inboxItems()->where('source', $candidate->source)->where('external_id', $candidate->externalId)->exists()) {
                 continue;
             }
@@ -42,7 +61,28 @@ class AlertInbox
                 continue;
             }
 
-            $judgement = $this->judge->judge($user, $candidate);
+            if ($judged >= self::MAX_JUDGED_PER_CHECK) {
+                $waiting[] = ['candidate' => $candidate, 'since' => $since];
+
+                continue;
+            }
+
+            $judged++;
+
+            try {
+                $judgement = $this->judge->judge($user, $candidate);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                // The AI may answer in a minute (rate limit, overload); after a while, simple rules decide.
+                if (now()->getTimestamp() - $since < self::WAIT_FOR_AI_SECONDS) {
+                    $waiting[] = ['candidate' => $candidate, 'since' => $since];
+
+                    continue;
+                }
+
+                $judgement = $this->rules->judge($user, $candidate);
+            }
 
             if (! $judgement->important) {
                 continue;
@@ -91,6 +131,7 @@ class AlertInbox
         }
 
         // Only now: if anything above failed, the same messages are checked again next minute.
+        Cache::put($waitingKey, $waiting, now()->addDay());
         $watcher->commit($account);
 
         return $alerts;

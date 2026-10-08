@@ -183,3 +183,32 @@ test('a document the docs api can not read, and that is not a word file, does no
 
     Http::assertNotSent(fn (Request $request) => ($request['alt'] ?? null) === 'media');
 });
+
+test('open comment threads are read with their replies, oldest first', function () {
+    Http::fake(['*/comments*' => Http::response(['comments' => [
+        ['id' => 'c2', 'author' => ['displayName' => 'Pablo Gil', 'me' => false], 'content' => '¿Lo confirmas?', 'quotedFileContent' => ['value' => 'paso 5 &amp; riesgos'], 'createdTime' => '2026-10-08T09:00:00Z', 'resolved' => false,
+            'replies' => [['id' => 'r1', 'author' => ['displayName' => 'John León', 'me' => true], 'content' => 'Sí', 'createdTime' => '2026-10-08T09:10:00Z'], ['id' => 'r2', 'author' => ['displayName' => 'Pablo Gil'], 'content' => '', 'createdTime' => '2026-10-08T09:11:00Z', 'deleted' => true]]],
+        ['id' => 'c1', 'author' => ['displayName' => 'Marta Ruiz'], 'content' => 'Revisa esto', 'createdTime' => '2026-10-08T08:00:00Z'],
+        ['id' => 'c0', 'author' => ['displayName' => 'Marta Ruiz'], 'content' => 'Hecho', 'createdTime' => '2026-10-07T08:00:00Z', 'resolved' => true],
+    ]])]);
+
+    $comments = app(GoogleDocs::class)->comments($this->user, "{$this->account->id}.doc1");
+
+    expect(array_map(fn ($comment) => $comment->id, $comments))->toBe(['c1', 'c2'])
+        ->and($comments[1]->quote)->toBe('paso 5 & riesgos')
+        ->and($comments[1]->replies)->toHaveCount(1)
+        ->and($comments[1]->awaitsUser())->toBeFalse()
+        ->and($comments[0]->awaitsUser())->toBeTrue();
+
+    Http::assertSent(fn (Request $request) => str_starts_with($request->url(), 'https://www.googleapis.com/drive/v3/files/doc1/comments?') && $request['includeDeleted'] === 'false');
+});
+
+test('a reply is posted as the user, resolving the comment when asked', function () {
+    Http::fake(['*' => Http::response(['id' => 'r9'])]);
+
+    expect(app(GoogleDocs::class)->replyToComment($this->user, "{$this->account->id}.doc1", 'c2', 'Confirmado, sigue en el paso 5.', resolve: true))->toBe('r9');
+
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://www.googleapis.com/drive/v3/files/doc1/comments/c2/replies?fields=id'
+        && $request['content'] === 'Confirmado, sigue en el paso 5.'
+        && $request['action'] === 'resolve');
+});

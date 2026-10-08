@@ -3,12 +3,10 @@
 namespace App\Alerts\Replies;
 
 use App\Alerts\AlertSource;
+use App\Alerts\Judges\CallsGemini;
 use App\Models\User;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
-use Throwable;
 
 /**
  * The reply engine on Gemini Flash, with structured output.
@@ -17,10 +15,12 @@ use Throwable;
  */
 class GeminiReplyPlanner implements ReplyPlanner
 {
+    use CallsGemini;
+
     private const MAX_TEXT = 4000;
 
     /**
-     * @param  array{api_key: ?string, base_url: string, model: string, thinking_level: ?string, timeout: int}  $config
+     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
      */
     public function __construct(private array $config) {}
 
@@ -30,32 +30,26 @@ class GeminiReplyPlanner implements ReplyPlanner
             throw new RuntimeException('GEMINI_API_KEY is not set.');
         }
 
-        $response = Http::baseUrl($this->config['base_url'])
-            ->withHeaders(['x-goog-api-key' => $this->config['api_key']])
-            ->timeout($this->config['timeout'])
-            ->acceptJson()
-            ->retry(3, 2000, fn (Throwable $exception): bool => $exception instanceof RequestException
-                && in_array($exception->response->status(), [429, 500, 502, 503, 504], true), throw: false)
-            ->post("/v1beta/models/{$this->config['model']}:generateContent", [
-                'systemInstruction' => ['parts' => [['text' => $this->instructions($user, $brief)]]],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($brief)]]]],
-                'generationConfig' => array_filter([
-                    'temperature' => 0.3,
-                    'responseMimeType' => 'application/json',
-                    'responseSchema' => [
-                        'type' => 'OBJECT',
-                        'properties' => [
-                            'summary' => ['type' => 'STRING'],
-                            'reply_to' => ['type' => 'STRING', 'enum' => [...ReplyPlan::AUDIENCES, 'none']],
-                            'reply_text' => ['type' => 'STRING'],
-                            'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
-                            'question' => ['type' => 'STRING'],
-                        ],
-                        'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question'],
+        $response = $this->generate([
+            'systemInstruction' => ['parts' => [['text' => $this->instructions($user, $brief)]]],
+            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($brief)]]]],
+            'generationConfig' => array_filter([
+                'temperature' => 0.3,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'summary' => ['type' => 'STRING'],
+                        'reply_to' => ['type' => 'STRING', 'enum' => [...ReplyPlan::AUDIENCES, 'none']],
+                        'reply_text' => ['type' => 'STRING'],
+                        'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
+                        'question' => ['type' => 'STRING'],
                     ],
-                    'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-                ]),
-            ]);
+                    'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question'],
+                ],
+                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
+            ]),
+        ]);
 
         if ($response->failed()) {
             throw new RuntimeException("Gemini reply plan failed with HTTP {$response->status()}: {$response->json('error.message')}");

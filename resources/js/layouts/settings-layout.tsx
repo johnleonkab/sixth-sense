@@ -13,6 +13,7 @@ type SettingsSection = {
 const sections: SettingsSection[] = [
     { href: '/settings/connections', label: 'Conexiones' },
     { href: '/settings/alerts', label: 'Avisos' },
+    { href: '/settings/display', label: 'Pantalla' },
 ];
 
 type SettingsLayoutProps = {

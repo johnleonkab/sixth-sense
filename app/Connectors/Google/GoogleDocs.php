@@ -5,6 +5,7 @@ namespace App\Connectors\Google;
 use App\Connections\AccessTokens;
 use App\Connections\Capability;
 use App\Connectors\Docs\Document;
+use App\Connectors\Docs\DocumentComment;
 use App\Connectors\Docs\DocumentLinks;
 use App\Connectors\Docs\Documents;
 use App\Connectors\Docs\DocumentSearch;
@@ -179,6 +180,79 @@ class GoogleDocs implements Documents
 
         if ($response->failed()) {
             throw new RuntimeException('Google Drive no ha aceptado el comentario: '.($response->json('error.message') ?? "HTTP {$response->status()}"));
+        }
+
+        return (string) $response->json('id');
+    }
+
+    public function comments(User $user, string $ref): array
+    {
+        [$accountId, $id] = array_pad(explode('.', $ref, 2), 2, '');
+        $account = $user->accountsWith(Capability::DocsRead)->firstWhere('id', (int) $accountId);
+
+        // Comments live in Drive: reading them needs a Drive scope.
+        if ($account === null || $id === '' || (! $account->grants(Capability::DriveRead) && ! $account->grants(Capability::DocsComment))) {
+            return [];
+        }
+
+        try {
+            $response = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(15)
+                ->get(self::FILES_URL.'/'.rawurlencode($id).'/comments', [
+                    'pageSize' => 100,
+                    'includeDeleted' => 'false',
+                    'fields' => 'comments(id,author(displayName,me),content,quotedFileContent(value),createdTime,resolved,deleted,replies(id,author(displayName,me),content,createdTime,deleted))',
+                ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        $comments = [];
+
+        foreach ($response->json('comments', []) as $comment) {
+            if (($comment['deleted'] ?? false) || ($comment['resolved'] ?? false)) {
+                continue;
+            }
+
+            $comments[] = new DocumentComment(
+                id: $comment['id'],
+                author: $comment['author']['displayName'] ?? 'Alguien',
+                mine: (bool) ($comment['author']['me'] ?? false),
+                content: (string) ($comment['content'] ?? ''),
+                quote: filled($comment['quotedFileContent']['value'] ?? null) ? html_entity_decode($comment['quotedFileContent']['value'], ENT_QUOTES | ENT_HTML5) : null,
+                createdAt: CarbonImmutable::parse($comment['createdTime']),
+                replies: array_values(array_map(fn (array $reply): array => [
+                    'id' => $reply['id'],
+                    'author' => $reply['author']['displayName'] ?? 'Alguien',
+                    'mine' => (bool) ($reply['author']['me'] ?? false),
+                    'content' => (string) ($reply['content'] ?? ''),
+                    'created_at' => CarbonImmutable::parse($reply['createdTime']),
+                ], array_filter($comment['replies'] ?? [], fn (array $reply): bool => ! ($reply['deleted'] ?? false) && filled($reply['content'] ?? null)))),
+            );
+        }
+
+        usort($comments, fn (DocumentComment $a, DocumentComment $b): int => $a->createdAt <=> $b->createdAt);
+
+        return $comments;
+    }
+
+    public function replyToComment(User $user, string $ref, string $commentId, string $content, bool $resolve = false): string
+    {
+        [$account, $id] = $this->accountFor($user, $ref, Capability::DocsComment);
+
+        $response = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(15)
+            ->post(self::FILES_URL.'/'.rawurlencode($id).'/comments/'.rawurlencode($commentId).'/replies?fields=id', array_filter([
+                'content' => $content,
+                'action' => $resolve ? 'resolve' : null,
+            ]));
+
+        if ($response->failed()) {
+            throw new RuntimeException('Google Drive no ha aceptado la respuesta: '.($response->json('error.message') ?? "HTTP {$response->status()}"));
         }
 
         return (string) $response->json('id');

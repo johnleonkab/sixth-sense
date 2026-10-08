@@ -95,6 +95,33 @@ class FakeDocuments implements Documents
         return 'comment-'.count($this->comments);
     }
 
+    /** @var list<array{ref: string, comment_id: string, content: string, resolve: bool}> */
+    public array $replies = [];
+
+    public function comments(User $user, string $ref): array
+    {
+        if ($ref !== 'demo.'.self::PREPAGO_ID) {
+            return [];
+        }
+
+        $today = CarbonImmutable::today();
+
+        return [
+            new DocumentComment('c2', 'John León', true, 'Revisar el texto del recordatorio.', '24 horas', $today->setTime(8, 40)),
+            new DocumentComment('c1', 'Pablo Gil', false, '¿El reembolso parcial sigue en el paso 5? Riesgos lo necesita ahí.', 'reembolso parcial', $today->setTime(9, 2), replies: [
+                ['id' => 'r1', 'author' => 'Marta Ruiz', 'mine' => false, 'content' => 'Sí, no lo hemos movido.', 'created_at' => $today->setTime(9, 20)],
+                ['id' => 'r2', 'author' => 'Pablo Gil', 'mine' => false, 'content' => '@John ¿lo confirmas tú?', 'created_at' => $today->setTime(9, 31)],
+            ]),
+        ];
+    }
+
+    public function replyToComment(User $user, string $ref, string $commentId, string $content, bool $resolve = false): string
+    {
+        $this->replies[] = ['ref' => $ref, 'comment_id' => $commentId, 'content' => $content, 'resolve' => $resolve];
+
+        return 'reply-'.count($this->replies);
+    }
+
     /**
      * @param  list<array{string, string}>  $paragraphs
      * @return list<array{text: string, start: int}>

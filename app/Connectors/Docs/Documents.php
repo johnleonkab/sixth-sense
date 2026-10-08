@@ -35,4 +35,17 @@ interface Documents
      * Returns the comment's id.
      */
     public function addComment(User $user, string $ref, string $content, ?string $quote = null): string;
+
+    /**
+     * The document's open comment threads, oldest first. Empty when the
+     * account can not read comments.
+     *
+     * @return list<DocumentComment>
+     */
+    public function comments(User $user, string $ref): array;
+
+    /**
+     * Reply to a comment as the user, optionally resolving it. Returns the reply's id.
+     */
+    public function replyToComment(User $user, string $ref, string $commentId, string $content, bool $resolve = false): string;
 }

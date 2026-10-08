@@ -6,11 +6,8 @@ use App\Alerts\MeetingAdvisor;
 use App\Alerts\MeetingBriefing;
 use App\Connectors\Calendar\CalendarEvent;
 use App\Models\User;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
-use Throwable;
 
 /**
  * Gemini Flash reads the meeting (title, agenda, people, linked documents) and
@@ -18,8 +15,10 @@ use Throwable;
  */
 class GeminiMeetingAdvisor implements MeetingAdvisor
 {
+    use CallsGemini;
+
     /**
-     * @param  array{api_key: ?string, base_url: string, model: string, thinking_level: ?string, timeout: int}  $config
+     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
      */
     public function __construct(private array $config) {}
 
@@ -29,30 +28,24 @@ class GeminiMeetingAdvisor implements MeetingAdvisor
             throw new RuntimeException('GEMINI_API_KEY is not set.');
         }
 
-        $response = Http::baseUrl($this->config['base_url'])
-            ->withHeaders(['x-goog-api-key' => $this->config['api_key']])
-            ->timeout($this->config['timeout'])
-            ->acceptJson()
-            ->retry(3, 2000, fn (Throwable $exception): bool => $exception instanceof RequestException
-                && in_array($exception->response->status(), [429, 500, 502, 503, 504], true), throw: false)
-            ->post("/v1beta/models/{$this->config['model']}:generateContent", [
-                'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($event)]]]],
-                'generationConfig' => array_filter([
-                    'temperature' => 0,
-                    'responseMimeType' => 'application/json',
-                    'responseSchema' => [
-                        'type' => 'OBJECT',
-                        'properties' => [
-                            'needs_preparation' => ['type' => 'BOOLEAN'],
-                            'lead_minutes' => ['type' => 'INTEGER'],
-                            'preparation' => ['type' => 'STRING'],
-                        ],
-                        'required' => ['needs_preparation', 'lead_minutes', 'preparation'],
+        $response = $this->generate([
+            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
+            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($event)]]]],
+            'generationConfig' => array_filter([
+                'temperature' => 0,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'needs_preparation' => ['type' => 'BOOLEAN'],
+                        'lead_minutes' => ['type' => 'INTEGER'],
+                        'preparation' => ['type' => 'STRING'],
                     ],
-                    'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-                ]),
-            ]);
+                    'required' => ['needs_preparation', 'lead_minutes', 'preparation'],
+                ],
+                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
+            ]),
+        ]);
 
         if ($response->failed()) {
             throw new RuntimeException("Gemini meeting advice failed with HTTP {$response->status()}: {$response->json('error.message')}");

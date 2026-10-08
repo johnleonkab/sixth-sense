@@ -133,6 +133,8 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                     ) : (
                         <CanvasContext value={{ runTool: runFromScreen, actions }}>
                             <div
+                                // The chosen display size scales the canvases, not the voice zone.
+                                style={{ zoom: auth.user?.display_scale ?? 1 }}
                                 className={`mx-auto grid items-start gap-5 ${
                                     canvases.length > 1
                                         ? 'max-w-[1120px] md:grid-cols-2'

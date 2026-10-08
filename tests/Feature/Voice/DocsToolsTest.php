@@ -143,3 +143,34 @@ test('a word file opens to be read, and edits to it are refused', function () {
 
     expect(PendingAction::count())->toBe(0);
 });
+
+test('a document opens with its open comments, numbered, and who waits for an answer', function () {
+    runDocsTool('open_document', ['document' => $this->prd])
+        ->assertJsonPath('canvas.props.comments.0.number', 1)
+        ->assertJsonPath('canvas.props.comments.1.author', 'Pablo Gil')
+        ->assertJsonPath('canvas.props.comments.1.awaits_user', true)
+        ->assertJsonPath('output.comments.0.author', 'el usuario')
+        ->assertJsonPath('output.comments.1.on', 'reembolso parcial')
+        ->assertJsonPath('output.comments.1.replies.1', 'Pablo Gil: @John ¿lo confirmas tú?')
+        ->assertJsonPath('output.comments.1.waiting_for_user', true);
+});
+
+test('replying to a comment is a draft until confirmed, then it reaches the document', function () {
+    $proposal = runDocsTool('propose_comment_reply', ['document' => $this->prd, 'comment' => '2', 'reply' => 'Confirmado: sigue en el paso 5.', 'resolve' => true])
+        ->assertJsonPath('canvas.view', 'docs.comment')
+        ->assertJsonPath('canvas.props.in_reply_to', ['author' => 'Pablo Gil', 'content' => '@John ¿lo confirmas tú?'])
+        ->assertJsonPath('canvas.props.resolve', true)
+        ->assertJsonPath('canvas.props.action.label', 'Responder y resolver el comentario de Pablo Gil');
+
+    expect($this->documents->replies)->toBe([]);
+
+    $this->actingAs($this->user)->postJson(route('actions.confirm', $proposal->json('output.pending_action_id')))->assertOk();
+
+    expect($this->documents->replies)->toBe([['ref' => $this->prd, 'comment_id' => 'c1', 'content' => 'Confirmado: sigue en el paso 5.', 'resolve' => true]]);
+});
+
+test('replying to a comment that is not there is sent back to the assistant', function () {
+    runDocsTool('propose_comment_reply', ['document' => $this->prd, 'comment' => '7', 'reply' => 'Hola'])
+        ->assertJsonPath('canvas', null)
+        ->assertJsonPath('output.error', fn (string $error) => str_contains($error, 'No encuentro ese comentario'));
+});

@@ -15,6 +15,7 @@ use App\Voice\Tools\Calendar\ProposeEventSummary;
 use App\Voice\Tools\Calendar\ProposeNewEvent;
 use App\Voice\Tools\Calendar\ShowCalendar;
 use App\Voice\Tools\Docs\OpenDocument;
+use App\Voice\Tools\Docs\ProposeCommentReply;
 use App\Voice\Tools\Docs\ProposeDocumentComment;
 use App\Voice\Tools\Docs\ProposeDocumentEdit;
 use App\Voice\Tools\Docs\SearchDocuments;
@@ -65,6 +66,7 @@ class Toolbox
         OpenDocument::class,
         ProposeDocumentEdit::class,
         ProposeDocumentComment::class,
+        ProposeCommentReply::class,
         ShowSlackUnread::class,
         ShowSlackConversation::class,
         SearchSlackMessages::class,

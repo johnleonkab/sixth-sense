@@ -8,11 +8,8 @@ use App\Alerts\Judgement;
 use App\Alerts\RelevanceJudge;
 use App\Connectors\Mail\MailAddress;
 use App\Models\User;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
-use Throwable;
 
 /**
  * Asks Gemini Flash whether a message (an email, a Slack message) deserves an
@@ -22,10 +19,12 @@ use Throwable;
  */
 class GeminiRelevanceJudge implements RelevanceJudge
 {
+    use CallsGemini;
+
     private const MAX_EXCERPT = 2000;
 
     /**
-     * @param  array{api_key: ?string, base_url: string, model: string, thinking_level: ?string, timeout: int}  $config
+     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
      */
     public function __construct(private array $config) {}
 
@@ -35,31 +34,24 @@ class GeminiRelevanceJudge implements RelevanceJudge
             throw new RuntimeException('GEMINI_API_KEY is not set.');
         }
 
-        $response = Http::baseUrl($this->config['base_url'])
-            ->withHeaders(['x-goog-api-key' => $this->config['api_key']])
-            ->timeout($this->config['timeout'])
-            ->acceptJson()
-            // Flash is sometimes briefly overloaded: retry a couple of times before giving up.
-            ->retry(3, 2000, fn (Throwable $exception): bool => $exception instanceof RequestException
-                && in_array($exception->response->status(), [429, 500, 502, 503, 504], true), throw: false)
-            ->post("/v1beta/models/{$this->config['model']}:generateContent", [
-                'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($user, $candidate)]]]],
-                'generationConfig' => array_filter([
-                    'temperature' => 0,
-                    'responseMimeType' => 'application/json',
-                    'responseSchema' => [
-                        'type' => 'OBJECT',
-                        'properties' => [
-                            'important' => ['type' => 'BOOLEAN'],
-                            'reason' => ['type' => 'STRING'],
-                            'relevance' => ['type' => 'INTEGER'],
-                        ],
-                        'required' => ['important', 'reason', 'relevance'],
+        $response = $this->generate([
+            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
+            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($user, $candidate)]]]],
+            'generationConfig' => array_filter([
+                'temperature' => 0,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'important' => ['type' => 'BOOLEAN'],
+                        'reason' => ['type' => 'STRING'],
+                        'relevance' => ['type' => 'INTEGER'],
                     ],
-                    'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-                ]),
-            ]);
+                    'required' => ['important', 'reason', 'relevance'],
+                ],
+                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
+            ]),
+        ]);
 
         if ($response->failed()) {
             throw new RuntimeException("Gemini relevance check failed with HTTP {$response->status()}: {$response->json('error.message')}");

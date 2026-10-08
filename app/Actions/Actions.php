@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Actions\Handlers\ChangeCalendar;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
+use App\Actions\Handlers\ReplyDocumentComment;
 use App\Actions\Handlers\SendChatMessage;
 use App\Actions\Handlers\SendEmail;
 use App\Jobs\ExecutePendingAction;
@@ -31,6 +32,7 @@ class Actions
     private const HANDLERS = [
         'docs.edit' => EditDocument::class,
         'docs.comment' => CommentDocument::class,
+        'docs.reply' => ReplyDocumentComment::class,
         'mail.send' => SendEmail::class,
         'calendar.change' => ChangeCalendar::class,
         'chat.send' => SendChatMessage::class,

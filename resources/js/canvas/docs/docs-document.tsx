@@ -1,5 +1,5 @@
 import CanvasFrame from '@/canvas/canvas-frame';
-import type { Block, DocumentProps, Run } from '@/canvas/docs/types';
+import type { Block, DocumentCommentThread, DocumentProps, Run } from '@/canvas/docs/types';
 import type { CanvasComponent } from '@/canvas/types';
 
 function Runs({ runs }: { runs: Run[] }) {
@@ -125,11 +125,47 @@ function Blocks({ blocks }: { blocks: Block[] }) {
     );
 }
 
+const commentTime = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** Open comment threads beside the document, numbered for "responde al 2". */
+function Comments({ comments }: { comments: DocumentCommentThread[] }) {
+    return (
+        <aside aria-label="Comentarios" className="min-w-0 border-t border-line pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
+            <h4 className="mb-3 text-[12px] font-medium tracking-wide text-muted uppercase">Comentarios · {comments.length}</h4>
+            <ol className="space-y-3">
+                {comments.map((comment) => (
+                    <li key={comment.id} className={`rounded-xl border p-3 text-[13px] ${comment.awaits_user ? 'border-accent/50 bg-accent-soft/40' : 'border-line'}`}>
+                        <div className="mb-1 flex items-center gap-2">
+                            <span className="grid size-[18px] flex-none place-items-center rounded-full border border-line font-mono text-[10px] text-muted">{comment.number}</span>
+                            <b className="truncate font-medium">{comment.mine ? 'Tú' : comment.author}</b>
+                            <time className="ml-auto flex-none font-mono text-[10.5px] text-faint">{commentTime.format(new Date(comment.created_at))}</time>
+                        </div>
+                        {comment.quote && <p className="mb-1 line-clamp-2 border-l-2 border-hl pl-2 text-[12px] text-muted italic">«{comment.quote}»</p>}
+                        <p className="whitespace-pre-wrap">{comment.content}</p>
+                        {comment.replies.length > 0 && (
+                            <ul className="mt-2 space-y-1.5 border-l border-line pl-3">
+                                {comment.replies.map((reply) => (
+                                    <li key={reply.id}>
+                                        <b className="text-[12px] font-medium">{reply.mine ? 'Tú' : reply.author}</b>
+                                        <p className="whitespace-pre-wrap text-ink/90">{reply.content}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        {comment.awaits_user && <p className="mt-2 text-[11.5px] text-accent">Espera tu respuesta</p>}
+                    </li>
+                ))}
+            </ol>
+        </aside>
+    );
+}
+
 /**
  * A Google Doc at full width, with its basic formatting: headings, emphasis,
- * links, lists and tables. Nothing from the document is rendered as HTML.
+ * links, lists and tables, and its open comments beside it. Nothing from the
+ * document is rendered as HTML.
  */
-const DocsDocument: CanvasComponent<DocumentProps> = ({ index, ...props }) => (
+const DocsDocument: CanvasComponent<DocumentProps> = ({ index, comments = [], ...props }) => (
     <CanvasFrame
         index={index}
         title={props.title}
@@ -142,8 +178,11 @@ const DocsDocument: CanvasComponent<DocumentProps> = ({ index, ...props }) => (
             )
         }
     >
-        <div className="mx-auto max-w-[720px] pb-4 text-[15px] leading-[1.7] break-words">
-            <Blocks blocks={props.blocks} />
+        <div className={comments.length > 0 ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]' : ''}>
+            <div className="mx-auto w-full max-w-[720px] pb-4 text-[15px] leading-[1.7] break-words">
+                <Blocks blocks={props.blocks} />
+            </div>
+            {comments.length > 0 && <Comments comments={comments} />}
         </div>
     </CanvasFrame>
 );

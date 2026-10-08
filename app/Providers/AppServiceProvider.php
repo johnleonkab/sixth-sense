@@ -69,20 +69,20 @@ class AppServiceProvider extends ServiceProvider
             : $this->app->make(GoogleDocs::class));
 
         $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (config('alerts.judge')) {
-            'gemini' => new GeminiRelevanceJudge(config('alerts.judges.gemini')),
+            'gemini' => new GeminiRelevanceJudge(self::lightGemini()),
             'fake' => new FakeRelevanceJudge,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         // The reply engine is its own piece: it can become another agent without touching the alerts.
         $this->app->bind(ReplyPlanner::class, fn (): ReplyPlanner => match (config('alerts.planner')) {
-            'gemini' => new GeminiReplyPlanner(config('alerts.judges.gemini')),
+            'gemini' => new GeminiReplyPlanner([...config('alerts.judges.gemini'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
             'fake' => new FakeReplyPlanner,
             default => throw new InvalidArgumentException('Unsupported reply planner ['.config('alerts.planner').'].'),
         });
 
         $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (config('alerts.judge')) {
-            'gemini' => new GeminiMeetingAdvisor(config('alerts.judges.gemini')),
+            'gemini' => new GeminiMeetingAdvisor(self::lightGemini()),
             'fake' => new FakeMeetingAdvisor,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
@@ -92,6 +92,18 @@ class AppServiceProvider extends ServiceProvider
             'fake' => new FakeVoiceProvider,
             default => throw new InvalidArgumentException('Unsupported voice provider ['.config('voice.default').'].'),
         });
+    }
+
+    /**
+     * Gemini settings for the calls made on every new message: the light model.
+     *
+     * @return array<string, mixed>
+     */
+    private static function lightGemini(): array
+    {
+        $config = config('alerts.judges.gemini');
+
+        return [...$config, 'model' => $config['judge_model']];
     }
 
     /**

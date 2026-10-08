@@ -124,7 +124,7 @@ test('the same email never alerts twice', function () {
     Event::assertDispatchedTimes(InboxItemCreated::class, 1);
 });
 
-test('if judging fails, the cursor stays so the emails are checked again', function () {
+test('if the ai judge can not answer, the email waits for it, and after a while simple rules decide', function () {
     $this->app->instance(RelevanceJudge::class, new class implements RelevanceJudge
     {
         public function judge(User $user, InboxCandidate $candidate): Judgement
@@ -134,8 +134,27 @@ test('if judging fails, the cursor stays so the emails are checked again', funct
     });
     fakeGmailHistory([incoming('m1')]);
 
-    expect(fn () => app(AlertInbox::class)->check($this->account))->toThrow(RuntimeException::class);
-    expect($this->account->refresh()->watch_cursor)->toBe('100');
+    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+        ->and($this->account->refresh()->watch_cursor)->toBe('200');
+
+    fakeGmailHistory([], newHistoryId: '201');
+    $this->travel(31)->minutes();
+    $alerts = app(AlertInbox::class)->check($this->account);
+
+    expect($alerts)->toHaveCount(1)
+        ->and($alerts[0]->why)->toBe('Andrés Vela te pide algo: «Contrato: necesito la firma antes del viernes»')
+        ->and($alerts[0]->relevance)->toBe(50);
+});
+
+test('a burst is judged a few at a time, the rest in the next checks', function () {
+    fakeGmailHistory(array_map(fn (int $n) => incoming("m{$n}", ['subject' => "Necesito la firma {$n}"]), range(1, 8)));
+
+    expect(app(AlertInbox::class)->check($this->account))->toHaveCount(6);
+
+    fakeGmailHistory([], newHistoryId: '201');
+
+    expect(app(AlertInbox::class)->check($this->account))->toHaveCount(2)
+        ->and($this->judge->judged)->toHaveCount(8);
 });
 
 test('when gmail forgot the old point in history it starts again from now', function () {

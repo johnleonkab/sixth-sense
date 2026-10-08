@@ -73,3 +73,19 @@ test('a failed or malformed answer is an error, so the email is retried', functi
     'server error' => fn () => Http::response(['error' => ['message' => 'overloaded']], 503),
     'not json' => fn () => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'no sé']]]]]]),
 ])->throws(RuntimeException::class);
+
+test('a model out of quota hands over to the fallback model', function () {
+    Http::fake([
+        '*/models/gemini-3.5-flash-lite:*' => Http::response(['error' => ['message' => 'You exceeded your current quota']], 429),
+        '*/models/gemini-flash-lite-latest:*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => '{"important":true,"reason":"Firma antes del viernes.","relevance":80}']]]]]]),
+    ]);
+
+    $judge = new GeminiRelevanceJudge([
+        'api_key' => 'test-key', 'base_url' => 'https://generativelanguage.googleapis.com',
+        'model' => 'gemini-3.5-flash-lite', 'fallback_model' => 'gemini-flash-lite-latest', 'thinking_level' => 'low', 'timeout' => 10,
+    ]);
+
+    expect($judge->judge(User::factory()->make(), candidate())->reason)->toBe('Firma antes del viernes.');
+
+    Http::assertSentCount(2);
+});
