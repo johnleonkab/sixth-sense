@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" role="img" aria-label="Sixth Sense">
+  <title>Sixth Sense</title>
+  <rect width="64" height="64" rx="14" fill="#141515"/>
+  <g transform="translate(11.94 12)">
+  <rect x="0.50" y="15.00" width="3.75" height="10.00" rx="1.88" fill="#FFFFFF"/>
+  <rect x="7.12" y="11.25" width="3.75" height="17.50" rx="1.88" fill="#FFFFFF"/>
+  <rect x="13.75" y="7.50" width="3.75" height="25.00" rx="1.88" fill="#FFFFFF"/>
+  <rect x="20.38" y="12.50" width="3.75" height="15.00" rx="1.88" fill="#FFFFFF"/>
+  <rect x="27.00" y="10.00" width="3.75" height="20.00" rx="1.88" fill="#FFFFFF"/>
+  <circle cx="36.88" cy="20.00" r="3.25" fill="#8EA6FF"/>
+  </g>
+</svg>

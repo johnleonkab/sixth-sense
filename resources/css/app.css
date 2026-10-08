@@ -1,9 +1,261 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+@source '../js';
+@source '../views';
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+/*
+ * Design tokens from docs/prototype.html: one typeface, one accent colour,
+ * light and dark themes. `data-theme` on <html> forces a theme.
+ */
+:root {
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --soft: #f3f3f1;
+    --ink: #141515;
+    --muted: #8b8f8d;
+    --faint: #b9bcba;
+    --line: #eaeae7;
+    --accent: #2e56e6;
+    --accent-soft: #edf1fe;
+    --accent-ink: #ffffff;
+    --ok: #1f8150;
+    --crit: #c42b3d;
+    --crit-soft: #fceef0;
+    --warn: #a8601b;
+    --warn-soft: #fbf1e6;
+    --hl: #fff0a6;
+    --c-slack: #7a55d3;
+    --c-gmail: #cf4a3a;
+    --c-jira: #2e6be6;
+    --c-notion: #3f4341;
+    --shadow: 0 2px 6px rgba(20, 22, 21, 0.05), 0 12px 32px rgba(20, 22, 21, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --bg: #0f1010;
+        --surface: #161717;
+        --soft: #1d1e1e;
+        --ink: #ededeb;
+        --muted: #8c908e;
+        --faint: #5a5e5c;
+        --line: #262827;
+        --accent: #8ea6ff;
+        --accent-soft: #1c2340;
+        --accent-ink: #0f1010;
+        --ok: #6bd39c;
+        --crit: #f2899a;
+        --crit-soft: #35191e;
+        --warn: #eba868;
+        --warn-soft: #33251a;
+        --hl: #4e4515;
+        --c-slack: #b59bff;
+        --c-gmail: #ff8f80;
+        --c-jira: #86a9ff;
+        --c-notion: #c9ccca;
+        --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.4);
+        color-scheme: dark;
+    }
+}
+
+:root[data-theme='dark'] {
+    --bg: #0f1010;
+    --surface: #161717;
+    --soft: #1d1e1e;
+    --ink: #ededeb;
+    --muted: #8c908e;
+    --faint: #5a5e5c;
+    --line: #262827;
+    --accent: #8ea6ff;
+    --accent-soft: #1c2340;
+    --accent-ink: #0f1010;
+    --ok: #6bd39c;
+    --crit: #f2899a;
+    --crit-soft: #35191e;
+    --warn: #eba868;
+    --warn-soft: #33251a;
+    --hl: #4e4515;
+    --c-slack: #b59bff;
+    --c-gmail: #ff8f80;
+    --c-jira: #86a9ff;
+    --c-notion: #c9ccca;
+    --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+}
+
+@theme inline {
+    --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --color-bg: var(--bg);
+    --color-surface: var(--surface);
+    --color-soft: var(--soft);
+    --color-ink: var(--ink);
+    --color-muted: var(--muted);
+    --color-faint: var(--faint);
+    --color-line: var(--line);
+    --color-accent: var(--accent);
+    --color-accent-soft: var(--accent-soft);
+    --color-accent-ink: var(--accent-ink);
+    --color-ok: var(--ok);
+    --color-crit: var(--crit);
+    --color-crit-soft: var(--crit-soft);
+    --color-warn: var(--warn);
+    --color-warn-soft: var(--warn-soft);
+    --color-hl: var(--hl);
+    --color-slack: var(--c-slack);
+    --color-gmail: var(--c-gmail);
+    --color-jira: var(--c-jira);
+    --color-notion: var(--c-notion);
+
+    --shadow-card: var(--shadow);
+}
+
+@layer base {
+    html,
+    body,
+    #app {
+        height: 100%;
+    }
+
+    body {
+        @apply bg-bg font-sans text-[14px] leading-normal text-ink antialiased;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+}
+
+/* Voice orb from docs/prototype.html: seven bars that idle, listen, speak or wait. */
+@layer components {
+    .orb {
+        @apply flex h-[26px] items-center justify-center gap-1;
+    }
+
+    .orb span {
+        @apply h-1 w-[3px] rounded-[2px] bg-faint;
+    }
+
+    .orb[data-status='listening'] span {
+        background: var(--accent);
+        animation: orb-wave 0.7s ease-in-out infinite;
+    }
+
+    .orb[data-status='speaking'] span {
+        background: var(--ink);
+        animation: orb-wave 1s ease-in-out infinite;
+    }
+
+    .orb[data-status='connecting'] span {
+        background: var(--muted);
+        animation: orb-pulse 1s ease-in-out infinite;
+    }
+
+    .orb span:nth-child(2) {
+        animation-delay: 0.1s;
+    }
+    .orb span:nth-child(3) {
+        animation-delay: 0.2s;
+    }
+    .orb span:nth-child(4) {
+        animation-delay: 0.3s;
+    }
+    .orb span:nth-child(5) {
+        animation-delay: 0.4s;
+    }
+    .orb span:nth-child(6) {
+        animation-delay: 0.5s;
+    }
+    .orb span:nth-child(7) {
+        animation-delay: 0.6s;
+    }
+
+    .caret {
+        @apply ml-0.5 inline-block h-[15px] w-[1.5px] bg-accent align-[-2px];
+        animation: orb-pulse 0.8s infinite;
+    }
+
+    .listen-dot i {
+        background: var(--faint);
+    }
+
+    .listen-dot[aria-pressed='true'] i {
+        background: var(--accent);
+        animation: breathe 2.4s ease-in-out infinite;
+    }
+}
+
+@keyframes orb-wave {
+    0%,
+    100% {
+        height: 4px;
+    }
+    50% {
+        height: 22px;
+    }
+}
+
+@keyframes orb-pulse {
+    0%,
+    100% {
+        opacity: 0.25;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+@keyframes breathe {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 6px transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Canvases enter as in the prototype; the orb waits while a tool runs. */
+@layer components {
+    .canvas-in {
+        animation: canvas-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .canvas-in:nth-child(2) {
+        animation-delay: 0.06s;
+    }
+
+    .orb[data-status='thinking'] span {
+        background: var(--muted);
+        animation: orb-pulse 1s ease-in-out infinite;
+    }
+}
+
+@keyframes canvas-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+
+@layer components {
+    .alert-in {
+        animation: alert-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+}
+
+@keyframes alert-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
 }

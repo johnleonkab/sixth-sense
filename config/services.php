@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL').'/settings/connections/google/callback'),
+    ],
+
+    'slack' => [
+        'client_id' => env('SLACK_CLIENT_ID'),
+        'client_secret' => env('SLACK_CLIENT_SECRET'),
+        // Slack may require HTTPS: point this at a tunnel (e.g. cloudflared) if localhost is refused.
+        'redirect' => env('SLACK_REDIRECT_URI', env('APP_URL').'/settings/connections/slack/callback'),
+    ],
+
 ];

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Sixth Sense">
+  <title>Sixth Sense</title>
+  <rect width="32" height="32" rx="7" fill="#141515"/>
+  <rect x="5" y="11.5" width="4" height="9" rx="2" fill="#FFFFFF"/>
+  <rect x="11.5" y="7" width="4" height="18" rx="2" fill="#FFFFFF"/>
+  <rect x="18" y="10" width="4" height="12" rx="2" fill="#FFFFFF"/>
+  <circle cx="26" cy="16" r="2.6" fill="#8EA6FF"/>
+</svg>

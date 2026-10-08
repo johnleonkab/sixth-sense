@@ -1,0 +1,58 @@
+name: sixth-sense
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: docker/php/Dockerfile
+            args:
+                UID: '${HOST_UID:-1000}'
+                GID: '${HOST_GID:-1000}'
+        ports:
+            - '${APP_PORT:-8000}:8000'
+        environment:
+            DB_HOST: pgsql
+            DB_PORT: 5432
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            REVERB_HOST: host.docker.internal
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        volumes:
+            - .:/var/www/html
+        depends_on:
+            pgsql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+
+    pgsql:
+        image: postgres:18-alpine
+        environment:
+            POSTGRES_DB: sixth_sense
+            POSTGRES_USER: sixth_sense
+            POSTGRES_PASSWORD: secret
+        ports:
+            - '${FORWARD_DB_PORT:-5433}:5432'
+        volumes:
+            - sixth-sense-pgsql:/var/lib/postgresql
+            - ./docker/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql
+        healthcheck:
+            test: ['CMD', 'pg_isready', '-q', '-d', 'sixth_sense', '-U', 'sixth_sense']
+            interval: 5s
+            retries: 5
+
+    redis:
+        image: redis:8-alpine
+        ports:
+            - '${FORWARD_REDIS_PORT:-6380}:6379'
+        volumes:
+            - sixth-sense-redis:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            retries: 5
+
+volumes:
+    sixth-sense-pgsql:
+    sixth-sense-redis:
