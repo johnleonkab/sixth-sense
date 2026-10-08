@@ -1,58 +1,167 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/brand/logo-dark.svg">
+    <img src="public/brand/logo.svg" alt="Sixth Sense" width="360">
+  </picture>
 </p>
 
-## About Laravel
+<p align="center">
+  <b>Tu jornada de trabajo, hablando.</b><br>
+  Hablas; la IA te responde con voz y, a la vez, pone en pantalla justo lo que hace falta.
+</p>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white" alt="PHP 8.5">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/Inertia-3-9553E9" alt="Inertia 3">
+  <img src="https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind 4">
+  <img src="https://img.shields.io/badge/Gemini_Live-voz-4285F4?logo=googlegemini&logoColor=white" alt="Gemini Live">
+  <img src="https://img.shields.io/badge/tests-Pest-F28D1A" alt="Pest">
+</p>
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Sixth Sense no es un dashboard ni un chatbot con voz. Es una **pantalla compartida**: lo que se dice y lo que se ve se refieren a lo mismo. Le pides «enséñame mañana», «abre el email de Marta», «contesta a este» o «pasa a la página 3», y la IA habla y muestra el calendario, el email, el hilo de Slack o el PDF del que estáis hablando.
 
-## Learning Laravel
+Conecta con **Google Calendar, Gmail, Google Docs, Google Drive y Slack**, con todas las cuentas que quieras de cada uno.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Qué se le puede pedir
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+> «¿Qué tengo hoy?» · «Busca el email donde Andrés habla del contrato» · «Contéstale a todos que lo reviso antes de las 12» · «Muévela al jueves e invita a Pablo» · «Abre el documento que me ha pasado Marta por Slack» · «Léeme la segunda página» · «¿Qué tengo pendiente de responder?» · «Dime»
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| | Leer y mostrar | Cambiar (siempre con tu «sí») |
+|---|---|---|
+| **Calendar** | Día y agenda de todos tus calendarios; buscar eventos | Crear reuniones con Meet, invitar, añadir resumen, cancelar, aceptar o rechazar |
+| **Gmail** | Búsqueda con expresiones regulares («donde X dice Y»), resultados y detalle, adjuntos | Redactar, responder (a uno o a todos) y reenviar |
+| **Docs y Drive** | Buscar, abrir con formato, abrir los enlazados desde emails, eventos o Slack, archivos de Word | Proponer ediciones y comentarios |
+| **Slack** | Personas, canales y DMs, no leídos importantes, hilos, archivos | Mensajes en conversaciones o hilos, con menciones |
+| **Archivos** | Visor de PDF (páginas, zoom, leer en voz alta) e imágenes | — |
 
-## Agentic Development
+## Proactiva, con criterio
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Sixth Sense vigila **Gmail y Slack** y solo te interrumpe cuando algo **espera tu respuesta**:
 
-```bash
-composer require laravel/boost --dev
+1. **Detecta**: los mensajes nuevos pasan primero por unas reglas baratas (newsletters, bots, tus propios mensajes) y después por un juez de IA que decide si te toca responder y **por qué**.
+2. **Te avisa** con un sonido propio de cada fuente y una nota breve. La alerta queda **pendiente** hasta que respondes, aunque recargues.
+3. **Propone**: un motor de respuestas independiente piensa cómo resolverla. Por ejemplo: «Responder a todos que no llegamos y proponer el jueves», con borrador y otras acciones como crear el evento.
+4. **La revisas hablando**: dices «dime», cambias lo que quieras y la IA prepara cada acción para que la confirmes.
+5. **Se cierra sola** cuando respondes, ya sea desde aquí o desde Gmail o Slack.
 
-php artisan boost:install
+También avisa antes de cada **reunión**: hasta 30 minutos antes si hay que preparar algo, y un par de minutos antes si no.
+
+## Principios
+
+- **Voz primero.** Todo se puede hacer hablando. El teclado es solo una alternativa: haz clic en la línea de tu voz para escribir.
+- **La pantalla es lo que hablas.** El agente decide qué mostrar, con un máximo de dos columnas.
+- **Solo dos líneas de texto**: lo que dices y lo que responde. No hay historial de chat.
+- **Leer es libre; escribir siempre pide un «sí».** Todo cambio se muestra antes como borrador y, una vez confirmado, tienes 8 segundos para deshacerlo.
+- **Multicuenta desde el principio.** Puedes conectar varias cuentas de Google o de Slack, y las lecturas las juntan.
+- **Diseño limpio.** Una tipografía, un color de acento, modo claro y oscuro.
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    subgraph Navegador
+        Mic([Micrófono]) --> Live[Gemini Live<br/>voz a voz]
+        Live --> Voice[Sesión de voz]
+        Voice -- tool calls --> Tools
+        Canvas[Lienzo<br/>canvases React]
+        Alerts[Avisos]
+    end
+
+    subgraph Laravel
+        Tools[POST /voice/tools] --> Toolbox
+        Toolbox --> Connectors[(Conectores<br/>Google · Slack)]
+        Toolbox -- escritura --> Pending[PendingAction<br/>«sí» + deshacer]
+        Watchers[Watchers<br/>Gmail · Slack] --> Judge[Juez IA] --> Inbox[(Alertas)]
+        Inbox --> Planner[Motor de respuestas]
+    end
+
+    Tools -- output + canvas --> Canvas
+    Inbox -- Reverb --> Alerts
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+- **Laravel nunca toca el audio.** El navegador habla directamente con el proveedor de voz usando un token efímero que emite Laravel.
+- **Proveedor de voz intercambiable**, detrás de `VoiceProvider` (PHP) y `VoiceTransport` (TS). Hoy es Gemini Live.
+- **Herramientas declaradas una sola vez** en `app/Voice/Tools` y traducidas al formato de cada proveedor. Cada una devuelve `output` para el modelo y, si procede, un **canvas**: una vista preconfigurada que el frontend sabe pintar (`calendar.day`, `mail.message`, `pdf.viewer`, `alerts.review`…).
+- **Toda la lógica de un servicio vive en su conector** (`app/Connectors`), cada uno con un `Fake` para los tests y para el **modo demo**.
+- **Motor de respuestas aislado** tras `ReplyPlanner`. Hoy usa Gemini Flash; se puede sustituir por otro agente con acceso a tu base de conocimiento.
 
-## Contributing
+## Puesta en marcha
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Requisitos:** PHP 8.5, Composer, Node y Docker.
 
-## Code of Conduct
+```bash
+git clone git@github.com:johnleonkab/sixth-sense.git && cd sixth-sense
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+cp .env.example .env
+composer install
+npm install
+php artisan key:generate
 
-## Security Vulnerabilities
+docker compose up -d          # app en :8000, Postgres en :5433, Redis en :6380
+php artisan migrate
+php artisan app:create-user   # te pide nombre, email y contraseña
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+composer dev                  # Horizon, Reverb, scheduler, logs y Vite
+```
 
-## License
+Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+> **Sin cuentas conectadas:** con `CONNECTORS_DEMO=true` todo funciona con los datos de ejemplo del prototipo (`docs/prototype.html`).
+
+### Configuración
+
+| Variable | Para qué |
+|---|---|
+| `GEMINI_API_KEY` | Voz (Gemini Live), juez de alertas y motor de respuestas. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
+| `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE` | Modelo y voz de la conversación. |
+| `ALERTS_GEMINI_MODEL` | Modelo del juez y del motor de respuestas. El nivel gratuito de Flash tiene un límite diario bajo. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Cliente OAuth web de Google Cloud, con las APIs de Calendar, Gmail, Docs y Drive activadas. |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | App de Slack con *user token scopes*. La redirección debe ser HTTPS, así que en local se usa un túnel. |
+| `CONNECTORS_DEMO` | `true` para usar datos de ejemplo en lugar de las cuentas reales. |
+
+Las cuentas se conectan desde **Configuración → Conexiones**, y los avisos se activan por fuente en **Configuración → Notificaciones**.
+
+### Comandos útiles
+
+```bash
+php artisan alerts:watch                 # comprueba Gmail y Slack ahora (el scheduler lo hace cada minuto)
+php artisan alerts:check-replies         # resuelve las alertas que ya has respondido
+php artisan alerts:test tu@email.com     # lanza una alerta de prueba en tu propio DM de Slack
+php artisan chats:warm                   # precarga personas y canales de Slack
+```
+
+## Tests
+
+```bash
+php artisan test --compact
+```
+
+Hay tests de Pest para cada herramienta, conector, alerta y acción. Ninguno llama a servicios reales: todos usan `Http::fake()` o el `Fake` del conector.
+
+## Estructura
+
+```
+app/
+├── Actions/        Cambios pendientes de confirmar: «sí», «cancela», «deshaz»
+├── Alerts/         Watchers, juez, motor de respuestas, recordatorios de reuniones
+├── Connections/    Cuentas conectadas, OAuth, capacidades y tokens
+├── Connectors/     Google (Calendar, Gmail, Docs, Drive) y Slack, con sus Fakes
+└── Voice/          Proveedor de voz, perfil del asistente y herramientas
+resources/js/
+├── canvas/         Una vista por tipo de contenido (calendario, email, Slack, PDF…)
+├── voice/          Sesión de voz, transporte, memoria y audio
+└── alerts/         Avisos en tiempo real y sonidos (Web Audio)
+```
+
+## Próximamente
+
+- Jira y Notion.
+- Dos columnas de contenido a la vez.
+- Que la IA pueda ver las imágenes que se le muestran.
+- Un motor de respuestas con acceso a la base de conocimiento.
+
+<p align="center"><sub>Hecho con voz, Laravel y mucho espacio en blanco.</sub></p>
