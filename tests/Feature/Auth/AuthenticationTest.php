@@ -4,7 +4,7 @@ use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected to the login screen', function () {
-    $this->get(route('home'))->assertRedirect(route('login'));
+    $this->get(route('settings.connections.index'))->assertRedirect(route('login'));
 });
 
 test('the login screen can be rendered', function () {

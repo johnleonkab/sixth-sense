@@ -24,8 +24,10 @@ Route::middleware('guest')->group(function () {
         ->name('register.store');
 });
 
+// Public: the landing for visitors, the assistant once signed in.
+Route::get('/', HomeController::class)->name('home');
+
 Route::middleware('auth')->group(function () {
-    Route::get('/', HomeController::class)->name('home');
     Route::post('voice/sessions', VoiceSessionController::class)
         ->middleware('throttle:10,1')
         ->name('voice.sessions.store');

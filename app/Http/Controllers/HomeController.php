@@ -11,11 +11,19 @@ use Inertia\Response;
 class HomeController extends Controller
 {
     /**
-     * The assistant. Opening it gets the chat workspaces ready, so the first
-     * names said in the conversation are already known.
+     * The landing for visitors; the assistant once signed in. Opening the
+     * assistant gets the chat workspaces ready, so the first names said in
+     * the conversation are already known.
      */
     public function __invoke(Request $request): Response
     {
+        if ($request->user() === null) {
+            return Inertia::render('landing', [
+                'canRegister' => (bool) config('auth.registration'),
+                'repositoryUrl' => config('app.repository_url'),
+            ]);
+        }
+
         WarmChats::dispatch($request->user());
 
         return Inertia::render('home', [
