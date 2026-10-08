@@ -35,7 +35,7 @@ class ConnectionController extends Controller
                     'id' => $account->id,
                     'name' => $account->name,
                     'email' => $account->email,
-                    'workspace' => $account->metadata['team_name'] ?? null,
+                    'workspace' => $account->metadata['team_name'] ?? $account->metadata['workspace_name'] ?? null,
                     'avatar_url' => $account->avatar_url,
                     'status' => $account->status->value,
                     'missing_scopes' => count($account->missingScopes()),

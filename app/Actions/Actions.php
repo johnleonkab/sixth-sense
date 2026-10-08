@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Actions\Handlers\ChangeCalendar;
+use App\Actions\Handlers\ChangeWiki;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
 use App\Actions\Handlers\ReplyDocumentComment;
@@ -36,6 +37,9 @@ class Actions
         'mail.send' => SendEmail::class,
         'calendar.change' => ChangeCalendar::class,
         'chat.send' => SendChatMessage::class,
+        'notion.create' => ChangeWiki::class,
+        'notion.edit' => ChangeWiki::class,
+        'notion.comment' => ChangeWiki::class,
     ];
 
     public function __construct(private Container $container) {}

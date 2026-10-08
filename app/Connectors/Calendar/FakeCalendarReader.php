@@ -4,6 +4,7 @@ namespace App\Connectors\Calendar;
 
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 /**
  * Sample day from docs/prototype.html, for tests and demo mode.
@@ -33,7 +34,7 @@ class FakeCalendarReader implements CalendarReader
                     allDay: false,
                     account: 'demo@sixth-sense.test',
                     calendar: 'demo@sixth-sense.test',
-                    attendees: array_map(fn (string $name): array => ['name' => $name, 'email' => null, 'response' => 'accepted'], $attendees),
+                    attendees: array_map(fn (string $name): array => ['name' => $name, 'email' => Str::lower(Str::ascii(strtok($name, ' '))).'@covermanager.test', 'response' => 'accepted'], $attendees),
                     ref: 'demo:primary:'.$day->format('Ymd').'-'.$index,
                     description: null,
                     isOrganizer: in_array($index, [2, 3], true),

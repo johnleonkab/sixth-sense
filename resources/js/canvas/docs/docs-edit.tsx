@@ -13,9 +13,9 @@ const DocsEdit: CanvasComponent<DocumentEditProps> = ({ index, ...props }) => {
     const count = props.changes.length === 1 ? 'un cambio' : `${props.changes.length} cambios`;
 
     return (
-        <CanvasFrame index={index} title={props.action.label} source={`Docs · ${props.title}`}>
+        <CanvasFrame index={index} title={props.action.label} source={`${props.source ?? 'Docs'} · ${props.title}`}>
             <p className="-mt-1 mb-4 text-[12.5px] text-muted">
-                {status === 'executed' ? `${count[0].toUpperCase()}${count.slice(1)} aplicado en el documento` : `Borrador de ${count} · aún no se ha tocado el documento`}
+                {status === 'executed' ? `${count[0].toUpperCase()}${count.slice(1)} aplicado` : `Borrador de ${count} · aún no se ha tocado nada`}
             </p>
 
             <ol className="flex flex-col gap-3">
@@ -31,7 +31,7 @@ const DocsEdit: CanvasComponent<DocumentEditProps> = ({ index, ...props }) => {
                 ))}
             </ol>
 
-            <ActionBar initial={props.action} doneLabel="Cambio aplicado en el documento" />
+            <ActionBar initial={props.action} doneLabel={props.source === 'Notion' ? 'Cambio aplicado en Notion' : 'Cambio aplicado en el documento'} />
         </CanvasFrame>
     );
 };

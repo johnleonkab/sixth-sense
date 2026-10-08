@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -90,6 +91,16 @@ class User extends Authenticatable
     public function wantsAlertsFrom(AlertSource $source): bool
     {
         return (bool) $this->alertSettings()->where('source', $source)->value('enabled');
+    }
+
+    /**
+     * What the user is working on lately, when they want the assistant to know.
+     *
+     * @return HasOne<WorkContext, $this>
+     */
+    public function workContext(): HasOne
+    {
+        return $this->hasOne(WorkContext::class);
     }
 
     /**

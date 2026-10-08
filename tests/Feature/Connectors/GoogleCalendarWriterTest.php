@@ -1,6 +1,7 @@
 <?php
 
 use App\Connections\Capability;
+use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Google\GoogleCalendarReader;
 use App\Connectors\Google\GoogleCalendarWriter;
@@ -120,4 +121,24 @@ test('nothing changes without the calendar permission', function () {
     expect(app(GoogleCalendarWriter::class)->canChange($this->user, $this->ref))->toBeFalse();
     expect(fn () => app(GoogleCalendarWriter::class)->cancel($this->user, $this->ref))->toThrow(RuntimeException::class);
     Http::assertNothingSent();
+});
+
+test('a change patches only what changes, on the version that was read, keeping its timezone', function () {
+    Http::fake(fn (Request $request) => $request->method() === 'GET' ? Http::response(existingEvent(['start' => ['dateTime' => '2026-10-08T13:00:00+02:00', 'timeZone' => 'Europe/Madrid']])) : Http::response(['id' => 'ev1']));
+
+    app(GoogleCalendarWriter::class)->update($this->user, $this->ref, new EventUpdate(
+        start: CarbonImmutable::parse('2026-10-09 12:00', 'Europe/Madrid'),
+        end: CarbonImmutable::parse('2026-10-09 13:00', 'Europe/Madrid'),
+        removeAttendees: ['pablo@work.com'],
+        notify: false,
+    ));
+
+    Http::assertSent(fn (Request $request) => $request->method() === 'PATCH'
+        && str_ends_with($request->url(), '/events/ev1?sendUpdates=none')
+        && $request->header('If-Match')[0] === '"etag-1"'
+        && $request->data() === [
+            'start' => ['dateTime' => '2026-10-09T12:00:00+02:00', 'timeZone' => 'Europe/Madrid'],
+            'end' => ['dateTime' => '2026-10-09T13:00:00+02:00', 'timeZone' => 'Europe/Madrid'],
+            'attendees' => [['email' => 'jhon@work.com', 'self' => true, 'organizer' => true, 'responseStatus' => 'accepted']],
+        ]);
 });

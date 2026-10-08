@@ -6,10 +6,12 @@ use App\Connections\AccessTokens;
 use App\Connections\Capability;
 use App\Connectors\Calendar\CalendarAccount;
 use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -87,6 +89,33 @@ class GoogleCalendarWriter implements CalendarWriter
         $this->ensureOk($response, 'crear la reunión');
 
         return $response->json('htmlLink');
+    }
+
+    public function update(User $user, string $ref, EventUpdate $changes): void
+    {
+        [$http, $url] = $this->eventRequest($user, $ref);
+        [$event, $etag] = $this->current($http, $url);
+
+        // Keep the event's own timezone when it has one.
+        $time = fn (CarbonImmutable $moment): array => ['dateTime' => $moment->toIso8601String(), 'timeZone' => $event['start']['timeZone'] ?? $moment->getTimezone()->getName()];
+        $removed = array_map('strtolower', $changes->removeAttendees);
+
+        $patch = array_filter([
+            'summary' => $changes->title,
+            'location' => $changes->location,
+            'description' => $changes->description,
+            'start' => $changes->start ? $time($changes->start) : null,
+            'end' => $changes->end ? $time($changes->end) : null,
+            'attendees' => $removed === [] ? null : array_values(array_filter(
+                $event['attendees'] ?? [],
+                fn (array $attendee): bool => ! in_array(strtolower($attendee['email'] ?? ''), $removed, true),
+            )),
+        ], fn (mixed $value): bool => $value !== null);
+
+        $this->ensureOk(
+            $http->withHeaders(['If-Match' => $etag])->patch($url.'?sendUpdates='.($changes->notify ? 'all' : 'none'), $patch),
+            'cambiar la reunión',
+        );
     }
 
     public function cancel(User $user, string $ref): void

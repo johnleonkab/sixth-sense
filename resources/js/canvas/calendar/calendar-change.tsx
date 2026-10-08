@@ -23,7 +23,7 @@ type EventCard = {
 
 type CalendarChangeProps = {
     action: ActionState;
-    kind: 'invite' | 'summary' | 'create' | 'cancel' | 'respond';
+    kind: 'invite' | 'summary' | 'create' | 'cancel' | 'respond' | 'update';
     event: EventCard | null;
     new_people?: Person[];
     heading?: string;
@@ -36,6 +36,10 @@ type CalendarChangeProps = {
     response_label?: string;
     previous_response?: string | null;
     comment?: string | null;
+    /** For updates: each field that changes, before and after, and the event as it will be. */
+    changes?: { label: string; before: string | null; after: string }[];
+    updated_event?: EventCard;
+    notify?: boolean;
 };
 
 const kindLabel: Record<CalendarChangeProps['kind'], string> = {
@@ -44,6 +48,7 @@ const kindLabel: Record<CalendarChangeProps['kind'], string> = {
     create: 'Reunión nueva',
     cancel: 'Cancelación',
     respond: 'Respuesta',
+    update: 'Cambio',
 };
 
 const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -113,7 +118,7 @@ function Card({ event, struck = false, highlighted = false, children }: { event:
 const CalendarChange: CanvasComponent<CalendarChangeProps> = ({ index, ...props }) => {
     const status = useCanvas().actions.actions[props.action.id]?.status ?? props.action.status;
     const done = status === 'executed';
-    const verb = { invite: 'invitar', summary: 'añadir', create: 'convocar', cancel: 'cancelarla', respond: 'responder' }[props.kind];
+    const verb = { invite: 'invitar', summary: 'añadir', create: 'convocar', cancel: 'cancelarla', respond: 'responder', update: 'cambiarla' }[props.kind];
 
     return (
         <CanvasFrame index={index} title={props.action.label} source={`Calendar · ${kindLabel[props.kind]}`}>
@@ -124,6 +129,30 @@ const CalendarChange: CanvasComponent<CalendarChangeProps> = ({ index, ...props 
                     <Card event={props.new_event} highlighted>
                         {props.new_event.description && <p className="mt-2.5 text-[13px] whitespace-pre-wrap">{props.new_event.description}</p>}
                     </Card>
+                    {props.conflicts && props.conflicts.length > 0 && (
+                        <div className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
+                            Choca con{' '}
+                            {props.conflicts.map((conflict) => `«${conflict.title}» (${timeOf(conflict.start)}–${timeOf(conflict.end)})`).join(', ')}.
+                        </div>
+                    )}
+                </>
+            )}
+
+            {props.kind === 'update' && props.updated_event && (
+                <>
+                    <Card event={props.updated_event} highlighted />
+                    <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
+                        {props.changes?.map((change) => (
+                            <div key={change.label} className="contents">
+                                <dt className="text-muted">{change.label}</dt>
+                                <dd className="min-w-0">
+                                    {change.before && <span className="mr-1.5 text-faint line-through">{change.before}</span>}
+                                    <span className="font-medium">{change.after}</span>
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className="mt-2.5 text-[12px] text-muted">{props.notify ? 'Se avisará a los invitados del cambio.' : 'No se avisará a los invitados.'}</p>
                     {props.conflicts && props.conflicts.length > 0 && (
                         <div className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
                             Choca con{' '}
@@ -183,7 +212,7 @@ const CalendarChange: CanvasComponent<CalendarChangeProps> = ({ index, ...props 
 
             <ActionBar
                 initial={props.action}
-                doneLabel={{ invite: 'Invitaciones enviadas', summary: 'Resumen añadido', create: 'Reunión convocada', cancel: 'Reunión cancelada', respond: 'Respuesta enviada' }[props.kind]}
+                doneLabel={{ invite: 'Invitaciones enviadas', summary: 'Resumen añadido', create: 'Reunión convocada', cancel: 'Reunión cancelada', respond: 'Respuesta enviada', update: 'Reunión cambiada' }[props.kind]}
                 linkLabel="Abrir en Calendar"
                 verb={verb}
                 countdownLabel="Se hará"

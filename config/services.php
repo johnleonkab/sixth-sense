@@ -48,4 +48,11 @@ return [
         'redirect' => env('SLACK_REDIRECT_URI', env('APP_URL').'/settings/connections/slack/callback'),
     ],
 
+    'notion' => [
+        'client_id' => env('NOTION_CLIENT_ID'),
+        'client_secret' => env('NOTION_CLIENT_SECRET'),
+        // Must match a redirect URI of the public connection in Notion's developer portal.
+        'redirect' => env('NOTION_REDIRECT_URI', env('APP_URL').'/settings/connections/notion/callback'),
+    ],
+
 ];

@@ -12,6 +12,7 @@ function Runs({ runs }: { runs: Run[] }) {
                 if (run.italic) node = <em>{node}</em>;
                 if (run.underline) node = <u>{node}</u>;
                 if (run.strike) node = <s>{node}</s>;
+                if (run.code) node = <code className="rounded bg-soft px-1 font-mono text-[0.9em]">{node}</code>;
                 if (run.link) {
                     node = (
                         <a href={run.link} target="_blank" rel="noreferrer noopener" className="text-accent underline decoration-accent/40 underline-offset-2">
@@ -54,7 +55,7 @@ function listMarkers(blocks: Block[]): (string | null)[] {
     });
 }
 
-function Blocks({ blocks }: { blocks: Block[] }) {
+export function Blocks({ blocks }: { blocks: Block[] }) {
     const markers = listMarkers(blocks);
 
     return (
@@ -73,8 +74,8 @@ function Blocks({ blocks }: { blocks: Block[] }) {
                     case 'list_item':
                         return (
                             <div key={i} className="my-1 flex gap-2.5" style={{ paddingLeft: block.level * 22 }}>
-                                <span className="w-5 flex-none text-right text-muted tabular-nums">{markers[i]}</span>
-                                <p className="min-w-0">
+                                <span className="w-5 flex-none text-right text-muted tabular-nums">{block.checked === undefined ? markers[i] : block.checked ? '☑' : '☐'}</span>
+                                <p className={`min-w-0 ${block.checked ? 'text-muted line-through' : ''}`}>
                                     <Runs runs={block.runs} />
                                 </p>
                             </div>
@@ -96,6 +97,18 @@ function Blocks({ blocks }: { blocks: Block[] }) {
                                     </tbody>
                                 </table>
                             </div>
+                        );
+                    case 'quote':
+                        return (
+                            <blockquote key={i} className="my-3 border-l-[3px] border-line pl-4 text-ink/85">
+                                <Runs runs={block.runs} />
+                            </blockquote>
+                        );
+                    case 'code':
+                        return (
+                            <pre key={i} className="my-3 overflow-x-auto rounded-lg bg-soft px-4 py-3 font-mono text-[13px] leading-[1.6]">
+                                {block.text}
+                            </pre>
                         );
                     case 'rule':
                         return <hr key={i} className="my-6 border-line" />;
@@ -128,7 +141,7 @@ function Blocks({ blocks }: { blocks: Block[] }) {
 const commentTime = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Open comment threads beside the document, numbered for "responde al 2". */
-function Comments({ comments }: { comments: DocumentCommentThread[] }) {
+export function Comments({ comments }: { comments: DocumentCommentThread[] }) {
     return (
         <aside aria-label="Comentarios" className="min-w-0 border-t border-line pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
             <h4 className="mb-3 text-[12px] font-medium tracking-wide text-muted uppercase">Comentarios · {comments.length}</h4>

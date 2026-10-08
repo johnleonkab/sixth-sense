@@ -4,7 +4,6 @@ namespace App\Voice\Tools\Calendar;
 
 use App\Connectors\Calendar\CalendarAccount;
 use App\Connectors\Calendar\CalendarEvent;
-use App\Connectors\Calendar\EventQuery;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\RecipientNotResolved;
@@ -116,20 +115,5 @@ class ProposeNewEvent implements VoiceTool
                 'conflict_count' => count($conflicts),
             ],
         );
-    }
-
-    /**
-     * What the user already has at that time.
-     *
-     * @return list<CalendarEvent>
-     */
-    private function conflicts(User $user, CarbonImmutable $start, CarbonImmutable $end): array
-    {
-        $day = $this->reader->read($user, new EventQuery($start->startOfDay(), $start->endOfDay()));
-
-        return array_values(array_filter($day->events, fn (CalendarEvent $event): bool => ! $event->allDay
-            && ! $event->declined
-            && $event->start->lessThan($end)
-            && $event->end->greaterThan($start)));
     }
 }

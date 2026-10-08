@@ -12,6 +12,9 @@ import MailDraft from '@/canvas/mail/mail-draft';
 import ImageViewer from '@/canvas/files/image-viewer';
 import PdfViewer from '@/canvas/files/pdf-viewer';
 import Media from '@/canvas/media';
+import NotionNew from '@/canvas/notion/notion-new';
+import NotionPage from '@/canvas/notion/notion-page';
+import NotionResults from '@/canvas/notion/notion-results';
 import SlackConversation from '@/canvas/slack/slack-conversation';
 import SlackDraft from '@/canvas/slack/slack-draft';
 import SlackResults from '@/canvas/slack/slack-results';
@@ -45,6 +48,9 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'image.viewer': ImageViewer,
     'alerts.list': AlertsList,
     'alerts.review': AlertReview,
+    'notion.results': NotionResults,
+    'notion.page': NotionPage,
+    'notion.new': NotionNew,
 };
 
 export function Canvas({ directive, index }: { directive: CanvasDirective; index: number }) {

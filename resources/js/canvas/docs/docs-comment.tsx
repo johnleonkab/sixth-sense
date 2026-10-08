@@ -8,7 +8,7 @@ import type { CanvasComponent } from '@/canvas/types';
  * bubble (as in the prototype).
  */
 const DocsComment: CanvasComponent<DocumentCommentProps> = ({ index, ...props }) => (
-    <CanvasFrame index={index} title={props.action.label} source="Docs">
+    <CanvasFrame index={index} title={props.action.label} source={props.source ?? 'Docs'}>
         {props.quote && (
             <blockquote className="mb-3 border-l-2 border-hl pl-3 text-[13.5px] text-muted italic">«{props.quote}»</blockquote>
         )}

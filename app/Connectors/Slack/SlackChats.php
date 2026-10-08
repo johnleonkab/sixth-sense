@@ -139,6 +139,37 @@ class SlackChats implements Chats
         }
     }
 
+    public function activity(User $user, CarbonImmutable $since, int $limit = 150): array
+    {
+        $found = [];
+
+        foreach ($user->accountsWith(Capability::SlackSearch) as $account) {
+            $me = $this->me($account);
+            $after = $since->subDay()->toDateString();
+
+            foreach (["from:<@{$me}> after:{$after}", "to:<@{$me}> after:{$after}", "<@{$me}> after:{$after}"] as $query) {
+                try {
+                    $matches = $this->slack->get($account, 'search.messages', ['query' => $query, 'sort' => 'timestamp', 'count' => 100])['messages']['matches'] ?? [];
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    continue;
+                }
+
+                foreach ($matches as $match) {
+                    if ((float) $match['ts'] >= $since->getTimestamp()) {
+                        $found["{$account->id}:{$match['channel']['id']}:{$match['ts']}"] ??= $this->fromSearch($account, $match);
+                    }
+                }
+            }
+        }
+
+        $found = array_values($found);
+        usort($found, fn (ChatMessage $a, ChatMessage $b): int => $b->sentAt <=> $a->sentAt);
+
+        return array_slice($found, 0, $limit);
+    }
+
     public function unread(User $user): array
     {
         $unread = [];

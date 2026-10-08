@@ -28,7 +28,10 @@ use App\Connectors\Mail\FakeMailbox;
 use App\Connectors\Mail\FakeOutbox;
 use App\Connectors\Mail\Mailbox;
 use App\Connectors\Mail\Outbox;
+use App\Connectors\Notion\NotionWiki;
 use App\Connectors\Slack\SlackChats;
+use App\Connectors\Wiki\FakeWiki;
+use App\Connectors\Wiki\Wiki;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
@@ -50,6 +53,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CalendarWriter::class, fn (): CalendarWriter => config('connectors.demo')
             ? new FakeCalendarWriter
             : $this->app->make(GoogleCalendarWriter::class));
+
+        // The fake keeps pages, edits and comments in memory: one instance per request.
+        $this->app->singleton(Wiki::class, fn (): Wiki => config('connectors.demo')
+            ? new FakeWiki
+            : $this->app->make(NotionWiki::class));
 
         $this->app->singleton(Chats::class, fn (): Chats => config('connectors.demo')
             ? new FakeChats

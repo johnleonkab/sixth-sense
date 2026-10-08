@@ -23,12 +23,14 @@ export type DocumentResultsProps = {
     results: DocumentResult[];
 };
 
-export type Run = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; link?: string };
+export type Run = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; code?: boolean; link?: string };
 
 export type Block =
     | { type: 'heading'; level: number; runs: Run[] }
     | { type: 'paragraph'; runs: Run[] }
-    | { type: 'list_item'; level: number; ordered: boolean; runs: Run[] }
+    | { type: 'list_item'; level: number; ordered: boolean; checked?: boolean; runs: Run[] }
+    | { type: 'quote'; runs: Run[] }
+    | { type: 'code'; text: string }
     | { type: 'table'; rows: Block[][][] }
     | { type: 'rule' }
     | { type: 'image' }
@@ -62,6 +64,8 @@ export type DocumentChange = { type: string; before: string; removed: string; in
 
 export type DocumentEditProps = {
     action: ActionState;
+    /** Where the document lives: Docs by default, or Notion. */
+    source?: string;
     title: string;
     url: string | null;
     changes: DocumentChange[];
@@ -69,6 +73,7 @@ export type DocumentEditProps = {
 
 export type DocumentCommentProps = {
     action: ActionState;
+    source?: string;
     title: string;
     url: string | null;
     quote: string | null;

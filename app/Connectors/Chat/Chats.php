@@ -3,6 +3,7 @@
 namespace App\Connectors\Chat;
 
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 /**
  * Chat workspaces (Slack today) across every account of the user.
@@ -40,6 +41,14 @@ interface Chats
      * and recent activity) where it is getting old. Slow: run it in a job.
      */
     public function warm(User $user): void;
+
+    /**
+     * What the user wrote, and what was written to them or mentioning them,
+     * since a moment, newest first. Read only.
+     *
+     * @return list<ChatMessage>
+     */
+    public function activity(User $user, CarbonImmutable $since, int $limit = 150): array;
 
     /**
      * Direct messages and mentions the user has not read, newest first.

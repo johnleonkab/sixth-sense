@@ -79,7 +79,7 @@ test('users are sent to google asking for offline, read-only access and an accou
 
 test('providers that can not be connected yet are not found', function (string $provider) {
     $this->actingAs($this->user)->get(route('settings.connections.redirect', $provider))->assertNotFound();
-})->with(['atlassian', 'notion', 'unknown']);
+})->with(['atlassian', 'unknown']);
 
 test('the callback stores the google account with encrypted tokens', function () {
     googleReturns();

@@ -3,6 +3,7 @@
 namespace App\Connections;
 
 use App\Connections\Google\GoogleTokens;
+use App\Connectors\Notion\NotionTokens;
 use App\Connectors\Slack\SlackTokens;
 use App\Models\ConnectedAccount;
 use Illuminate\Contracts\Container\Container;
@@ -43,6 +44,24 @@ class AccessTokens
             }
 
             return $this->refresh($account);
+        });
+    }
+
+    /**
+     * A new access token now, for providers whose tokens give no expiry and
+     * are found expired when the API refuses them. Skipped if another request
+     * renewed it in the last moments.
+     *
+     * @throws AccountNeedsReconnection
+     * @throws TokenRefreshFailed
+     */
+    public function renew(ConnectedAccount $account, string $refused): string
+    {
+        return Cache::lock("connected-account:{$account->id}:refresh", 15)->block(10, function () use ($account, $refused): string {
+            $account->refresh();
+            $this->ensureActive($account);
+
+            return $account->access_token !== $refused ? $account->access_token : $this->refresh($account);
         });
     }
 
@@ -102,6 +121,7 @@ class AccessTokens
         return match ($provider) {
             Provider::Google => $this->container->make(GoogleTokens::class),
             Provider::Slack => $this->container->make(SlackTokens::class),
+            Provider::Notion => $this->container->make(NotionTokens::class),
             default => throw new InvalidArgumentException("No token operations for [{$provider->value}]."),
         };
     }

@@ -22,6 +22,9 @@ enum Capability: string
     case SlackSearch = 'slack.search';
     case SlackFiles = 'slack.files';
     case SlackSend = 'slack.send';
+    case NotionRead = 'notion.read';
+    case NotionEdit = 'notion.edit';
+    case NotionComment = 'notion.comment';
 
     public function provider(): Provider
     {
@@ -39,6 +42,9 @@ enum Capability: string
             self::SlackSearch,
             self::SlackFiles,
             self::SlackSend => Provider::Slack,
+            self::NotionRead,
+            self::NotionEdit,
+            self::NotionComment => Provider::Notion,
         };
     }
 
@@ -68,11 +74,13 @@ enum Capability: string
             self::SlackSearch => ['search:read'],
             self::SlackFiles => ['files:read'],
             self::SlackSend => ['chat:write', 'im:write'],
+            // Notion has no OAuth scopes: what a connection may do is set on the connection itself.
+            self::NotionRead, self::NotionEdit, self::NotionComment => [],
         };
     }
 
     /**
-     * The scope of a capability that needs only one.
+     * The scope of a capability that needs only one (none for Notion).
      */
     public function scope(): string
     {
@@ -95,6 +103,9 @@ enum Capability: string
             self::SlackSearch => 'Buscar mensajes',
             self::SlackFiles => 'Abrir archivos',
             self::SlackSend => 'Enviar mensajes',
+            self::NotionRead => 'Leer páginas y comentarios',
+            self::NotionEdit => 'Crear y editar páginas',
+            self::NotionComment => 'Comentar páginas',
         };
     }
 
@@ -107,7 +118,7 @@ enum Capability: string
      */
     public function writes(): bool
     {
-        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend], true);
+        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment], true);
     }
 
     /**

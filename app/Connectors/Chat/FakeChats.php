@@ -44,6 +44,11 @@ class FakeChats implements Chats
 
     public function warm(User $user): void {}
 
+    public function activity(User $user, CarbonImmutable $since, int $limit = 150): array
+    {
+        return array_slice(array_reverse($this->allMessages()), 0, $limit);
+    }
+
     public function unread(User $user): array
     {
         $messages = collect($this->allMessages())->keyBy('ref');

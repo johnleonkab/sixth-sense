@@ -6,12 +6,14 @@ use App\Actions\Actions;
 use App\Connectors\Calendar\CalendarEvent;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\EventQuery;
 use App\Connectors\Mail\RecipientResolver;
 use App\Models\User;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\Docs\ProposesChanges;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
+use Carbon\CarbonImmutable;
 
 /**
  * Shared steps for changing an event: find it, check the user may change it,
@@ -85,6 +87,22 @@ trait ProposesCalendarChanges
             'meeting_url' => $event->meetingUrl,
             'url' => $event->url,
         ];
+    }
+
+    /**
+     * What the user already has at that time.
+     *
+     * @return list<CalendarEvent>
+     */
+    private function conflicts(User $user, CarbonImmutable $start, CarbonImmutable $end, ?string $except = null): array
+    {
+        $day = $this->reader->read($user, new EventQuery($start->startOfDay(), $start->endOfDay()));
+
+        return array_values(array_filter($day->events, fn (CalendarEvent $event): bool => ! $event->allDay
+            && ! $event->declined
+            && ($except === null || $event->ref !== $except)
+            && $event->start->lessThan($end)
+            && $event->end->greaterThan($start)));
     }
 
     /**

@@ -39,6 +39,11 @@ class FakeCalendarWriter implements CalendarWriter
         return null;
     }
 
+    public function update(User $user, string $ref, EventUpdate $changes): void
+    {
+        $this->changes[] = ['update', ['ref' => $ref, ...$changes->toArray()]];
+    }
+
     public function cancel(User $user, string $ref): void
     {
         $this->changes[] = ['cancel', ['ref' => $ref]];

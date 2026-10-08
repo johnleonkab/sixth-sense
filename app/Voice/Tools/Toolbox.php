@@ -12,6 +12,7 @@ use App\Voice\Tools\Calendar\ProposeEventCancellation;
 use App\Voice\Tools\Calendar\ProposeEventInvite;
 use App\Voice\Tools\Calendar\ProposeEventResponse;
 use App\Voice\Tools\Calendar\ProposeEventSummary;
+use App\Voice\Tools\Calendar\ProposeEventUpdate;
 use App\Voice\Tools\Calendar\ProposeNewEvent;
 use App\Voice\Tools\Calendar\ShowCalendar;
 use App\Voice\Tools\Docs\OpenDocument;
@@ -27,6 +28,11 @@ use App\Voice\Tools\Mail\ProposeEmailReply;
 use App\Voice\Tools\Mail\ProposeNewEmail;
 use App\Voice\Tools\Mail\SearchEmails;
 use App\Voice\Tools\Mail\ShowEmailResults;
+use App\Voice\Tools\Notion\OpenNotionPage;
+use App\Voice\Tools\Notion\ProposeNotionComment;
+use App\Voice\Tools\Notion\ProposeNotionEdit;
+use App\Voice\Tools\Notion\ProposeNotionPage;
+use App\Voice\Tools\Notion\SearchNotion;
 use App\Voice\Tools\Screen\ControlViewer;
 use App\Voice\Tools\Slack\FindSlackConversations;
 use App\Voice\Tools\Slack\FindSlackPeople;
@@ -53,6 +59,7 @@ class Toolbox
         ProposeEventInvite::class,
         ProposeEventSummary::class,
         ProposeEventResponse::class,
+        ProposeEventUpdate::class,
         ProposeEventCancellation::class,
         SearchEmails::class,
         ShowEmailResults::class,
@@ -73,6 +80,11 @@ class Toolbox
         FindSlackConversations::class,
         FindSlackPeople::class,
         OpenSlackFile::class,
+        SearchNotion::class,
+        OpenNotionPage::class,
+        ProposeNotionPage::class,
+        ProposeNotionEdit::class,
+        ProposeNotionComment::class,
         ProposeSlackMessage::class,
         ControlViewer::class,
         GetActionStatus::class,

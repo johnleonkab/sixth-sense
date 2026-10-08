@@ -41,6 +41,12 @@ interface CalendarWriter
     public function create(User $user, NewEvent $event): ?string;
 
     /**
+     * Change an event the user organises: move it, rename it, change where,
+     * or take people off it. Attendees are told unless asked otherwise.
+     */
+    public function update(User $user, string $ref, EventUpdate $changes): void;
+
+    /**
      * Cancel an event the user organises; attendees are told.
      */
     public function cancel(User $user, string $ref): void;

@@ -4,6 +4,7 @@ namespace App\Actions\Handlers;
 
 use App\Actions\ActionHandler;
 use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
 use App\Models\PendingAction;
@@ -23,6 +24,7 @@ class ChangeCalendar implements ActionHandler
             'invite' => $this->calendar->invite($user, $payload['ref'], $people()),
             'summary' => $this->calendar->addSummary($user, $payload['ref'], $payload['summary'], $payload['heading']),
             'cancel' => $this->calendar->cancel($user, $payload['ref']),
+            'update' => $this->calendar->update($user, $payload['ref'], EventUpdate::fromArray($payload['changes'])),
             'respond' => $this->calendar->respond($user, $payload['ref'], $payload['response'], $payload['comment'] ?? null),
             'create' => $payload['url'] = $this->calendar->create($user, NewEvent::fromArray($payload['event'])),
             default => throw new InvalidArgumentException("Unknown calendar change [{$payload['kind']}]."),
