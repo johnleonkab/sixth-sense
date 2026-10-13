@@ -12,9 +12,11 @@ use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
 use App\Http\Controllers\Settings\JiraRulesController;
 use App\Http\Controllers\Settings\SystemController;
+use App\Http\Controllers\Settings\WingmanController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
+use App\Http\Controllers\Wingman\MeetingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -49,10 +51,18 @@ Route::middleware('auth')->group(function () {
         Route::post('undo', [PendingActionController::class, 'undo'])->name('undo');
     });
 
+    Route::prefix('wingman')->name('wingman.')->group(function () {
+        Route::get('/', [MeetingController::class, 'index'])->name('index');
+        Route::get('{meeting}', [MeetingController::class, 'show'])->whereNumber('meeting')->name('show');
+        Route::post('{meeting}/prepare', [MeetingController::class, 'prepare'])->whereNumber('meeting')->name('prepare');
+    });
+
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        Route::get('wingman', [WingmanController::class, 'edit'])->name('wingman.edit');
+        Route::put('wingman', [WingmanController::class, 'update'])->name('wingman.update');
         Route::put('system/display', [SystemController::class, 'updateDisplay'])->name('system.display');
         Route::put('system/voice', [SystemController::class, 'updateVoice'])->name('system.voice');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');

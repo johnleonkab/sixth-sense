@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'display_size', 'voice'])]
+#[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,6 +30,7 @@ class User extends Authenticatable
      */
     protected $attributes = [
         'display_size' => 'normal',
+        'wingman_enabled' => false,
     ];
 
     /**
@@ -43,6 +44,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'display_size' => DisplaySize::class,
+            'wingman_enabled' => 'boolean',
         ];
     }
 
@@ -129,5 +131,13 @@ class User extends Authenticatable
     public function meetingReminders(): HasMany
     {
         return $this->hasMany(MeetingReminder::class);
+    }
+
+    /**
+     * @return HasMany<WingmanMeeting, $this>
+     */
+    public function wingmanMeetings(): HasMany
+    {
+        return $this->hasMany(WingmanMeeting::class);
     }
 }

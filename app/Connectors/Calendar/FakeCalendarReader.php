@@ -35,8 +35,9 @@ class FakeCalendarReader implements CalendarReader
                     account: 'demo@sixth-sense.test',
                     calendar: 'demo@sixth-sense.test',
                     attendees: array_map(fn (string $name): array => ['name' => $name, 'email' => Str::lower(Str::ascii(strtok($name, ' '))).'@covermanager.test', 'response' => 'accepted'], $attendees),
+                    meetingUrl: $index === 4 ? null : 'https://meet.google.com/'.['dly-prod-uct', 'pre-pago-rev', 'one-oone-mrt', 'syn-pven-tas'][$index],
                     ref: 'demo:primary:'.$day->format('Ymd').'-'.$index,
-                    description: null,
+                    description: $index === 1 ? "Revisamos dónde está CPD-412 antes del sprint.\nPlan: https://www.notion.so/covermanager/Plan-de-lanzamiento-prepago-1a2b3c4d000040008000000000000001" : null,
                     isOrganizer: in_array($index, [2, 3], true),
                     myResponse: in_array($index, [2, 3], true) ? 'accepted' : 'needsAction',
                 );

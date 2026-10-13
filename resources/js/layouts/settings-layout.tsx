@@ -14,6 +14,7 @@ const sections: SettingsSection[] = [
     { href: '/settings/connections', label: 'Conexiones' },
     { href: '/settings/alerts', label: 'Avisos' },
     { href: '/settings/context', label: 'Contexto' },
+    { href: '/settings/wingman', label: 'Wingman' },
     { href: '/settings/system', label: 'Sistema' },
 ];
 
