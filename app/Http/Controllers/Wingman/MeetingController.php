@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Wingman;
 use App\Http\Controllers\Controller;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\WingmanMeeting;
+use App\Models\WingmanSegment;
 use App\Wingman\WingmanMeetings;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -17,6 +18,9 @@ class MeetingController extends Controller
 {
     /** Past meetings listed below today's. */
     private const PAST = 30;
+
+    /** The latest things said that a meeting's page shows. */
+    private const TRANSCRIPT = 300;
 
     /**
      * Wingman's meetings: today's (looked up in the calendar as the page opens) and past ones.
@@ -74,6 +78,15 @@ class MeetingController extends Controller
                 'attendees' => $meeting->attendees ?? [],
                 'context' => $meeting->context,
                 'context_prepared_at' => $meeting->context_prepared_at?->toIso8601String(),
+                'paused' => $meeting->paused_at !== null,
+                'transcript' => $meeting->segments()->getQuery()->reorder()->latest('spoken_at')->latest('id')->limit(self::TRANSCRIPT)->get()->reverse()->values()
+                    ->map(fn (WingmanSegment $segment): array => [
+                        'id' => $segment->id,
+                        'speaker' => $segment->is_me ? 'Tú' : $segment->speaker,
+                        'is_me' => $segment->is_me,
+                        'text' => $segment->text,
+                        'at' => $segment->spoken_at->setTimezone((string) config('agenda.timezone'))->format('H:i'),
+                    ])->all(),
             ],
         ]);
     }

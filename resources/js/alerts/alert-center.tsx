@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
+import WingmanBubble from '@/wingman/wingman-bubble';
 
 export const sourceDot: Record<Alert['source'], string> = {
     gmail: 'bg-gmail',
@@ -263,20 +264,25 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
 
     return (
         <div className="fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2">
-            <button
-                type="button"
-                aria-expanded={open}
-                aria-label={`Avisos: ${waiting.length} pendientes`}
-                onClick={() => setOpen(!open)}
-                className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
-            >
-                <span
-                    title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
-                    className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
-                />
-                {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
-                {working && <span className="text-muted">· analizando</span>}
-            </button>
+            <div className="flex items-start gap-2">
+                {/* Wingman's bubble, beside the alerts, only while in a call. */}
+                <WingmanBubble />
+
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-label={`Avisos: ${waiting.length} pendientes`}
+                    onClick={() => setOpen(!open)}
+                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
+                >
+                    <span
+                        title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
+                        className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
+                    />
+                    {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
+                    {working && <span className="text-muted">· analizando</span>}
+                </button>
+            </div>
 
             {open ? (
                 <div className="alerts-panel-in max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card">

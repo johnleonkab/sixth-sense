@@ -39,4 +39,7 @@ export type WingmanMeeting = WingmanMeetingSummary & {
     attendees: { name: string; email: string | null; response?: string | null }[];
     context: WingmanContext | null;
     context_prepared_at: string | null;
+    paused: boolean;
+    /** What was said, oldest first (the latest few hundred lines). */
+    transcript: { id: number; speaker: string; is_me: boolean; text: string; at: string }[];
 };

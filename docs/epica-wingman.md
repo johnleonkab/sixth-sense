@@ -140,6 +140,14 @@ Lo aprendido del HTML real: los subtítulos están en `role="region"` con `aria-
 
 **Hecho cuando:** entrar en Meet hace aparecer la burbuja en menos de 5 s, y al abrirla se ve la llamada en curso.
 
+**Estado:** ✅ hecho (14/10).
+- `WingmanBubble` va junto a la burbuja de avisos en todas las páginas y solo aparece durante una llamada.
+- Se entera al momento con los eventos `wingman.meeting.started/ended/updated` y, mientras la llamada sigue, pide `/wingman/live` cada 4 s.
+- Abierta muestra: tiempo en la llamada, asistentes, tickets y páginas del contexto, y las últimas frases ("Tú" resaltado).
+- **Pausar** (`paused_at`): lo que se dice durante la pausa no se guarda, y la extensión lo indica.
+- **Abrir** lleva a `/wingman/{id}`, que muestra la conversación y se actualiza sola mientras la llamada sigue.
+- Las notas y propuestas llegarán con H4 y H5; de momento la burbuja cuenta frases.
+
 ### H4 · Notas en tiempo real (1 día)
 - La transcripción se procesa por bloques: cada ~20 s o al cambiar de turno.
 - Un agente de notas mantiene el documento vivo: temas, decisiones, preguntas abiertas y quién dijo qué cuando importa.

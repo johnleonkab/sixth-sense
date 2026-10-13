@@ -116,19 +116,23 @@ function Preparing() {
 
 export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
     const preparing = meeting.context_prepared_at === null;
+    const live = meeting.status === 'live';
     const [refreshing, setRefreshing] = useState(false);
 
-    // While it is being gathered, ask for it every little while.
+    // While it is being gathered, or the call goes on, ask for it every little while.
     const { start, stop } = usePoll(2500, { only: ['meeting'] }, { autoStart: false, mode: 'rest' });
 
     useEffect(() => {
-        if (preparing) {
+        if (preparing || live) {
             start();
         } else {
             stop();
+        }
+
+        if (!preparing) {
             setRefreshing(false);
         }
-    }, [preparing, start, stop]);
+    }, [preparing, live, start, stop]);
 
     const prepareAgain = () => {
         setRefreshing(true);
@@ -172,6 +176,25 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                     ))}
                 </ul>
             </Section>
+
+            {(live || meeting.transcript.length > 0) && (
+                <Section title={live ? (meeting.paused ? 'Conversación · en pausa' : 'Conversación · en directo') : 'Conversación'}>
+                    {meeting.transcript.length === 0 ? (
+                        <p className="text-[14px] text-faint">Todavía no se ha dicho nada.</p>
+                    ) : (
+                        <ol className="max-h-[420px] space-y-1.5 overflow-auto rounded-xl border border-line px-3.5 py-3 text-[14px]">
+                            {meeting.transcript.map((line) => (
+                                <li key={line.id} className="grid grid-cols-[42px_minmax(0,1fr)] gap-2">
+                                    <time className="font-mono text-[12px] text-faint">{line.at}</time>
+                                    <span>
+                                        <b className={`font-medium ${line.is_me ? 'text-accent' : ''}`}>{line.speaker}:</b> {line.text}
+                                    </span>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </Section>
+            )}
 
             {preparing || !meeting.context ? <Preparing /> : <Context context={meeting.context} />}
         </WingmanLayout>

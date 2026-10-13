@@ -16,6 +16,7 @@ use App\Http\Controllers\Settings\WingmanController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
+use App\Http\Controllers\Wingman\LiveController;
 use App\Http\Controllers\Wingman\MeetingController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('wingman')->name('wingman.')->group(function () {
         Route::get('/', [MeetingController::class, 'index'])->name('index');
+        Route::get('live', [LiveController::class, 'show'])->name('live');
+        Route::post('{meeting}/pause', [LiveController::class, 'pause'])->whereNumber('meeting')->name('pause');
         Route::get('{meeting}', [MeetingController::class, 'show'])->whereNumber('meeting')->name('show');
         Route::post('{meeting}/prepare', [MeetingController::class, 'prepare'])->whereNumber('meeting')->name('prepare');
     });

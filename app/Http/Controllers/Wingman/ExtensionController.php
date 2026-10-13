@@ -55,7 +55,7 @@ class ExtensionController extends Controller
             'segments.*.spoken_at' => ['required', 'date'],
         ]);
 
-        return response()->json(['taken' => $calls->record($meeting, $data['segments'])]);
+        return response()->json(['taken' => $calls->record($meeting, $data['segments']), 'paused' => $meeting->paused_at !== null]);
     }
 
     /**

@@ -35,6 +35,7 @@
         meetingTitle: null,
         sent: 0,
         lastError: null,
+        paused: false,
     };
 
     /** The version of each segment sixth-sense already has. */
@@ -230,6 +231,7 @@
             meetingTitle: state.meetingTitle,
             sent: state.sent,
             lastError: state.lastError,
+            paused: state.paused,
             speakers,
             segments: state.segments,
             raw: state.raw,
@@ -290,6 +292,8 @@
         // When it fails, the worker keeps them and sends them with the next batch.
         markSent(segments);
         state.lastError = answer.ok ? null : answer.error;
+        // Paused from sixth-sense: what is said is not kept there meanwhile.
+        state.paused = answer.ok ? Boolean(answer.data?.paused) : state.paused;
     }
 
     async function endCall() {
@@ -310,7 +314,7 @@
         const code = location.pathname.match(MEETING_CODE)?.[1] ?? null;
 
         if (inCall && !state.inCall) {
-            Object.assign(state, { inCall: true, code, joinedAt: now(), leftAt: null, segments: [], raw: [], errors: [], meetingId: null, meetingTitle: null, sent: 0, lastError: null });
+            Object.assign(state, { inCall: true, code, joinedAt: now(), leftAt: null, segments: [], raw: [], errors: [], meetingId: null, meetingTitle: null, sent: 0, lastError: null, paused: false });
             live.clear();
             sentVersions.clear();
             void startCall();

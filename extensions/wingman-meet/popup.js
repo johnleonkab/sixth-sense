@@ -58,7 +58,7 @@ function render(status) {
         : status.lastError
           ? `<span class="bad">${escape(status.lastError)}</span>`
           : status.meetingId
-            ? `<span class="ok">${escape(status.meetingTitle ?? 'Llamada')}</span> · ${status.sent} enviadas`
+            ? `<span class="ok">${escape(status.meetingTitle ?? 'Llamada')}</span> · ${status.paused ? 'en pausa desde sixth-sense' : `${status.sent} enviadas`}`
             : 'Avisando…';
     $('toggle-hidden').textContent = status.hidden ? 'Mostrar subtítulos' : 'Ocultar subtítulos';
     $('toggle-hidden').dataset.hidden = String(status.hidden);

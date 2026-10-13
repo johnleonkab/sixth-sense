@@ -4,6 +4,7 @@ namespace App\Wingman;
 
 use App\Events\WingmanMeetingEnded;
 use App\Events\WingmanMeetingStarted;
+use App\Events\WingmanMeetingUpdated;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\User;
 use App\Models\WingmanMeeting;
@@ -59,6 +60,8 @@ class WingmanCalls
             // Joining again after dropping keeps the first time in.
             'joined_at' => $meeting->joined_at ?? $joinedAt,
             'left_at' => null,
+            // A new call starts listening, even if the last one was paused.
+            'paused_at' => $meeting->status === MeetingStatus::Live ? $meeting->paused_at : null,
         ]);
 
         if ($meeting->context_prepared_at === null) {
@@ -78,7 +81,8 @@ class WingmanCalls
      */
     public function record(WingmanMeeting $meeting, array $segments): int
     {
-        if ($segments === []) {
+        // Paused by the person: what is said meanwhile is not kept.
+        if ($segments === [] || $meeting->paused_at !== null) {
             return 0;
         }
 
@@ -107,7 +111,7 @@ class WingmanCalls
      */
     public function end(WingmanMeeting $meeting, CarbonImmutable $leftAt): WingmanMeeting
     {
-        $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt]);
+        $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt, 'paused_at' => null]);
         $meeting->segments()->getQuery()->where('final', false)->update(['final' => true]);
 
         WingmanMeetingEnded::dispatch($meeting);
@@ -123,5 +127,17 @@ class WingmanCalls
             ->get()
             ->sortBy(fn (WingmanMeeting $meeting): int => abs($meeting->starts_at->diffInSeconds($joinedAt, false)))
             ->first();
+    }
+
+    /**
+     * Stop keeping what is said, or start again.
+     */
+    public function pause(WingmanMeeting $meeting, bool $paused): WingmanMeeting
+    {
+        $meeting->update(['paused_at' => $paused ? now() : null]);
+
+        WingmanMeetingUpdated::dispatch($meeting);
+
+        return $meeting;
     }
 }
