@@ -6,7 +6,6 @@ use App\Models\InboxItem;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
-use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
@@ -15,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class InboxItemUpdated implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use BroadcastsWhenItCan, InteractsWithSockets, SerializesModels;
 
     public function __construct(public InboxItem $item) {}
 
