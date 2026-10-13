@@ -20,7 +20,16 @@ class ExecutePendingAction implements ShouldQueue
     /** Writing twice is worse than failing once: never retry automatically. */
     public int $tries = 1;
 
-    public function __construct(public PendingAction $action) {}
+    /**
+     * Its own queue and worker: something the person confirmed is never
+     * stuck behind slow AI jobs (judging, planning) on the default queue.
+     */
+    public const QUEUE = 'actions';
+
+    public function __construct(public PendingAction $action)
+    {
+        $this->onQueue(self::QUEUE);
+    }
 
     public function handle(Actions $actions): void
     {

@@ -98,6 +98,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:actions' => 15,
     ],
 
     /*
@@ -202,6 +203,21 @@ return [
             'queue' => ['default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => 60,
+            'nice' => 0,
+        ],
+
+        // Confirmed actions (send, move, comment) run on their own worker,
+        // so slow AI jobs on the default queue never hold them back.
+        'supervisor-actions' => [
+            'connection' => 'redis',
+            'queue' => ['actions'],
+            'balance' => 'simple',
             'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,

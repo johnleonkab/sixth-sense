@@ -31,7 +31,7 @@ test('confirming runs the action once the undo window closes', function () {
         ->assertOk()
         ->assertJsonPath('status', 'confirmed');
 
-    Queue::assertPushed(ExecutePendingAction::class, fn (ExecutePendingAction $job) => $job->action->is($action)
+    Queue::assertPushedOn(ExecutePendingAction::QUEUE, ExecutePendingAction::class, fn (ExecutePendingAction $job) => $job->action->is($action)
         && now()->diffInSeconds($job->delay) >= Actions::UNDO_WINDOW - 1);
     expect($this->documents->comments)->toBe([]);
 });
