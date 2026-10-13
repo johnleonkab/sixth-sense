@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Http;
 class GeminiVoiceProvider implements VoiceProvider
 {
     /**
-     * @param  array{api_key: ?string, api_version: string, base_url: string, model: string, voice: string, timeout: int, end_of_speech_sensitivity?: string, silence_duration_ms?: int}  $config
+     * @param  array{api_key: ?string, api_version: string, base_url: string, model: string, voice: string, voices?: array<string, string>, timeout: int, end_of_speech_sensitivity?: string, silence_duration_ms?: int}  $config
      * @param  array{connect_window: int, max_duration: int}  $session
      */
     public function __construct(
@@ -37,7 +37,8 @@ class GeminiVoiceProvider implements VoiceProvider
         $now = CarbonImmutable::now();
         $connectBefore = $now->addSeconds($this->session['connect_window']);
         $expiresAt = $now->addSeconds($this->session['max_duration']);
-        $setup = $this->setup($assistant);
+        $voice = $this->voiceFor($user);
+        $setup = $this->setup($assistant, $voice);
 
         try {
             $response = Http::baseUrl($this->config['base_url'])
@@ -69,7 +70,7 @@ class GeminiVoiceProvider implements VoiceProvider
             connection: [
                 'model' => $this->config['model'],
                 'api_version' => $this->config['api_version'],
-                'voice' => $this->config['voice'],
+                'voice' => $voice,
                 'instructions' => $assistant->instructions,
                 'tools' => $setup['tools'] ?? [],
                 'realtime_input' => $setup['realtimeInputConfig'],
@@ -78,11 +79,21 @@ class GeminiVoiceProvider implements VoiceProvider
     }
 
     /**
+     * The voice the person chose, if it is still offered; otherwise the app's.
+     */
+    private function voiceFor(User $user): string
+    {
+        return $user->voice !== null && array_key_exists($user->voice, $this->config['voices'] ?? [])
+            ? $user->voice
+            : $this->config['voice'];
+    }
+
+    /**
      * The Live API session setup, locked into the token.
      *
      * @return array<string, mixed>
      */
-    private function setup(AssistantProfile $assistant): array
+    private function setup(AssistantProfile $assistant, string $voice): array
     {
         return [
             'model' => "models/{$this->config['model']}",
@@ -90,7 +101,7 @@ class GeminiVoiceProvider implements VoiceProvider
                 'responseModalities' => ['AUDIO'],
                 'speechConfig' => [
                     'voiceConfig' => [
-                        'prebuiltVoiceConfig' => ['voiceName' => $this->config['voice']],
+                        'prebuiltVoiceConfig' => ['voiceName' => $voice],
                     ],
                 ],
             ],

@@ -62,6 +62,20 @@ test('it issues a single-use ephemeral token with the session locked server-side
         && $request['bidiGenerateContentSetup']['realtimeInputConfig'] === ['automaticActivityDetection' => ['endOfSpeechSensitivity' => 'END_SENSITIVITY_LOW', 'silenceDurationMs' => 800]]);
 });
 
+test('it speaks with the voice the person chose, while it is still offered', function (?string $chosen, string $used) {
+    Http::fake(['generativelanguage.googleapis.com/v1alpha/auth_tokens' => Http::response(['name' => 'auth_tokens/abc123'])]);
+    $this->user->voice = $chosen;
+
+    $session = geminiProvider(['voices' => ['Kore' => 'Firme', 'Puck' => 'Animada']])->startSession($this->user, $this->assistant);
+
+    expect($session->connection['voice'])->toBe($used);
+    Http::assertSent(fn (Request $request) => $request['bidiGenerateContentSetup']['generationConfig']['speechConfig']['voiceConfig']['prebuiltVoiceConfig']['voiceName'] === $used);
+})->with([
+    'chosen' => ['Puck', 'Puck'],
+    'none chosen' => [null, 'Kore'],
+    'no longer offered' => ['Darth', 'Kore'],
+]);
+
 test('it never sends a request without an api key', function () {
     Http::fake();
 

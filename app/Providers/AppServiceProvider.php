@@ -41,6 +41,7 @@ use App\Scheduling\TaskAssessor;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
+use App\Voice\VoiceSamples;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
 use App\WorkContext\Summarizers\GeminiContextSummarizer;
@@ -131,6 +132,8 @@ class AppServiceProvider extends ServiceProvider
             'fake' => new FakeVoiceProvider,
             default => throw new InvalidArgumentException('Unsupported voice provider ['.config('voice.default').'].'),
         });
+
+        $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));
     }
 
     /**

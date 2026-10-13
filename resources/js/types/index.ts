@@ -2,7 +2,7 @@ export type User = {
     id: number;
     name: string;
     email: string;
-    /** How much canvases are scaled (Configuración → Pantalla). */
+    /** How much canvases are scaled (Configuración → Sistema). */
     display_scale: number;
 };
 

@@ -10,8 +10,8 @@ use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
-use App\Http\Controllers\Settings\DisplayController;
 use App\Http\Controllers\Settings\JiraRulesController;
+use App\Http\Controllers\Settings\SystemController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
@@ -51,8 +51,11 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');
-        Route::get('display', [DisplayController::class, 'index'])->name('display.index');
-        Route::put('display', [DisplayController::class, 'update'])->name('display.update');
+        Route::redirect('display', '/settings/system');
+        Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        Route::put('system/display', [SystemController::class, 'updateDisplay'])->name('system.display');
+        Route::put('system/voice', [SystemController::class, 'updateVoice'])->name('system.voice');
+        Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
         Route::put('alerts/{source}', [AlertController::class, 'update'])->name('alerts.update');
         Route::get('context', [WorkContextController::class, 'index'])->name('context.index');

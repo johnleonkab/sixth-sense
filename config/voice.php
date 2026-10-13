@@ -75,6 +75,44 @@ return [
             'model' => env('GEMINI_LIVE_MODEL', 'gemini-3.8-live'),
             'voice' => env('GEMINI_LIVE_VOICE', 'Kore'),
 
+            // A short sample of each voice, to hear it before choosing it (made once, then kept).
+            'sample_model' => env('GEMINI_VOICE_SAMPLE_MODEL', 'gemini-3.8-flash-lite-tts'),
+            'sample_text' => 'Hola, soy :voice. Así sonaré cuando te cuente cómo va tu día.',
+
+            // The prebuilt voices the person can choose from (Configuración → Sistema), with how each sounds.
+            'voices' => [
+                'Zephyr' => 'Brillante',
+                'Puck' => 'Animada',
+                'Charon' => 'Informativa',
+                'Kore' => 'Firme',
+                'Fenrir' => 'Entusiasta',
+                'Leda' => 'Juvenil',
+                'Orus' => 'Firme',
+                'Aoede' => 'Ligera',
+                'Callirrhoe' => 'Tranquila',
+                'Autonoe' => 'Brillante',
+                'Enceladus' => 'Susurrante',
+                'Iapetus' => 'Clara',
+                'Umbriel' => 'Tranquila',
+                'Algieba' => 'Suave',
+                'Despina' => 'Suave',
+                'Erinome' => 'Clara',
+                'Algenib' => 'Grave',
+                'Rasalgethi' => 'Informativa',
+                'Laomedeia' => 'Animada',
+                'Achernar' => 'Dulce',
+                'Alnilam' => 'Firme',
+                'Schedar' => 'Serena',
+                'Gacrux' => 'Madura',
+                'Pulcherrima' => 'Directa',
+                'Achird' => 'Cercana',
+                'Zubenelgenubi' => 'Informal',
+                'Vindemiatrix' => 'Amable',
+                'Sadachbia' => 'Vivaz',
+                'Sadaltager' => 'Experta',
+                'Sulafat' => 'Cálida',
+            ],
+
             // How long a pause has to last before the person's turn is over.
             // Longer pauses let people think mid-sentence, at the cost of a little latency.
             'end_of_speech_sensitivity' => env('GEMINI_END_OF_SPEECH_SENSITIVITY', 'END_SENSITIVITY_LOW'),
