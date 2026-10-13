@@ -3,6 +3,7 @@
 namespace App\Alerts;
 
 use App\Connectors\Google\GmailWatcher;
+use App\Connectors\Jira\JiraWatcher;
 use App\Connectors\Slack\SlackWatcher;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
@@ -19,6 +20,7 @@ class InboxWatchers
         return match ($source) {
             AlertSource::Gmail => $this->container->make(GmailWatcher::class),
             AlertSource::Slack => $this->container->make(SlackWatcher::class),
+            AlertSource::Jira => $this->container->make(JiraWatcher::class),
             default => throw new InvalidArgumentException("{$source->value} has no inbox to watch."),
         };
     }

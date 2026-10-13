@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Actions\Handlers\ChangeCalendar;
+use App\Actions\Handlers\ChangeJira;
 use App\Actions\Handlers\ChangeWiki;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
@@ -40,6 +41,11 @@ class Actions
         'notion.create' => ChangeWiki::class,
         'notion.edit' => ChangeWiki::class,
         'notion.comment' => ChangeWiki::class,
+        'jira.create' => ChangeJira::class,
+        'jira.update' => ChangeJira::class,
+        'jira.link' => ChangeJira::class,
+        'jira.unlink' => ChangeJira::class,
+        'jira.comment' => ChangeJira::class,
     ];
 
     public function __construct(private Container $container) {}

@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
@@ -15,6 +15,8 @@ type ConnectedAccount = {
     name: string | null;
     email: string | null;
     workspace: string | null;
+    /** Jira only: whether the person wrote this connection's rules. */
+    has_rules?: boolean | null;
     avatar_url: string | null;
     status: 'active' | 'needs_reconnection';
     missing_scopes: number;
@@ -116,6 +118,14 @@ function AccountRow({ provider, account }: { provider: ProviderConnections; acco
                 </div>
 
                 <div className="flex flex-none items-center gap-1 text-[13px]">
+                    {provider.key === 'atlassian' && (
+                        <Link
+                            href={`/settings/connections/${account.id}/rules`}
+                            className={`rounded-lg px-2.5 py-1 font-medium hover:bg-accent-soft ${account.has_rules ? 'text-accent' : 'text-warn'}`}
+                        >
+                            {account.has_rules ? 'Reglas de Jira' : 'Escribir reglas'}
+                        </Link>
+                    )}
                     {needsAttention && (
                         <a href={authorizeUrl(provider)} className="rounded-lg px-2.5 py-1 font-medium text-accent hover:bg-accent-soft">
                             Reconectar

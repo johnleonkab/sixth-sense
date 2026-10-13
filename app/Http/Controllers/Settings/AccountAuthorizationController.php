@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Connections\AccountStatus;
 use App\Connections\AuthorizationCancelled;
 use App\Connections\AuthorizedAccount;
+use App\Connections\Authorizers\AtlassianAuthorizer;
 use App\Connections\Authorizers\GoogleAuthorizer;
 use App\Connections\Authorizers\NotionAuthorizer;
 use App\Connections\Authorizers\SlackAuthorizer;
@@ -66,12 +67,13 @@ class AccountAuthorizationController extends Controller
             : "Cuenta {$account->email} actualizada.");
     }
 
-    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer
+    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer|AtlassianAuthorizer
     {
         return match ($provider) {
             Provider::Google => app(GoogleAuthorizer::class),
             Provider::Slack => app(SlackAuthorizer::class),
             Provider::Notion => app(NotionAuthorizer::class),
+            Provider::Atlassian => app(AtlassianAuthorizer::class),
             default => abort(404),
         };
     }

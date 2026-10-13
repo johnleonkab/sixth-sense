@@ -105,6 +105,18 @@ class GeminiRelevanceJudge implements RelevanceJudge
             $addresses,
         )) ?: '—';
 
+        if ($candidate->source === AlertSource::Jira) {
+            return implode("\n", [
+                "Jira, cuenta {$candidate->account}",
+                'Tipo: le mencionan en un comentario de un issue',
+                'Issue: '.$candidate->subject,
+                'De: '.$people(array_filter([$candidate->from])),
+                '',
+                '--- Comentario (datos) ---',
+                Str::limit($candidate->excerpt, self::MAX_EXCERPT),
+            ]);
+        }
+
         if ($candidate->source === AlertSource::Slack) {
             return implode("\n", [
                 "Slack, cuenta {$candidate->account}",

@@ -91,9 +91,11 @@ class GeminiReplyPlanner implements ReplyPlanner
 
     private function instructions(User $user, AlertBrief $brief): string
     {
-        $audiences = $brief->source === AlertSource::Gmail
+        $audiences = $brief->source === AlertSource::Jira
+            ? 'reply_to: "thread" (un comentario nuevo en el issue que responde al que le menciona). En Jira no hay hilos: el borrador se dirige a quien pregunta.'
+            : ($brief->source === AlertSource::Gmail
             ? 'reply_to: "sender" (solo a quien lo envió) o "all" (a todos los del email). Elige "all" solo si los demás deben enterarse.'
-            : 'reply_to: "thread" (en el hilo del mensaje) o "conversation" (en el canal o mensaje directo, sin hilo). En un mensaje directo sin hilos, "conversation".';
+            : 'reply_to: "thread" (en el hilo del mensaje) o "conversation" (en el canal o mensaje directo, sin hilo). En un mensaje directo sin hilos, "conversation".');
 
         return <<<TEXT
             Eres el motor de respuestas de {$user->name}. Le llega un mensaje que espera su respuesta y tú piensas cómo resolverlo,

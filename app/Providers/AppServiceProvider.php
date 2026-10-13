@@ -24,6 +24,9 @@ use App\Connectors\Google\GmailOutbox;
 use App\Connectors\Google\GoogleCalendarReader;
 use App\Connectors\Google\GoogleCalendarWriter;
 use App\Connectors\Google\GoogleDocs;
+use App\Connectors\Issues\FakeIssueTracker;
+use App\Connectors\Issues\IssueTracker;
+use App\Connectors\Jira\JiraIssueTracker;
 use App\Connectors\Mail\FakeMailbox;
 use App\Connectors\Mail\FakeOutbox;
 use App\Connectors\Mail\Mailbox;
@@ -64,6 +67,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Wiki::class, fn (): Wiki => config('connectors.demo')
             ? new FakeWiki
             : $this->app->make(NotionWiki::class));
+
+        $this->app->singleton(IssueTracker::class, fn (): IssueTracker => config('connectors.demo')
+            ? new FakeIssueTracker
+            : $this->app->make(JiraIssueTracker::class));
 
         $this->app->singleton(Chats::class, fn (): Chats => config('connectors.demo')
             ? new FakeChats

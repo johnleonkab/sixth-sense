@@ -34,6 +34,8 @@ trait DescribesAlerts
             'email_id' => $item->source === AlertSource::Gmail ? $item->external_id : null,
             'message_id' => $item->source === AlertSource::Slack ? $item->external_id : null,
             'conversation_id' => $item->source === AlertSource::Slack ? Str::beforeLast($item->external_id, ':') : null,
+            'issue_id' => $item->source === AlertSource::Jira ? Str::beforeLast($item->external_id, ':') : null,
+            'comment_id' => $item->source === AlertSource::Jira ? $item->external_id : null,
             'event_id' => $item->payload['event_ref'] ?? null,
         ], fn (mixed $value): bool => $value !== null);
     }

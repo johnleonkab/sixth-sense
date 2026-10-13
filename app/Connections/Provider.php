@@ -33,7 +33,7 @@ enum Provider: string
         return match ($this) {
             self::Google => ['Calendar', 'Gmail', 'Docs', 'Sheets'],
             self::Slack => ['Canales', 'Mensajes directos', 'Archivos'],
-            self::Atlassian => ['Jira'],
+            self::Atlassian => ['Jira', 'Comentarios', 'Avisos de menciones'],
             self::Notion => ['Páginas', 'Comentarios', 'Enlaces'],
         };
     }
@@ -43,7 +43,7 @@ enum Provider: string
      */
     public function isConnectable(): bool
     {
-        return in_array($this, [self::Google, self::Slack, self::Notion], true);
+        return in_array($this, [self::Google, self::Slack, self::Notion, self::Atlassian], true);
     }
 
     /**

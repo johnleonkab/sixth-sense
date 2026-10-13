@@ -24,6 +24,12 @@ use App\Voice\Tools\Docs\ProposeDocumentComment;
 use App\Voice\Tools\Docs\ProposeDocumentEdit;
 use App\Voice\Tools\Docs\SearchDocuments;
 use App\Voice\Tools\Docs\ShowDocumentResults;
+use App\Voice\Tools\Jira\OpenJiraIssue;
+use App\Voice\Tools\Jira\ProposeJiraComment;
+use App\Voice\Tools\Jira\ProposeJiraDependency;
+use App\Voice\Tools\Jira\ProposeJiraIssue;
+use App\Voice\Tools\Jira\ProposeJiraUpdate;
+use App\Voice\Tools\Jira\SearchJira;
 use App\Voice\Tools\Mail\OpenEmail;
 use App\Voice\Tools\Mail\OpenEmailAttachment;
 use App\Voice\Tools\Mail\ProposeEmailForward;
@@ -85,6 +91,12 @@ class Toolbox
         FindSlackConversations::class,
         FindSlackPeople::class,
         OpenSlackFile::class,
+        SearchJira::class,
+        OpenJiraIssue::class,
+        ProposeJiraIssue::class,
+        ProposeJiraUpdate::class,
+        ProposeJiraDependency::class,
+        ProposeJiraComment::class,
         SearchNotion::class,
         OpenNotionPage::class,
         ProposeNotionPage::class,

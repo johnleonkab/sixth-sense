@@ -56,6 +56,11 @@ const sounds: Record<string, (ctx: AudioContext) => void> = {
         tone(ctx, { frequency: 523.25, to: 440, delay: 0.16, duration: 0.22, volume: 0.17, type: 'triangle' });
         tone(ctx, { frequency: 1046.5, delay: 0.17, duration: 0.5, volume: 0.04 });
     },
+    /** "Jira": a short rising pair, crisp, for a mention that asks for help. */
+    jira: (ctx) => {
+        tone(ctx, { frequency: 587.33, duration: 0.14, volume: 0.15, type: 'square' });
+        tone(ctx, { frequency: 880, delay: 0.1, duration: 0.35, volume: 0.1, type: 'triangle' });
+    },
     /** "Agenda": two soft notes going down, for a task that found no slot. */
     agenda: (ctx) => {
         tone(ctx, { frequency: 880, duration: 0.3, volume: 0.14, type: 'triangle' });

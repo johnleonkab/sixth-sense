@@ -8,6 +8,7 @@ export const sourceDot: Record<Alert['source'], string> = {
     slack: 'bg-slack',
     calendar: 'bg-accent',
     agenda: 'bg-ok',
+    jira: 'bg-jira',
 };
 
 const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });

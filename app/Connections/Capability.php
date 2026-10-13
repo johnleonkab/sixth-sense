@@ -25,6 +25,9 @@ enum Capability: string
     case NotionRead = 'notion.read';
     case NotionEdit = 'notion.edit';
     case NotionComment = 'notion.comment';
+    case JiraRead = 'jira.read';
+    case JiraWrite = 'jira.write';
+    case JiraComment = 'jira.comment';
 
     public function provider(): Provider
     {
@@ -45,6 +48,9 @@ enum Capability: string
             self::NotionRead,
             self::NotionEdit,
             self::NotionComment => Provider::Notion,
+            self::JiraRead,
+            self::JiraWrite,
+            self::JiraComment => Provider::Atlassian,
         };
     }
 
@@ -76,6 +82,8 @@ enum Capability: string
             self::SlackSend => ['chat:write', 'im:write'],
             // Notion has no OAuth scopes: what a connection may do is set on the connection itself.
             self::NotionRead, self::NotionEdit, self::NotionComment => [],
+            self::JiraRead => ['read:jira-work', 'read:jira-user'],
+            self::JiraWrite, self::JiraComment => ['write:jira-work'],
         };
     }
 
@@ -106,6 +114,9 @@ enum Capability: string
             self::NotionRead => 'Leer páginas y comentarios',
             self::NotionEdit => 'Crear y editar páginas',
             self::NotionComment => 'Comentar páginas',
+            self::JiraRead => 'Ver issues y comentarios',
+            self::JiraWrite => 'Crear y editar issues',
+            self::JiraComment => 'Comentar issues',
         };
     }
 
@@ -118,7 +129,7 @@ enum Capability: string
      */
     public function writes(): bool
     {
-        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment], true);
+        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment, self::JiraWrite, self::JiraComment], true);
     }
 
     /**

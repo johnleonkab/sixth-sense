@@ -33,7 +33,7 @@ class ReviewAlert implements VoiceTool
     {
         return 'Abre un aviso para revisarlo: muestra el mensaje y la propuesta para resolverlo, y te devuelve ambos. '
             .'Cuéntale en una o dos frases qué le piden y lo que propones (proposal.summary); si hay proposal.question, pregúntasela. Después escucha lo que quiere cambiar. '
-            .'Para resolverlo usa tus herramientas de siempre, una o varias: propose_email_reply con su email_id (reply_all para "a todos"), propose_slack_message (reply_to con su message_id para responder en el hilo, o to con su conversation_id para responder en la conversación), propose_new_event, etc., '
+            .'Para resolverlo usa tus herramientas de siempre, una o varias: propose_email_reply con su email_id (reply_all para "a todos"), propose_slack_message (reply_to con su message_id para responder en el hilo, o to con su conversation_id para responder en la conversación), propose_jira_comment (issue con su issue_id y reply_to con su comment_id), propose_new_event, etc., '
             .'con el texto de la propuesta o con sus cambios. Cuando responda desde aquí, el aviso se resuelve solo.';
     }
 

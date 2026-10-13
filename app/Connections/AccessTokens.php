@@ -3,6 +3,7 @@
 namespace App\Connections;
 
 use App\Connections\Google\GoogleTokens;
+use App\Connectors\Jira\AtlassianTokens;
 use App\Connectors\Notion\NotionTokens;
 use App\Connectors\Slack\SlackTokens;
 use App\Models\ConnectedAccount;
@@ -122,6 +123,7 @@ class AccessTokens
             Provider::Google => $this->container->make(GoogleTokens::class),
             Provider::Slack => $this->container->make(SlackTokens::class),
             Provider::Notion => $this->container->make(NotionTokens::class),
+            Provider::Atlassian => $this->container->make(AtlassianTokens::class),
             default => throw new InvalidArgumentException("No token operations for [{$provider->value}]."),
         };
     }

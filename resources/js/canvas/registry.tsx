@@ -13,6 +13,9 @@ import DocsResults from '@/canvas/docs/docs-results';
 import MailDraft from '@/canvas/mail/mail-draft';
 import ImageViewer from '@/canvas/files/image-viewer';
 import PdfViewer from '@/canvas/files/pdf-viewer';
+import JiraDraft from '@/canvas/jira/jira-draft';
+import JiraIssue from '@/canvas/jira/jira-issue';
+import JiraList from '@/canvas/jira/jira-list';
 import Media from '@/canvas/media';
 import NotionNew from '@/canvas/notion/notion-new';
 import NotionPage from '@/canvas/notion/notion-page';
@@ -52,6 +55,9 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'alerts.review': AlertReview,
     'alerts.history': AlertsHistory,
     'agenda.task': AgendaTask,
+    'jira.list': JiraList,
+    'jira.issue': JiraIssue,
+    'jira.draft': JiraDraft,
     'notion.results': NotionResults,
     'notion.page': NotionPage,
     'notion.new': NotionNew,

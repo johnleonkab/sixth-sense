@@ -11,6 +11,7 @@ use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
 use App\Http\Controllers\Settings\DisplayController;
+use App\Http\Controllers\Settings\JiraRulesController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
@@ -66,6 +67,8 @@ Route::middleware('auth')->group(function () {
         Route::put('connections/{account}/capabilities/{capability}', [AccountCapabilityController::class, 'update'])
             ->whereNumber('account')
             ->name('connections.capabilities.update');
+        Route::get('connections/{account}/rules', [JiraRulesController::class, 'edit'])->whereNumber('account')->name('connections.rules.edit');
+        Route::put('connections/{account}/rules', [JiraRulesController::class, 'update'])->whereNumber('account')->name('connections.rules.update');
         Route::get('connections/{provider}/redirect', [AccountAuthorizationController::class, 'redirect'])
             ->name('connections.redirect');
 

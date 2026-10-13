@@ -10,10 +10,10 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('alerts:watch')]
-#[Description('Queue a check for new messages waiting for an answer in every watched Gmail and Slack account')]
+#[Description('Queue a check for new messages waiting for an answer in every watched Gmail, Slack and Jira account')]
 class WatchInboxes extends Command
 {
-    private const SOURCES = [AlertSource::Gmail, AlertSource::Slack];
+    private const SOURCES = [AlertSource::Gmail, AlertSource::Slack, AlertSource::Jira];
 
     /**
      * Execute the console command.

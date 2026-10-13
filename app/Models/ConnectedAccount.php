@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'scopes',
     'disabled_capabilities',
     'metadata',
+    'rules',
     'expires_at',
     'status',
     'last_refreshed_at',

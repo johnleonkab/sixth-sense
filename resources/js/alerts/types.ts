@@ -3,7 +3,7 @@ export type AlertState = 'judging' | 'important' | 'planning' | 'ready' | 'routi
 /** Mirrors InboxItem::toAlert(). */
 export type Alert = {
     id: number;
-    source: 'gmail' | 'slack' | 'calendar' | 'agenda';
+    source: 'gmail' | 'slack' | 'calendar' | 'agenda' | 'jira';
     source_label: string;
     actor_name: string | null;
     /** Email subject; for Slack, where it was said ("Mensaje directo", "Mención en #producto"). */

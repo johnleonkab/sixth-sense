@@ -48,6 +48,13 @@ return [
         'redirect' => env('SLACK_REDIRECT_URI', env('APP_URL').'/settings/connections/slack/callback'),
     ],
 
+    'atlassian' => [
+        'client_id' => env('ATLASSIAN_CLIENT_ID'),
+        'client_secret' => env('ATLASSIAN_CLIENT_SECRET'),
+        // Must match the callback URL of the OAuth 2.0 (3LO) app in developer.atlassian.com.
+        'redirect' => env('ATLASSIAN_REDIRECT_URI', env('APP_URL').'/settings/connections/atlassian/callback'),
+    ],
+
     'notion' => [
         'client_id' => env('NOTION_CLIENT_ID'),
         'client_secret' => env('NOTION_CLIENT_SECRET'),

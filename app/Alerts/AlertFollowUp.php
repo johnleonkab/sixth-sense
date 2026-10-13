@@ -6,6 +6,8 @@ use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Chat\Chats;
+use App\Connectors\Issues\IssueComment;
+use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\Mailbox;
 use App\Events\InboxItemUpdated;
@@ -30,6 +32,7 @@ class AlertFollowUp
         private ReplyPlanner $planner,
         private Mailbox $mailbox,
         private Chats $chats,
+        private IssueTracker $issues,
     ) {}
 
     /**
@@ -89,15 +92,17 @@ class AlertFollowUp
         $resolved = [];
 
         $pending = $user->inboxItems()->pending()
-            ->whereIn('source', [AlertSource::Gmail, AlertSource::Slack])
+            ->whereIn('source', [AlertSource::Gmail, AlertSource::Slack, AlertSource::Jira])
             ->where('received_at', '>=', now()->subDays(self::CHECK_DAYS))
             ->get();
 
         foreach ($pending as $item) {
             try {
-                $replied = $item->source === AlertSource::Gmail
-                    ? $this->mailbox->repliedAfter($user, $item->messageRef())
-                    : $this->chats->repliedAfter($user, $item->messageRef());
+                $replied = match ($item->source) {
+                    AlertSource::Gmail => $this->mailbox->repliedAfter($user, $item->messageRef()),
+                    AlertSource::Jira => $this->issues->repliedAfter($user, $item->messageRef()),
+                    default => $this->chats->repliedAfter($user, $item->messageRef()),
+                };
             } catch (Throwable $exception) {
                 report($exception);
 
@@ -120,13 +125,49 @@ class AlertFollowUp
     public function brief(InboxItem $item): ?AlertBrief
     {
         try {
-            return $item->source === AlertSource::Gmail ? $this->emailBrief($item) : $this->chatBrief($item);
+            return match ($item->source) {
+                AlertSource::Gmail => $this->emailBrief($item),
+                AlertSource::Jira => $this->issueBrief($item),
+                AlertSource::Slack => $this->chatBrief($item),
+                default => $this->keptBrief($item),
+            };
         } catch (Throwable $exception) {
             // The service could not give it now: what the alert kept of the message is enough.
             report($exception);
 
             return $this->keptBrief($item);
         }
+    }
+
+    private function issueBrief(InboxItem $item): AlertBrief
+    {
+        $issue = $this->issues->issue($item->user, Str::beforeLast($item->messageRef(), ':'));
+        $comment = collect($issue?->comments ?? [])->firstWhere('ref', $item->messageRef());
+
+        if ($issue === null || $comment === null) {
+            return $this->keptBrief($item);
+        }
+
+        $timezone = (string) config('app.timezone');
+
+        return new AlertBrief(
+            source: AlertSource::Jira,
+            where: "{$issue->summary->key} · {$issue->summary->summary} ({$issue->summary->type}, {$issue->summary->status})",
+            from: $comment->author,
+            subject: $issue->summary->summary,
+            text: $comment->text,
+            receivedAt: $comment->createdAt,
+            participants: array_values(array_unique(array_filter(array_map(fn (IssueComment $other): ?string => $other->mine ? null : $other->author, $issue->comments)))),
+            conversation: [
+                ['from' => 'Descripción del issue', 'when' => '', 'text' => Str::limit($issue->descriptionText, 1200)],
+                ...array_map(fn (IssueComment $other): array => [
+                    'from' => $other->mine ? "{$item->user->name} (él)" : $other->author,
+                    'when' => $other->createdAt->setTimezone($timezone)->format('d/m H:i'),
+                    'text' => $other->text,
+                ], array_slice(array_filter($issue->comments, fn (IssueComment $other): bool => $other->ref !== $comment->ref), -8)),
+            ],
+            why: $item->why,
+        );
     }
 
     private function keptBrief(InboxItem $item): AlertBrief

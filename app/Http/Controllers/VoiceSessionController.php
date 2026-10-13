@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Connectors\Chat\Chats;
+use App\Connectors\Issues\IssueTracker;
 use App\Http\Requests\StartVoiceSessionRequest;
 use App\Voice\AssistantProfile;
 use App\Voice\Tools\Toolbox;
@@ -15,12 +16,12 @@ class VoiceSessionController extends Controller
     /**
      * Issue a short-lived grant so the browser can talk to the voice provider.
      */
-    public function __invoke(StartVoiceSessionRequest $request, VoiceProvider $voice, Toolbox $toolbox, Chats $chats): JsonResponse
+    public function __invoke(StartVoiceSessionRequest $request, VoiceProvider $voice, Toolbox $toolbox, Chats $chats, IssueTracker $issues): JsonResponse
     {
         try {
             $session = $voice->startSession(
                 $request->user(),
-                AssistantProfile::for($request->user(), $request->now(), $toolbox, $chats),
+                AssistantProfile::for($request->user(), $request->now(), $toolbox, $chats, $issues),
             );
         } catch (VoiceProviderUnavailable $exception) {
             report($exception);

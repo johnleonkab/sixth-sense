@@ -5,6 +5,8 @@ namespace App\Voice;
 use App\Connectors\Chat\ChatConversation;
 use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
+use App\Connectors\Issues\IssueTracker;
+use App\Connectors\Jira\JiraRules;
 use App\Models\User;
 use App\Voice\Tools\Toolbox;
 use App\WorkContext\WorkDigest;
@@ -26,7 +28,7 @@ final readonly class AssistantProfile
     /**
      * Build the profile for a conversation starting at `$now`, in the user's timezone.
      */
-    public static function for(User $user, CarbonImmutable $now, ?Toolbox $toolbox = null, ?Chats $chats = null): self
+    public static function for(User $user, CarbonImmutable $now, ?Toolbox $toolbox = null, ?Chats $chats = null, ?IssueTracker $issues = null): self
     {
         $moment = $now->locale('es');
 
@@ -42,9 +44,28 @@ final readonly class AssistantProfile
                 $instructions,
                 $chats ? self::familiarChats($chats->familiar($user)) : '',
                 self::workContext($user),
+                $issues ? self::jiraRules($issues->rules($user)) : '',
             ]))),
             tools: $toolbox?->declarations() ?? [],
         );
+    }
+
+    /**
+     * How each Jira site works, as the person wrote it: followed when creating,
+     * editing, prioritising, linking or commenting there.
+     *
+     * @param  list<array{account_id: int, site: string, rules: JiraRules}>  $sites
+     */
+    private static function jiraRules(array $sites): string
+    {
+        $written = array_filter($sites, fn (array $site): bool => trim($site['rules']->text) !== '');
+
+        if ($written === []) {
+            return '';
+        }
+
+        return "Reglas de Jira que el usuario ha escrito para cada sitio. Síguelas siempre al crear, editar, priorizar, enlazar o comentar ahí, y úsalas para saber en qué proyectos buscar:\n"
+            .implode("\n\n", array_map(fn (array $site): string => "--- Jira «{$site['site']}» (site_id {$site['account_id']}) ---\n".$site['rules']->forAssistant(), $written));
     }
 
     /**
