@@ -25,7 +25,7 @@ test('the assistant finds what waits for an answer, newest first, with its propo
         ->assertJsonPath('output.alerts.0.why_it_matters', 'Necesita la firma antes del viernes.')
         ->assertJsonPath('output.alerts.0.proposal', 'Responder a Andrés que lo firmas el jueves.')
         ->assertJsonPath('output.alerts.0.email_id', '4.m9')
-        ->assertJsonPath('output.alerts.0.status', 'Pendiente')
+        ->assertJsonPath('output.alerts.0.status', 'Pendiente, con propuesta')
         ->assertJsonPath('output.alerts.0.received', 'hace 2 minutos')
         ->assertJsonPath('output.alerts.1.subject', 'Antiguo')
         ->assertJsonPath('canvas.view', 'alerts.list')

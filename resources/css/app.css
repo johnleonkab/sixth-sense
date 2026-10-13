@@ -259,3 +259,69 @@
         transform: translateY(-10px);
     }
 }
+
+/* The alerts widget: the panel unfolds from its button, toasts slide in, work in progress shimmers. */
+@layer components {
+    .alerts-panel-in {
+        transform-origin: top right;
+        animation: alerts-panel-in 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+    }
+
+    .alerts-row-in {
+        animation: alerts-row-in 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .alerts-toast-in {
+        animation: alerts-toast-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+    }
+
+    .alerts-shimmer {
+        background: linear-gradient(90deg, var(--soft) 0%, var(--line) 45%, var(--soft) 90%);
+        background-size: 200% 100%;
+        animation: alerts-shimmer 1.4s linear infinite;
+    }
+
+    .alerts-ping::after {
+        content: '';
+        position: absolute;
+        inset: -3px;
+        border-radius: 9999px;
+        border: 1.5px solid currentColor;
+        animation: alerts-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+}
+
+@keyframes alerts-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.94);
+    }
+}
+
+@keyframes alerts-row-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes alerts-toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(24px) scale(0.97);
+    }
+}
+
+@keyframes alerts-shimmer {
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes alerts-ping {
+    75%,
+    100% {
+        opacity: 0;
+        transform: scale(1.9);
+    }
+}

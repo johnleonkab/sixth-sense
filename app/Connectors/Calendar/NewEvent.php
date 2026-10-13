@@ -18,6 +18,8 @@ final readonly class NewEvent
         public array $attendees = [],
         public ?string $description = null,
         public bool $videoCall = true,
+        /** A block of the person's own work, put there by the scheduler. */
+        public bool $task = false,
     ) {}
 
     /**
@@ -34,6 +36,7 @@ final readonly class NewEvent
             'attendees' => array_map(fn (MailAddress $address): array => $address->toArray(), $this->attendees),
             'description' => $this->description,
             'video_call' => $this->videoCall,
+            'task' => $this->task,
         ];
     }
 
@@ -50,6 +53,7 @@ final readonly class NewEvent
             attendees: array_map(fn (array $address): MailAddress => new MailAddress($address['name'], $address['email']), $data['attendees']),
             description: $data['description'],
             videoCall: (bool) $data['video_call'],
+            task: (bool) ($data['task'] ?? false),
         );
     }
 }

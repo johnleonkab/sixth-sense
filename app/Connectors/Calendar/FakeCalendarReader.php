@@ -54,6 +54,14 @@ class FakeCalendarReader implements CalendarReader
         );
     }
 
+    /** @var array<string, list<array{CarbonImmutable, CarbonImmutable}>> Busy times of other people, for tests. */
+    public array $othersBusy = [];
+
+    public function busy(User $user, array $emails, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return array_intersect_key($this->othersBusy, array_flip($emails));
+    }
+
     public function event(User $user, string $ref, string $timezone): ?CalendarEvent
     {
         if (! preg_match('/^demo:primary:(\d{8})-(\d+)$/', $ref, $match)) {

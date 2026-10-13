@@ -105,7 +105,12 @@ test('an alert of someone else can not be reviewed, nor a meeting reminder', fun
 test('the person can close an alert as done or as needing nothing', function () {
     Event::fake([InboxItemUpdated::class]);
 
-    runAlertTool('resolve_alert', ['alert_id' => $this->email->id, 'outcome' => 'done'])->assertJsonPath('output.status', 'Resuelta');
+    // The alert comes back on screen as it now stands.
+    runAlertTool('resolve_alert', ['alert_id' => $this->email->id, 'outcome' => 'done'])
+        ->assertJsonPath('output.status', 'Resuelta')
+        ->assertJsonPath('canvas.view', 'alerts.review')
+        ->assertJsonPath('canvas.props.alert.state', 'resolved')
+        ->assertJsonPath('canvas.props.alert.resolution', 'marked_done');
     runAlertTool('resolve_alert', ['alert_id' => $this->slack->id, 'outcome' => 'dismissed'])->assertJsonPath('output.status', 'Descartada');
     runAlertTool('resolve_alert', ['alert_id' => $this->slack->id, 'outcome' => 'done'])->assertJsonPath('output.say', 'Ese aviso ya estaba cerrado.');
 
@@ -115,12 +120,82 @@ test('the person can close an alert as done or as needing nothing', function () 
     Event::assertDispatchedTimes(InboxItemUpdated::class, 2);
 });
 
-test('alerts waiting for an answer are on screen after reloading', function () {
+test('a closed alert, or one judged unimportant, can be left pending again', function () {
+    $this->email->close(AlertStatus::Resolved, 'marked_done');
+    $routine = InboxItem::factory()->for($this->user)->create(['triage' => 'routine', 'status' => AlertStatus::Notice]);
+
+    runAlertTool('resolve_alert', ['alert_id' => $this->email->id, 'outcome' => 'reopen'])
+        ->assertJsonPath('output.say', 'Hecho, vuelve a estar pendiente.')
+        ->assertJsonPath('canvas.props.alert.state', 'important');
+    runAlertTool('resolve_alert', ['alert_id' => $routine->id, 'outcome' => 'reopen'])->assertJsonPath('canvas.props.alert.state', 'important');
+    runAlertTool('resolve_alert', ['alert_id' => $this->slack->id, 'outcome' => 'reopen'])->assertJsonPath('output.say', 'Ese aviso ya estaba pendiente.');
+
+    expect($this->email->refresh()->status)->toBe(AlertStatus::Pending)
+        ->and($this->email->resolution)->toBeNull()
+        ->and($this->email->resolved_at)->toBeNull()
+        ->and($routine->refresh()->status)->toBe(AlertStatus::Pending);
+});
+
+test('a message judged unimportant can be reviewed too', function () {
+    $this->email->update(['triage' => 'routine', 'status' => AlertStatus::Notice]);
+
+    runAlertTool('review_alert', ['alert_id' => $this->email->id])
+        ->assertJsonPath('canvas.props.alert.state', 'routine')
+        ->assertJsonPath('output.note', 'No espera su respuesta: se consideró sin importancia.');
+
+    expect($this->planner->planned)->toBe([]);
+});
+
+test('after reloading, the screen lists what came in lately and every alert still waiting for an answer', function () {
     $this->slack->close(AlertStatus::Resolved, 'replied');
+    $old = InboxItem::factory()->for($this->user)->create(['received_at' => now()->subDays(5), 'title' => 'Antiguo pero pendiente']);
+    InboxItem::factory()->for($this->user)->create(['received_at' => now()->subDays(5), 'status' => AlertStatus::Resolved]);
+    InboxItem::factory()->for($this->user)->create(['status' => AlertStatus::Dismissed, 'resolution' => 'superseded']);
 
     $this->actingAs($this->user)->get(route('home'))
-        ->assertInertia(fn ($page) => $page->component('home')
-            ->has('alerts', 1)
-            ->where('alerts.0.id', $this->email->id)
-            ->where('alerts.0.status', 'pending'));
+        ->assertInertia(fn ($page) => $page->component('home')->has('alerts', 3));
+
+    $feed = $this->actingAs($this->user)->getJson(route('alerts.feed'))->assertOk()->json('items');
+
+    expect(collect($feed)->pluck('state', 'id')->all())->toEqualCanonicalizing([
+        $this->email->id => 'important',
+        $this->slack->id => 'resolved',
+        $old->id => 'important',
+    ]);
+});
+
+test('each alert says where it stands', function (array $attributes, string $state) {
+    expect(InboxItem::factory()->for($this->user)->create($attributes)->state())->toBe($state);
+})->with([
+    'just arrived' => [['triage' => 'judging', 'status' => 'notice'], 'judging'],
+    'nothing to answer' => [['triage' => 'routine', 'status' => 'notice'], 'routine'],
+    'waiting' => [[], 'important'],
+    'preparing a proposal' => [['planning' => true], 'planning'],
+    'with a proposal' => [['proposal' => ['summary' => 'x']], 'ready'],
+    'answered' => [['status' => 'resolved'], 'resolved'],
+    'meeting' => [['source' => 'calendar', 'status' => 'notice', 'triage' => null], 'meeting'],
+]);
+
+test('the history keeps everything, a page at a time, and can show only what was addressed', function () {
+    $this->email->close(AlertStatus::Resolved, 'replied');
+    InboxItem::factory()->for($this->user)->count(31)->create(['received_at' => now()->subDays(10)]);
+    InboxItem::factory()->for($this->user)->create(['status' => AlertStatus::Dismissed, 'resolution' => 'superseded']);
+
+    $first = $this->actingAs($this->user)->getJson(route('alerts.history'))->assertOk();
+
+    expect($first->json('items'))->toHaveCount(30)
+        ->and($first->json('next'))->not->toBeNull();
+
+    $second = $this->actingAs($this->user)->getJson(route('alerts.history', ['before' => $first->json('next')]))->json();
+
+    expect(count($second['items']))->toBe(3)
+        ->and($second['next'])->toBeNull();
+
+    $this->actingAs($this->user)->getJson(route('alerts.history', ['filter' => 'addressed']))
+        ->assertJsonCount(1, 'items')
+        ->assertJsonPath('items.0.resolution', 'replied');
+
+    runAlertTool('show_alert_history', [])
+        ->assertJsonPath('canvas.view', 'alerts.history')
+        ->assertJsonPath('output.pending', 32);
 });

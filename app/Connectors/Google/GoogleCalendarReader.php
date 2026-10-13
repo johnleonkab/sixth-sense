@@ -139,6 +139,43 @@ class GoogleCalendarReader implements CalendarReader
         return $this->toEvent($response->json(), (string) $account->email, $calendar, $timezone, $account->id);
     }
 
+    public function busy(User $user, array $emails, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $account = $user->accountsWith(Capability::CalendarRead)->first();
+
+        if ($account === null || $emails === []) {
+            return [];
+        }
+
+        try {
+            $response = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(10)
+                ->post('https://www.googleapis.com/calendar/v3/freeBusy', [
+                    'timeMin' => $from->toRfc3339String(),
+                    'timeMax' => $to->toRfc3339String(),
+                    'items' => array_map(fn (string $email): array => ['id' => $email], array_values(array_unique($emails))),
+                ]);
+        } catch (ConnectionException $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        $busy = [];
+
+        foreach ($response->json('calendars', []) as $email => $calendar) {
+            if (! empty($calendar['errors'])) {
+                continue;
+            }
+
+            $busy[$email] = array_map(
+                fn (array $period): array => [CarbonImmutable::parse($period['start']), CarbonImmutable::parse($period['end'])],
+                $calendar['busy'] ?? [],
+            );
+        }
+
+        return $busy;
+    }
+
     /**
      * Calendars of the account whose events can be read, primary first. People
      * who only share their free/busy are left out: their events can not be listed.

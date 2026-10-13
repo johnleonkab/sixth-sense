@@ -98,7 +98,7 @@ test('a direct message that waits for an answer raises a pending alert with a pr
 
     expect($alerts)->toHaveCount(1)
         ->and($alerts[0]->source)->toBe(AlertSource::Slack)
-        ->and($alerts[0]->status)->toBe(AlertStatus::Pending)
+        ->and($alerts[0]->refresh()->status)->toBe(AlertStatus::Pending)
         ->and($alerts[0]->external_id)->toBe("{$this->account->id}:D5:{$this->now}.000100")
         ->and($alerts[0]->thread_key)->toBe("{$this->account->id}:D5")
         ->and($alerts[0]->title)->toBe('Mensaje directo')
@@ -129,29 +129,31 @@ test('the user own messages, apps and what was already handled are left out', fu
         slackMatch("{$this->now}.000300", 'U5', 'Gracias!'),
     ]);
 
-    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([])
+    $listed = app(AlertInbox::class)->check($this->account, AlertSource::Slack);
+
+    expect($listed)->toHaveCount(1)
+        ->and($listed[0]->refresh()->state())->toBe('routine')
         ->and($this->judge->judged)->toHaveCount(1);
 
-    // A minute later the same search answers the same: nothing is judged twice.
-    app(AlertInbox::class)->check($this->account, AlertSource::Slack);
-
-    expect($this->judge->judged)->toHaveCount(1);
+    // A minute later the same search answers the same: nothing is listed or judged twice.
+    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([])
+        ->and($this->judge->judged)->toHaveCount(1);
 });
 
-test('a new message in a conversation already waiting for an answer updates its alert', function () {
+test('a new important message in a conversation already waiting for an answer takes its place', function () {
     fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?')]);
     $first = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
 
     fakeSlackInbox([slackMatch("{$this->now}.000500", 'U5', 'Es urgente, necesito la firma hoy')]);
-    $again = app(AlertInbox::class)->check($this->account, AlertSource::Slack);
+    $second = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
 
-    expect($again)->toHaveCount(1)
-        ->and($again[0]->id)->toBe($first->id)
-        ->and($this->user->inboxItems()->count())->toBe(1)
-        ->and($first->refresh()->external_id)->toBe("{$this->account->id}:D5:{$this->now}.000500")
-        ->and($first->body)->toBe('Es urgente, necesito la firma hoy');
+    expect($second->refresh()->status)->toBe(AlertStatus::Pending)
+        ->and($second->body)->toBe('Es urgente, necesito la firma hoy')
+        ->and($first->refresh()->status)->toBe(AlertStatus::Dismissed)
+        ->and($first->resolution)->toBe('superseded')
+        ->and($this->user->inboxItems()->pending()->count())->toBe(1);
 
-    Event::assertDispatchedTimes(InboxItemCreated::class, 1);
+    Event::assertDispatchedTimes(InboxItemCreated::class, 2);
 });
 
 test('every minute slack accounts of users who want its alerts are checked', function () {

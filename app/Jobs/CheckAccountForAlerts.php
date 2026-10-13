@@ -22,6 +22,8 @@ class CheckAccountForAlerts implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 300;
 
+    public int $timeout = 120;
+
     public function __construct(
         public ConnectedAccount $account,
         public AlertSource $source = AlertSource::Gmail,

@@ -1,4 +1,8 @@
-import { sourceDot } from '@/alerts/alert-center';
+import { useEffect, useState } from 'react';
+
+import { sourceDot, StateChip } from '@/alerts/alert-center';
+import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
+import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
 import type { Alert } from '@/alerts/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
@@ -12,6 +16,7 @@ type Proposal = {
 };
 
 type AlertReviewProps = {
+    task: AgendaTaskCard | null;
     alert: Alert;
     source_label: string;
     from: string | null;
@@ -36,9 +41,70 @@ const audience: Record<NonNullable<Proposal['reply']>['to'], string> = {
  * reply engine proposes to resolve it. The person changes it by voice; the
  * assistant then prepares each action as a draft to confirm.
  */
+const resolutionText: Record<string, string> = {
+    replied: 'Respondiste tú: se resolvió sola.',
+    marked_done: 'La marcaste como resuelta.',
+    dismissed: 'La descartaste: no hacía falta hacer nada.',
+    superseded: 'La sustituyó un mensaje más reciente de la misma conversación.',
+};
+
+/** Where the alert stands, said in a line under its label. */
+function stateLine(alert: Alert): string {
+    switch (alert.state) {
+        case 'judging':
+            return 'Viendo si espera tu respuesta…';
+        case 'routine':
+            return 'No parece esperar tu respuesta. Si sí la espera, déjala pendiente.';
+        case 'planning':
+            return 'Esperando tu respuesta. Preparando una propuesta…';
+        case 'ready':
+        case 'important':
+            return 'Esperando tu respuesta.';
+        default:
+            return resolutionText[alert.resolution ?? ''] ?? '';
+    }
+}
+
 const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => {
     const { runTool } = useCanvas();
-    const pending = props.alert.status === 'pending';
+    const [alert, setAlert] = useState<Alert>(props.alert);
+    const [busy, setBusy] = useState(false);
+    const pending = alert.status === 'pending';
+    const closed = alert.state === 'resolved' || alert.state === 'dismissed';
+
+    // It changes while on screen: answered from Slack or Gmail, a proposal ready, closed by voice.
+    useEffect(() => {
+        const onChange = (event: Event) => {
+            const changed = (event as CustomEvent<Alert>).detail;
+
+            if (changed.id !== props.alert.id) {
+                return;
+            }
+
+            setAlert(changed);
+
+            // The proposal is ready, or the scheduler found time for it: show them whole.
+            if ((changed.state === 'ready' && !props.proposal) || (changed.task?.status ?? null) !== (props.task?.status ?? null)) {
+                runTool('review_alert', { alert_id: changed.id });
+            }
+        };
+
+        window.addEventListener(ALERT_CHANGED, onChange);
+
+        return () => window.removeEventListener(ALERT_CHANGED, onChange);
+    }, [props.alert.id, props.proposal, props.task, runTool]);
+
+    /** Shown at once; the canvas then comes back as the server left it. */
+    const change = (outcome: 'done' | 'dismissed' | 'reopen') => {
+        setBusy(true);
+        setAlert((current) => ({
+            ...current,
+            ...(outcome === 'reopen'
+                ? { status: 'pending', state: current.proposal ? 'ready' : 'important', resolution: null }
+                : { status: outcome === 'done' ? 'resolved' : 'dismissed', state: outcome === 'done' ? 'resolved' : 'dismissed', resolution: outcome === 'done' ? 'marked_done' : 'dismissed' }),
+        }));
+        runTool('resolve_alert', { alert_id: alert.id, outcome });
+    };
 
     return (
         <CanvasFrame
@@ -53,10 +119,19 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 )
             }
         >
-            <p className="mb-4 flex items-center gap-2 text-[13px] text-muted">
-                <i aria-hidden className={`size-[8px] rounded-[3px] ${sourceDot[props.alert.source]}`} />
-                {props.alert.why}
-            </p>
+            <div
+                key={alert.state}
+                className={`alerts-row-in mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-3.5 py-2.5 ${closed ? 'bg-soft' : alert.state === 'routine' ? 'bg-soft/60' : 'bg-accent-soft/60'}`}
+            >
+                <StateChip state={alert.state} />
+                <span className="text-[12.5px] text-muted">{stateLine(alert)}</span>
+                {alert.why && (
+                    <span className="flex basis-full items-center gap-2 text-[13px] text-ink/85">
+                        <i aria-hidden className={`size-[8px] flex-none rounded-[3px] ${sourceDot[alert.source]}`} />
+                        {alert.why}
+                    </span>
+                )}
+            </div>
 
             <div className="grid gap-5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                 <section aria-label="Mensaje" className="min-w-0">
@@ -104,32 +179,47 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
 
                             {pending && <p className="mt-3 text-[12px] text-muted">Dime si lo hago así o qué cambio.</p>}
                         </>
+                    ) : alert.state === 'planning' ? (
+                        <div className="mt-2 space-y-2" aria-label="Preparando la propuesta">
+                            <div className="alerts-shimmer h-4 w-4/5 rounded" />
+                            <div className="alerts-shimmer h-16 rounded-lg" />
+                            <div className="alerts-shimmer h-3 w-1/2 rounded" />
+                        </div>
                     ) : (
-                        <p className="mt-1.5 text-[13.5px] text-muted">Sin propuesta todavía. Dime cómo quieres responder.</p>
+                        <p className="mt-1.5 text-[13.5px] text-muted">{pending ? 'Sin propuesta todavía. Dime cómo quieres responder.' : 'Sin propuesta.'}</p>
                     )}
                 </section>
             </div>
 
-            <div className="mt-4 flex justify-end gap-2 text-[12.5px]">
+            {props.task && (
+                <section aria-label="Agendado" className="mt-4 rounded-xl border border-line p-4">
+                    <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
+                    <AgendaTaskSummary task={props.task} compact />
+                </section>
+            )}
+
+            <div className="mt-4 flex items-center justify-end gap-2 text-[12.5px]">
+                {busy && <span aria-hidden className="mr-auto size-3 animate-spin rounded-full border-[1.5px] border-muted border-t-transparent" />}
                 {pending ? (
                     <>
-                        <button
-                            type="button"
-                            onClick={() => runTool('resolve_alert', { alert_id: props.alert.id, outcome: 'dismissed' })}
-                            className="rounded-full border border-line px-3 py-1 hover:bg-soft"
-                        >
+                        <button type="button" disabled={busy} onClick={() => change('dismissed')} className="rounded-full border border-line px-3 py-1 hover:bg-soft disabled:opacity-50">
                             Descartar
                         </button>
                         <button
                             type="button"
-                            onClick={() => runTool('resolve_alert', { alert_id: props.alert.id, outcome: 'done' })}
-                            className="rounded-full border border-line px-3 py-1 hover:bg-soft"
+                            disabled={busy}
+                            onClick={() => change('done')}
+                            className="rounded-full bg-ink px-3 py-1 font-medium text-bg hover:opacity-90 disabled:opacity-50"
                         >
                             Ya está resuelta
                         </button>
                     </>
                 ) : (
-                    <span className="text-muted">{props.alert.status === 'resolved' ? 'Resuelta' : props.alert.status === 'dismissed' ? 'Descartada' : ''}</span>
+                    alert.state !== 'judging' && (
+                        <button type="button" disabled={busy} onClick={() => change('reopen')} className="rounded-full border border-line px-3 py-1 hover:bg-soft disabled:opacity-50">
+                            {closed ? 'Reabrir' : 'Dejar pendiente'}
+                        </button>
+                    )
                 )}
             </div>
         </CanvasFrame>

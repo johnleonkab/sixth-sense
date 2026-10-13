@@ -104,6 +104,16 @@ class User extends Authenticatable
     }
 
     /**
+     * What the scheduler found time for.
+     *
+     * @return HasMany<AgendaTask, $this>
+     */
+    public function agendaTasks(): HasMany
+    {
+        return $this->hasMany(AgendaTask::class);
+    }
+
+    /**
      * Alerts raised for this user, newest first.
      *
      * @return HasMany<InboxItem, $this>

@@ -38,6 +38,11 @@ class ScriptedCalendar implements CalendarReader
     {
         return null;
     }
+
+    public function busy(User $user, array $emails, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return [];
+    }
 }
 
 function meeting(string $title, int $inMinutes, array $overrides = []): CalendarEvent

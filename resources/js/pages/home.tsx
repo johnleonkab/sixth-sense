@@ -155,6 +155,7 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
 
                 <AlertCenter
                     pending={alerts}
+                    onHistory={() => runFromScreen('show_alert_history', {})}
                     listening={voice.active}
                     onOpen={(alert) =>
                         alert.source === 'calendar'

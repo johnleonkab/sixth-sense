@@ -68,7 +68,7 @@ test('a summary is added after the existing description', function () {
 test('a new meeting is created with google meet and its guests are invited', function () {
     Http::fake(['*' => Http::response(['id' => 'new1', 'htmlLink' => 'https://calendar.google.com/event?eid=new1'])]);
 
-    $url = app(GoogleCalendarWriter::class)->create($this->user, new NewEvent(
+    $created = app(GoogleCalendarWriter::class)->create($this->user, new NewEvent(
         accountId: $this->account->id,
         title: 'Revisión prepago',
         start: CarbonImmutable::parse('2026-10-09 10:00', 'Europe/Madrid'),
@@ -76,7 +76,8 @@ test('a new meeting is created with google meet and its guests are invited', fun
         attendees: [new MailAddress('Marta Ruiz', 'marta@work.com')],
     ));
 
-    expect($url)->toBe('https://calendar.google.com/event?eid=new1');
+    expect($created->url)->toBe('https://calendar.google.com/event?eid=new1')
+        ->and($created->ref)->toBe("{$this->account->id}:primary:new1");
     Http::assertSent(fn (Request $request) => $request->url() === 'https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1'
         && $request['summary'] === 'Revisión prepago'
         && $request['start'] === ['dateTime' => '2026-10-09T10:00:00+02:00', 'timeZone' => 'Europe/Madrid']

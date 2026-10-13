@@ -4,7 +4,7 @@ import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
 type AlertSource = {
-    key: 'gmail' | 'slack' | 'calendar';
+    key: 'gmail' | 'slack' | 'calendar' | 'agenda';
     name: string;
     description: string;
     enabled: boolean;
@@ -16,6 +16,7 @@ type AlertSource = {
 const sourceColor: Record<AlertSource['key'], string> = {
     gmail: 'bg-gmail',
     slack: 'bg-slack',
+    agenda: 'bg-ok',
     calendar: 'bg-accent',
 };
 

@@ -9,6 +9,8 @@ use App\Connectors\Chat\Chats;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\Mailbox;
 use App\Events\InboxItemUpdated;
+use App\Jobs\ScheduleTask;
+use App\Models\AgendaTask;
 use App\Models\InboxItem;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -36,17 +38,45 @@ class AlertFollowUp
     public function plan(InboxItem $item): void
     {
         if ($item->status !== AlertStatus::Pending) {
+            $this->stopPlanning($item);
+
             return;
         }
 
         $brief = $this->brief($item);
 
         if ($brief === null) {
+            $this->stopPlanning($item);
+
             return;
         }
 
-        $item->update(['proposal' => $this->planner->plan($item->user, $brief)->toArray()]);
+        $plan = $this->planner->plan($item->user, $brief);
+        $item->update(['proposal' => $plan->toArray(), 'planning' => false]);
         InboxItemUpdated::dispatch($item);
+
+        // Work the person has to do themselves: the scheduler finds time for it.
+        if ($plan->task !== null && $item->user->wantsAlertsFrom(AlertSource::Agenda) && ! AgendaTask::where('inbox_item_id', $item->id)->exists()) {
+            $task = $item->user->agendaTasks()->create([
+                'inbox_item_id' => $item->id,
+                'origin' => 'alert',
+                'title' => $plan->task['title'],
+                'context' => trim("{$item->actor_name}: {$item->why}\n\n".mb_substr($brief->text, 0, 1500)),
+            ]);
+
+            ScheduleTask::dispatch($task, $plan->task['effort_minutes'], $plan->task['deadline'], $plan->task['people']);
+        }
+    }
+
+    /**
+     * The reply engine gave up (or had nothing to do): the alert stays, without a proposal.
+     */
+    public function stopPlanning(InboxItem $item): void
+    {
+        if ($item->planning) {
+            $item->update(['planning' => false]);
+            InboxItemUpdated::dispatch($item);
+        }
     }
 
     /**

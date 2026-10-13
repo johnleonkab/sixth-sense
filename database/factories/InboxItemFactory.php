@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Alerts\Triage;
 use App\Models\InboxItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,6 +30,7 @@ class InboxItemFactory extends Factory
             'why' => 'Te pide revisar algo antes del viernes.',
             'relevance' => 80,
             'status' => AlertStatus::Pending,
+            'triage' => Triage::Important,
             'payload' => ['account' => 'jhon@work.com'],
             'received_at' => now(),
         ];

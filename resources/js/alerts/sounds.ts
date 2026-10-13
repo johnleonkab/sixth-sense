@@ -56,6 +56,11 @@ const sounds: Record<string, (ctx: AudioContext) => void> = {
         tone(ctx, { frequency: 523.25, to: 440, delay: 0.16, duration: 0.22, volume: 0.17, type: 'triangle' });
         tone(ctx, { frequency: 1046.5, delay: 0.17, duration: 0.5, volume: 0.04 });
     },
+    /** "Agenda": two soft notes going down, for a task that found no slot. */
+    agenda: (ctx) => {
+        tone(ctx, { frequency: 880, duration: 0.3, volume: 0.14, type: 'triangle' });
+        tone(ctx, { frequency: 659.25, delay: 0.18, duration: 0.5, volume: 0.12, type: 'triangle' });
+    },
     /** "Reunión": three short marimba-like notes going up, then the top one again, softer. */
     calendar: (ctx) => {
         [659.25, 830.61, 987.77].forEach((frequency, i) => tone(ctx, { frequency, delay: i * 0.13, duration: 0.32, volume: 0.16, type: 'triangle' }));

@@ -6,6 +6,7 @@ use App\Alerts\AlertFollowUp;
 use App\Models\InboxItem;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 /**
  * Asks the reply engine how to answer a new alert. Separate from raising the
@@ -31,5 +32,15 @@ class PlanAlertReply implements ShouldQueue
     public function handle(AlertFollowUp $followUp): void
     {
         $followUp->plan($this->item->fresh() ?? $this->item);
+    }
+
+    /**
+     * Out of tries: the alert stays, without a proposal; it can be asked for again when reviewed.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        if ($item = $this->item->fresh()) {
+            app(AlertFollowUp::class)->stopPlanning($item);
+        }
     }
 }

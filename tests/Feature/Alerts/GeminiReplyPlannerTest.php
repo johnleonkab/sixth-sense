@@ -61,3 +61,18 @@ test('an answer without a summary is an error, so the alert stays without a prop
 
     $this->planner->plan($this->user, $this->brief);
 })->throws(RuntimeException::class);
+
+test('work the person has to do themselves comes with the proposal, for the scheduler', function () {
+    geminiPlan([
+        'summary' => 'Responder que lo revisas hoy.', 'reply_to' => 'sender', 'reply_text' => 'Lo reviso hoy.', 'other_actions' => [], 'question' => '',
+        'manual_task' => ['needed' => true, 'title' => 'Revisar el contrato de Grupo Vela', 'effort_minutes' => 45, 'deadline' => '2026-10-16', 'people' => []],
+    ]);
+
+    expect($this->planner->plan($this->user, $this->brief)->task)->toBe(['title' => 'Revisar el contrato de Grupo Vela', 'effort_minutes' => 45, 'deadline' => '2026-10-16', 'people' => []]);
+});
+
+test('when answering is enough, there is no task to schedule', function () {
+    geminiPlan(['summary' => 'Responder.', 'reply_to' => 'sender', 'reply_text' => 'Ok', 'other_actions' => [], 'question' => '', 'manual_task' => ['needed' => false, 'title' => '', 'effort_minutes' => 0, 'deadline' => '', 'people' => []]]);
+
+    expect($this->planner->plan($this->user, $this->brief)->task)->toBeNull();
+});

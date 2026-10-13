@@ -4,9 +4,12 @@ namespace App\Voice\Tools;
 
 use App\Models\User;
 use App\Voice\Tools\Actions\GetActionStatus;
+use App\Voice\Tools\Agenda\CancelScheduledTask;
+use App\Voice\Tools\Agenda\ScheduleTaskTool;
 use App\Voice\Tools\Alerts\ListAlerts;
 use App\Voice\Tools\Alerts\ResolveAlert;
 use App\Voice\Tools\Alerts\ReviewAlert;
+use App\Voice\Tools\Alerts\ShowAlertHistory;
 use App\Voice\Tools\Calendar\FindCalendarEvents;
 use App\Voice\Tools\Calendar\ProposeEventCancellation;
 use App\Voice\Tools\Calendar\ProposeEventInvite;
@@ -61,6 +64,8 @@ class Toolbox
         ProposeEventResponse::class,
         ProposeEventUpdate::class,
         ProposeEventCancellation::class,
+        ScheduleTaskTool::class,
+        CancelScheduledTask::class,
         SearchEmails::class,
         ShowEmailResults::class,
         OpenEmail::class,
@@ -89,6 +94,7 @@ class Toolbox
         ControlViewer::class,
         GetActionStatus::class,
         ListAlerts::class,
+        ShowAlertHistory::class,
         ReviewAlert::class,
         ResolveAlert::class,
     ];

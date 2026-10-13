@@ -32,11 +32,11 @@ class FakeCalendarWriter implements CalendarWriter
         $this->changes[] = ['summary', ['ref' => $ref, 'summary' => $summary, 'heading' => $heading]];
     }
 
-    public function create(User $user, NewEvent $event): ?string
+    public function create(User $user, NewEvent $event): CreatedEvent
     {
         $this->changes[] = ['create', $event->toArray()];
 
-        return null;
+        return new CreatedEvent('demo:primary:new-'.count($this->changes));
     }
 
     public function update(User $user, string $ref, EventUpdate $changes): void

@@ -39,3 +39,19 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export const browserTimezone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/**
+ * JSON GET from the Laravel app, with the session.
+ */
+export async function getJson<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    });
+
+    if (!response.ok) {
+        throw new HttpError(response.status, `HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+}

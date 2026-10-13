@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AlertFeedController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\HomeController;
@@ -35,6 +36,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:60,1')
         ->name('voice.tools.run');
 
+    Route::get('alerts/feed', AlertFeedController::class)->middleware('throttle:120,1')->name('alerts.feed');
+    Route::get('alerts/history', [AlertFeedController::class, 'history'])->middleware('throttle:120,1')->name('alerts.history');
     Route::get('media/chat/{file}', [MediaController::class, 'chatFile'])->name('media.chat');
     Route::get('media/mail/{message}/{index}', [MediaController::class, 'mailAttachment'])->whereNumber('index')->name('media.mail');
 

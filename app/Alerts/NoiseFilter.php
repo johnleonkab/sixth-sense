@@ -10,6 +10,17 @@ use App\Models\User;
  */
 class NoiseFilter
 {
+    /** Never listed: the person's own mail, spam, the bin, what is not in the inbox. */
+    private const HIDDEN = ['enviado por el usuario', 'spam', 'papelera', 'fuera de la bandeja de entrada'];
+
+    /**
+     * Whether something that is noise should not even be listed.
+     */
+    public function hides(string $reason): bool
+    {
+        return in_array($reason, self::HIDDEN, true);
+    }
+
     private const IGNORED_LABELS = [
         'CATEGORY_PROMOTIONS' => 'promoción',
         'CATEGORY_SOCIAL' => 'red social',

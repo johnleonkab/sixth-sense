@@ -6,6 +6,7 @@ use App\Connections\AccessTokens;
 use App\Connections\Capability;
 use App\Connectors\Calendar\CalendarAccount;
 use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\CreatedEvent;
 use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
@@ -69,7 +70,7 @@ class GoogleCalendarWriter implements CalendarWriter
         $this->ensureOk($http->withHeaders(['If-Match' => $etag])->patch($url.'?sendUpdates=none', ['description' => $description]), 'añadir el resumen');
     }
 
-    public function create(User $user, NewEvent $event): ?string
+    public function create(User $user, NewEvent $event): CreatedEvent
     {
         $account = $this->account($user, $event->accountId);
         $timezone = $event->start->getTimezone()->getName();
@@ -84,11 +85,14 @@ class GoogleCalendarWriter implements CalendarWriter
                 'conferenceData' => $event->videoCall
                     ? ['createRequest' => ['requestId' => (string) Str::uuid(), 'conferenceSolutionKey' => ['type' => 'hangoutsMeet']]]
                     : null,
+                // Blocks of the person's own work are marked, so they can be told apart (and moved) later.
+                'extendedProperties' => $event->task ? ['private' => ['sixthSense' => 'task']] : null,
+                'reminders' => $event->task ? ['useDefault' => false, 'overrides' => [['method' => 'popup', 'minutes' => 5]]] : null,
             ]));
 
         $this->ensureOk($response, 'crear la reunión');
 
-        return $response->json('htmlLink');
+        return new CreatedEvent(GoogleEventRef::make($account->id, 'primary', (string) $response->json('id')), $response->json('htmlLink'));
     }
 
     public function update(User $user, string $ref, EventUpdate $changes): void

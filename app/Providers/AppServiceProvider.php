@@ -32,6 +32,9 @@ use App\Connectors\Notion\NotionWiki;
 use App\Connectors\Slack\SlackChats;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
+use App\Scheduling\Assessors\FakeTaskAssessor;
+use App\Scheduling\Assessors\GeminiTaskAssessor;
+use App\Scheduling\TaskAssessor;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
@@ -92,6 +95,13 @@ class AppServiceProvider extends ServiceProvider
             default => throw new InvalidArgumentException('Unsupported reply planner ['.config('alerts.planner').'].'),
         });
 
+        // The scheduler's judgement is its own piece too: urgency and length of each task.
+        $this->app->bind(TaskAssessor::class, fn (): TaskAssessor => match (config('agenda.assessor')) {
+            'gemini' => new GeminiTaskAssessor([...config('alerts.judges.gemini'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeTaskAssessor,
+            default => throw new InvalidArgumentException('Unsupported task assessor ['.config('agenda.assessor').'].'),
+        });
+
         $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (config('alerts.judge')) {
             'gemini' => new GeminiMeetingAdvisor(self::lightGemini()),
             'fake' => new FakeMeetingAdvisor,
@@ -133,8 +143,30 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        DevCommands::artisan('reverb:start', 'reverb');
         DevCommands::artisan('schedule:work', 'scheduler');
-        DevCommands::except('queue', 'server');
+
+        // Reverb may already run inside Docker, which publishes its port: then `composer dev` does not start another.
+        DevCommands::except('queue', 'server', ...($this->reverbAlreadyListening() ? ['reverb'] : []));
+    }
+
+    /**
+     * Whether something already listens on Reverb's port. Only checked when
+     * `php artisan dev` starts, never on web requests.
+     */
+    private function reverbAlreadyListening(): bool
+    {
+        if (! $this->app->runningInConsole() || ($_SERVER['argv'][1] ?? null) !== 'dev') {
+            return false;
+        }
+
+        $socket = @fsockopen('127.0.0.1', (int) config('reverb.servers.reverb.port'), $errno, $error, 0.3);
+
+        if ($socket === false) {
+            return false;
+        }
+
+        fclose($socket);
+
+        return true;
     }
 }

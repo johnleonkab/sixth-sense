@@ -36,9 +36,9 @@ interface CalendarWriter
     public function addSummary(User $user, string $ref, string $summary, string $heading): void;
 
     /**
-     * Create the event and invite its attendees. Returns its link.
+     * Create the event and invite its attendees.
      */
-    public function create(User $user, NewEvent $event): ?string;
+    public function create(User $user, NewEvent $event): CreatedEvent;
 
     /**
      * Change an event the user organises: move it, rename it, change where,

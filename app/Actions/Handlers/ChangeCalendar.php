@@ -26,7 +26,7 @@ class ChangeCalendar implements ActionHandler
             'cancel' => $this->calendar->cancel($user, $payload['ref']),
             'update' => $this->calendar->update($user, $payload['ref'], EventUpdate::fromArray($payload['changes'])),
             'respond' => $this->calendar->respond($user, $payload['ref'], $payload['response'], $payload['comment'] ?? null),
-            'create' => $payload['url'] = $this->calendar->create($user, NewEvent::fromArray($payload['event'])),
+            'create' => $payload['url'] = $this->calendar->create($user, NewEvent::fromArray($payload['event']))->url,
             default => throw new InvalidArgumentException("Unknown calendar change [{$payload['kind']}]."),
         };
 
