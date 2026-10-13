@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Alerts\AlertFollowUp;
 use App\Alerts\Triage;
 use App\Jobs\JudgeInboxItem;
 use App\Models\InboxItem;
@@ -10,7 +11,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('alerts:unstick')]
-#[Description('Judge again alerts left judging (a lost job, the queue down for a while), and let rules decide the oldest')]
+#[Description('Judge again alerts left judging (a lost job, the queue down for a while), let rules decide the oldest, and stop proposals that never came')]
 class UnstickAlerts extends Command
 {
     /** Judging longer than this: its job is queued again (a job still alive keeps it, being unique). */
@@ -22,7 +23,7 @@ class UnstickAlerts extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(AlertFollowUp $followUp): int
     {
         $requeued = 0;
         $decided = 0;
@@ -42,7 +43,18 @@ class UnstickAlerts extends Command
                 $requeued++;
             });
 
-        $this->components->info("{$requeued} en cola de nuevo, {$decided} decididas por reglas.");
+        // A proposal that never came (its job lost): the alert stays pending, without one.
+        $stopped = 0;
+
+        InboxItem::query()
+            ->where('planning', true)
+            ->where('updated_at', '<', now()->subMinutes(self::DECIDE_AFTER_MINUTES))
+            ->each(function (InboxItem $item) use (&$stopped, $followUp): void {
+                $followUp->stopPlanning($item);
+                $stopped++;
+            });
+
+        $this->components->info("{$requeued} en cola de nuevo, {$decided} decididas por reglas, {$stopped} propuestas abandonadas.");
 
         return self::SUCCESS;
     }

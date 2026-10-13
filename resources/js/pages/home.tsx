@@ -28,6 +28,22 @@ const timeFormat = new Intl.DateTimeFormat('es-ES', {
     minute: '2-digit',
 });
 
+/** What the screen says while a tool it asked for is on its way. */
+const OPENING_LABELS: Record<string, string> = {
+    review_alert: 'Abriendo la alerta…',
+    show_alert_history: 'Abriendo el historial…',
+    show_calendar: 'Abriendo el calendario…',
+};
+
+function Opening({ label }: { label: string }) {
+    return (
+        <div role="status" className="pointer-events-none sticky top-0 z-10 mx-auto mb-3 flex w-fit items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] text-muted shadow-card">
+            <i aria-hidden className="size-[7px] animate-pulse rounded-full bg-accent" />
+            {label}
+        </div>
+    );
+}
+
 function useNow(): Date {
     const [now, setNow] = useState(() => new Date());
 
@@ -86,10 +102,24 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
         screen: () => describeCanvases(onScreen.current.map((canvas) => canvas.directive)),
     });
 
+    // One thing opens at a time from the screen: further clicks wait for it, and it shows.
+    const [opening, setOpening] = useState<string | null>(null);
+    const openingNow = useRef(false);
+
     const runFromScreen = (name: string, args: Record<string, unknown>) => {
-        void runTool({ id: `screen-${Date.now()}`, name, args }).then(
-            (outcome) => outcome.canvas && show(outcome.canvas),
-        );
+        if (openingNow.current) {
+            return;
+        }
+
+        openingNow.current = true;
+        setOpening(OPENING_LABELS[name] ?? 'Abriendo…');
+
+        void runTool({ id: `screen-${Date.now()}`, name, args })
+            .then((outcome) => outcome.canvas && show(outcome.canvas))
+            .finally(() => {
+                openingNow.current = false;
+                setOpening(null);
+            });
     };
     const now = useNow();
 
@@ -125,17 +155,20 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                     </div>
                 </header>
 
-                <main aria-live="polite" className="min-h-0 overflow-auto py-4">
+                <main aria-live="polite" aria-busy={opening !== null} className="min-h-0 overflow-auto py-4">
+                    {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
-                        <p className="grid h-full place-items-center text-[15px] text-faint">
-                            {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
-                        </p>
+                        !opening && (
+                            <p className="grid h-full place-items-center text-[15px] text-faint">
+                                {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
+                            </p>
+                        )
                     ) : (
                         <CanvasContext value={{ runTool: runFromScreen, actions }}>
                             <div
                                 // The chosen display size scales the canvases, not the voice zone.
                                 style={{ zoom: auth.user?.display_scale ?? 1 }}
-                                className={`mx-auto grid items-start gap-5 ${
+                                className={`mx-auto grid items-start gap-5 transition-opacity ${opening ? 'pointer-events-none opacity-50' : ''} ${
                                     canvases.length > 1
                                         ? 'max-w-[1120px] md:grid-cols-2'
                                         : canvases[0].directive.layout === 'wide'

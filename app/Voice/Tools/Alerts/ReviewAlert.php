@@ -5,12 +5,13 @@ namespace App\Voice\Tools\Alerts;
 use App\Alerts\AlertFollowUp;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Events\InboxItemUpdated;
+use App\Jobs\PlanAlertReply;
 use App\Models\User;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
 use Illuminate\Support\Str;
-use Throwable;
 
 /**
  * One alert on screen with the message it is about and how the reply engine
@@ -63,13 +64,13 @@ class ReviewAlert implements VoiceTool
             return ToolResult::error('Es un aviso de reunión: no hay nada que responder. Para verla, usa show_calendar.');
         }
 
-        // The engine may still be thinking, or have failed: ask it now.
-        if ($item->proposal === null && $item->status === AlertStatus::Pending) {
-            try {
-                $this->followUp->plan($item);
-            } catch (Throwable $exception) {
-                report($exception);
-            }
+        // No proposal and nobody thinking one: ask for it in the background. The
+        // screen opens now and shows the proposal once it is ready.
+        if ($item->proposal === null && $item->status === AlertStatus::Pending && ! $item->planning) {
+            $item->update(['planning' => true]);
+            InboxItemUpdated::dispatch($item);
+            PlanAlertReply::dispatch($item);
+            $item->refresh();
         }
 
         $brief = $this->followUp->brief($item);
@@ -86,6 +87,7 @@ class ReviewAlert implements VoiceTool
                     $item->state() === 'routine' => 'No espera su respuesta: se consideró sin importancia.',
                     $item->state() === 'judging' => 'Todavía se está viendo si espera su respuesta.',
                     $item->status !== AlertStatus::Pending => "Este aviso ya está {$item->status->label()}.",
+                    $item->planning => 'La propuesta se está preparando y aparecerá en pantalla en cuanto esté: mientras, pregúntale cómo quiere responder.',
                     $item->proposal === null => 'No hay propuesta: pregúntale cómo quiere responder.',
                     default => null,
                 },

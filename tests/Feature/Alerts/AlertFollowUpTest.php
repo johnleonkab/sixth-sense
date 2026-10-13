@@ -13,6 +13,7 @@ use App\Connectors\Mail\Mailbox;
 use App\Events\InboxItemUpdated;
 use App\Jobs\CheckAlertReplies;
 use App\Jobs\ExecutePendingAction;
+use App\Jobs\PlanAlertReply;
 use App\Models\InboxItem;
 use App\Models\PendingAction;
 use App\Models\User;
@@ -92,6 +93,21 @@ test('reviewing an alert shows the message and the proposal, thinking it through
         ->assertJsonPath('output.message', fn (string $text) => str_contains($text, 'Figma'));
 
     expect($this->email->refresh()->read_at)->not->toBeNull();
+});
+
+test('reviewing never waits for the proposal: it opens at once and the proposal is thought in the background', function () {
+    Queue::fake([PlanAlertReply::class]);
+
+    runAlertTool('review_alert', ['alert_id' => $this->email->id])
+        ->assertJsonPath('canvas.props.alert.state', 'planning')
+        ->assertJsonPath('canvas.props.proposal', null)
+        ->assertJsonPath('output.note', fn (string $note) => str_contains($note, 'se está preparando'));
+
+    // Opened again while it is being thought: not asked for twice.
+    runAlertTool('review_alert', ['alert_id' => $this->email->id]);
+
+    expect($this->planner->planned)->toBe([]);
+    Queue::assertPushed(PlanAlertReply::class, 1);
 });
 
 test('an alert of someone else can not be reviewed, nor a meeting reminder', function () {
