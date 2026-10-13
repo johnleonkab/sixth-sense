@@ -26,6 +26,10 @@ trait DescribesAlerts
             'subject' => $item->source === AlertSource::Slack ? null : $item->title,
             'where' => $item->source === AlertSource::Slack ? $item->title : null,
             'why_it_matters' => $item->why,
+            // A conversation is one alert: everything said in it since the person last dealt with it.
+            'new_messages' => count($item->messages()) > 1 && $item->source !== AlertSource::Calendar
+                ? array_map(fn (array $message): string => trim(($message['from'] ?? '').': '.$message['text'], ': '), $item->messages())
+                : null,
             'received' => $item->received_at->setTimezone($timezone)->locale('es')->diffForHumans(),
             'status' => $item->stateLabel(),
             'proposal' => $item->proposal['summary'] ?? null,

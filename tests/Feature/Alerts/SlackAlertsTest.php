@@ -140,20 +140,58 @@ test('the user own messages, apps and what was already handled are left out', fu
         ->and($this->judge->judged)->toHaveCount(1);
 });
 
-test('a new important message in a conversation already waiting for an answer takes its place', function () {
+test('messages of one conversation make one alert, ending on the latest', function () {
+    fakeSlackInbox([
+        slackMatch("{$this->now}.000300", 'U5', 'Es urgente, necesito la firma hoy'),
+        slackMatch("{$this->now}.000100", 'U5', 'Hola'),
+    ]);
+
+    $listed = app(AlertInbox::class)->check($this->account, AlertSource::Slack);
+    $alert = $this->user->inboxItems()->sole();
+
+    expect($listed)->toHaveCount(2)
+        ->and($alert->external_id)->toBe("{$this->account->id}:D5:{$this->now}.000300")
+        ->and(array_column($alert->messages(), 'text'))->toBe(['Hola', 'Es urgente, necesito la firma hoy'])
+        ->and($alert->status)->toBe(AlertStatus::Pending)
+        ->and($alert->toAlert()['messages'])->toHaveCount(2);
+
+    Event::assertDispatchedTimes(InboxItemCreated::class, 1);
+});
+
+test('a new message in a conversation already waiting for an answer updates its alert and its proposal', function () {
     fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?')]);
     $first = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
+    $planned = count($this->planner->planned);
 
-    fakeSlackInbox([slackMatch("{$this->now}.000500", 'U5', 'Es urgente, necesito la firma hoy')]);
+    fakeSlackInbox([slackMatch("{$this->now}.000500", 'U5', 'Gracias!')]);
     $second = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
 
-    expect($second->refresh()->status)->toBe(AlertStatus::Pending)
-        ->and($second->body)->toBe('Es urgente, necesito la firma hoy')
-        ->and($first->refresh()->status)->toBe(AlertStatus::Dismissed)
-        ->and($first->resolution)->toBe('superseded')
-        ->and($this->user->inboxItems()->pending()->count())->toBe(1);
+    expect($second->is($first))->toBeTrue()
+        ->and($first->refresh()->status)->toBe(AlertStatus::Pending)
+        ->and($first->body)->toBe('Gracias!')
+        ->and($first->messages())->toHaveCount(2)
+        ->and($this->user->inboxItems()->count())->toBe(1)
+        ->and(count($this->planner->planned))->toBe($planned + 1);
 
-    Event::assertDispatchedTimes(InboxItemCreated::class, 2);
+    Event::assertDispatchedTimes(InboxItemCreated::class, 1);
+});
+
+test('once dealt with, a new message opens the same alert again with only what came since', function () {
+    fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?')]);
+    $alert = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
+    $alert->refresh()->close(AlertStatus::Resolved, 'replied');
+
+    fakeSlackInbox([slackMatch("{$this->now}.000500", 'U5', 'Ahora necesito la firma')]);
+    app(AlertInbox::class)->check($this->account, AlertSource::Slack);
+
+    expect($this->user->inboxItems()->count())->toBe(1)
+        ->and($alert->refresh()->status)->toBe(AlertStatus::Pending)
+        ->and($alert->resolution)->toBeNull()
+        ->and(array_column($alert->messages(), 'text'))->toBe(['Ahora necesito la firma']);
+
+    // The first message is still known: the same search a minute later lists nothing.
+    fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?'), slackMatch("{$this->now}.000500", 'U5', 'Ahora necesito la firma')]);
+    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([]);
 });
 
 test('every minute slack accounts of users who want its alerts are checked', function () {

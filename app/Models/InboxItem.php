@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Alerts\InboxCandidate;
 use App\Alerts\Triage;
 use Database\Factories\InboxItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -23,6 +24,9 @@ class InboxItem extends Model
 {
     /** @use HasFactory<InboxItemFactory> */
     use HasFactory;
+
+    /** Messages of a conversation an alert keeps (the newest). */
+    public const MAX_MESSAGES = 20;
 
     /**
      * Get the attributes that should be cast.
@@ -82,7 +86,37 @@ class InboxItem extends Model
     }
 
     /**
-     * The message it is about: an email ref, or a Slack message ref.
+     * The messages of the conversation since the person last dealt with it, oldest first.
+     *
+     * @return list<array{id: string, from: ?string, text: string, at: string}>
+     */
+    public function messages(): array
+    {
+        return $this->payload['messages'] ?? [[
+            'id' => $this->external_id,
+            'from' => $this->actor_name,
+            'text' => (string) $this->body,
+            'at' => $this->received_at->toIso8601String(),
+        ]];
+    }
+
+    /**
+     * One message of a conversation, as an alert keeps it.
+     *
+     * @return array{id: string, from: ?string, text: string, at: string}
+     */
+    public static function messageOf(InboxCandidate $candidate): array
+    {
+        return [
+            'id' => $candidate->externalId,
+            'from' => $candidate->from?->label(),
+            'text' => mb_substr($candidate->excerpt, 0, 1000),
+            'at' => $candidate->receivedAt->toIso8601String(),
+        ];
+    }
+
+    /**
+     * The message it is about (the latest of its conversation): an email ref, or a Slack message ref.
      */
     public function messageRef(): string
     {
@@ -151,6 +185,7 @@ class InboxItem extends Model
             'resolved_at' => $this->resolved_at?->toIso8601String(),
             'resolution' => $this->resolution,
             'conversation' => $this->payload['conversation'] ?? null,
+            'messages' => $this->source === AlertSource::Calendar ? [] : $this->messages(),
             'proposal' => $this->proposal ? ['summary' => $this->proposal['summary'] ?? null] : null,
             'task' => $this->agendaTask ? [
                 'id' => $this->agendaTask->id,

@@ -19,6 +19,8 @@ export type Alert = {
     state: AlertState;
     resolution: string | null;
     resolved_at?: string | null;
+    /** A conversation is one alert: what was said in it since the person last dealt with it, oldest first. */
+    messages?: { id: string; from: string | null; text: string; at: string }[];
     /** How the reply engine proposes to resolve it, once it has thought it through. */
     proposal: { summary: string | null } | null;
     /** What the scheduler did about it, if it asks for work of the person's own. */

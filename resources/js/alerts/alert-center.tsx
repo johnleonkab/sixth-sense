@@ -64,6 +64,13 @@ export function StateChip({ state }: { state: Alert['state'] }) {
     }
 }
 
+/** " · 3 mensajes" when the conversation brought more than one since it was last dealt with. */
+function messageCount(alert: Alert): string {
+    const count = alert.messages?.length ?? 0;
+
+    return count > 1 ? ` · ${count} mensajes` : '';
+}
+
 function Row({ alert, onOpen, delay = 0 }: { alert: Alert; onOpen: (alert: Alert) => void; delay?: number }) {
     const addressed = alert.state === 'resolved' || alert.state === 'dismissed';
     const quiet = addressed || alert.state === 'routine';
@@ -86,6 +93,7 @@ function Row({ alert, onOpen, delay = 0 }: { alert: Alert; onOpen: (alert: Alert
                     <span className="flex items-center gap-2 text-[11.5px] text-muted">
                         <span className="truncate">
                             {alert.actor_name ?? alert.source_label} · {alert.title}
+                            {messageCount(alert)}
                         </span>
                         <time className="ml-auto flex-none font-mono">{timeFormat.format(new Date(alert.received_at))}</time>
                     </span>
@@ -151,7 +159,10 @@ function IncomingToast({
                         </span>
                         <StateChip state={alert.state} />
                     </div>
-                    <b className="mt-0.5 block truncate text-[13.5px] font-semibold">{alert.title}</b>
+                    <b className="mt-0.5 block truncate text-[13.5px] font-semibold">
+                        {alert.title}
+                        <span className="font-normal text-muted">{messageCount(alert)}</span>
+                    </b>
                     <p className={`mt-px line-clamp-2 text-[13px] ${alert.state === 'judging' ? 'text-faint italic' : 'text-muted'}`}>
                         {alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why}
                     </p>

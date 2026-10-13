@@ -14,18 +14,21 @@ const RING_WITHIN = 10 * 60_000;
 
 const RUNG_KEY = 'alerts-rung';
 
-/** States in which an alert waits for the person: these ring, once. */
+/** States in which an alert waits for the person: these ring, once per new message. */
 const IMPORTANT = new Set<Alert['state']>(['important', 'planning', 'ready']);
 
-function rungIds(): Set<number> {
+/** A conversation is one alert: each new message in it may ring again. */
+const ringKey = (alert: Alert): string => `${alert.id}:${alert.messages?.length ?? 1}:${alert.external_id}`;
+
+function rungIds(): Set<string> {
     try {
-        return new Set(JSON.parse(sessionStorage.getItem(RUNG_KEY) ?? '[]') as number[]);
+        return new Set((JSON.parse(sessionStorage.getItem(RUNG_KEY) ?? '[]') as unknown[]).map(String));
     } catch {
         return new Set();
     }
 }
 
-function remember(rung: Set<number>): void {
+function remember(rung: Set<string>): void {
     try {
         sessionStorage.setItem(RUNG_KEY, JSON.stringify([...rung].slice(-200)));
     } catch {
@@ -73,13 +76,13 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
     const [fresh, setFresh] = useState<Alert[]>([]);
     const [live, setLive] = useState(false);
     const known = useRef(new Map<number, Alert>(initial.map((item) => [item.id, item])));
-    const rung = useRef<Set<number>>(rungIds());
+    const rung = useRef<Set<string>>(rungIds());
     const callbacks = useRef({ onArrive, onImportant });
     callbacks.current = { onArrive, onImportant };
 
     // What was already there when the page loaded never rings.
     useEffect(() => {
-        initial.forEach((item) => IMPORTANT.has(item.state) && rung.current.add(item.id));
+        initial.forEach((item) => IMPORTANT.has(item.state) && rung.current.add(ringKey(item)));
         remember(rung.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -95,10 +98,10 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
             }
 
             const recent = Date.now() - new Date(incoming.received_at).getTime() < RING_WITHIN;
-            const becameImportant = IMPORTANT.has(incoming.state) && !rung.current.has(incoming.id);
+            const becameImportant = IMPORTANT.has(incoming.state) && !rung.current.has(ringKey(incoming));
 
             if (becameImportant) {
-                rung.current.add(incoming.id);
+                rung.current.add(ringKey(incoming));
                 remember(rung.current);
 
                 if (recent) {
