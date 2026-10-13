@@ -97,14 +97,48 @@
                 font-weight: 600;
                 color: var(--muted);
             }
-            #audio {
+            #audio,
+            #connection-status {
                 color: var(--muted);
                 font-size: 12px;
+            }
+            label {
+                display: block;
+                margin-bottom: 6px;
+                color: var(--muted);
+                font-size: 12px;
+            }
+            input {
+                box-sizing: border-box;
+                width: 100%;
+                margin-top: 2px;
+                padding: 5px 8px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                background: var(--surface);
+                color: var(--ink);
+                font: 12px ui-monospace, monospace;
+            }
+            details {
+                margin-bottom: 12px;
+            }
+            summary {
+                cursor: pointer;
+                margin-bottom: 8px;
+                color: var(--muted);
             }
         </style>
     </head>
     <body>
-        <h1>Wingman · spike de captura</h1>
+        <h1>Wingman</h1>
+
+        <details id="connection">
+            <summary id="connection-summary">Conexión con sixth-sense</summary>
+            <label>Servidor <input id="server" type="url" placeholder="http://127.0.0.1:8000" /></label>
+            <label>Token <input id="token" type="password" placeholder="wm_…" /></label>
+            <div class="row"><button id="connect">Conectar</button></div>
+            <div id="connection-status"></div>
+        </details>
 
         <dl>
             <dt>Llamada</dt>
@@ -115,6 +149,8 @@
             <dd id="count">—</dd>
             <dt>Quién habla</dt>
             <dd id="speakers">—</dd>
+            <dt>sixth-sense</dt>
+            <dd id="sync">—</dd>
         </dl>
 
         <div id="lines"><p>Abre esto con la pestaña de Meet delante.</p></div>
@@ -125,7 +161,7 @@
             <button id="export-html">Exportar HTML de subtítulos</button>
         </div>
 
-        <h2>Opción B · audio de la pestaña</h2>
+        <h2>Pruebas · audio de la pestaña (opción B)</h2>
         <div class="row">
             <button id="audio-test">Probar 6 s de audio</button>
         </div>

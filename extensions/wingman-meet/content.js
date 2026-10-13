@@ -1,10 +1,10 @@
 /**
- * Wingman para Meet · spike H0.
+ * Wingman para Meet.
  *
  * Runs inside the Meet tab, only in the person's browser: notices when they
  * are in a call (not the waiting room), turns on Meet's own captions just for
- * them, hides them, and keeps what is said and who says it. Nothing is sent
- * anywhere: the popup exports it, to judge whether captions are enough.
+ * them, hides them, and keeps what is said and who says it. The extension's
+ * worker sends it to sixth-sense; the popup can also export it.
  */
 (() => {
     const LEAVE_BUTTON = /leave call|salir de la llamada|abandonar la llamada|colgar/i;
@@ -14,6 +14,10 @@
     /** A line nobody touched for this long is taken as finished. */
     const SETTLED_AFTER_MS = 2000;
     const RAW_LIMIT = 4000;
+    /** What changed is sent this often. */
+    const SEND_EVERY_MS = 2000;
+    /** Telling sixth-sense about the call is tried again this often until it answers. */
+    const RETRY_START_MS = 10_000;
 
     const state = {
         inCall: false,
@@ -26,7 +30,16 @@
         segments: [],
         raw: [],
         errors: [],
+        // The link with sixth-sense.
+        meetingId: null,
+        meetingTitle: null,
+        sent: 0,
+        lastError: null,
     };
+
+    /** The version of each segment sixth-sense already has. */
+    const sentVersions = new Map();
+    let startTimer = null;
 
     /** Each caption block on screen, and the segment it is writing. */
     const live = new Map();
@@ -133,7 +146,8 @@
             let segment = live.get(element);
 
             if (!segment || segment.speaker !== speaker) {
-                segment = { id: nextSegmentId++, speaker, text: '', startedAt: now(), updatedAt: now(), final: false };
+                // Unique across reloads of the tab: the server keeps segments by this id.
+                segment = { id: `${state.joinedAt}#${nextSegmentId++}`, speaker, text: '', startedAt: now(), updatedAt: now(), final: false };
                 live.set(element, segment);
                 state.segments.push(segment);
             }
@@ -212,6 +226,10 @@
             captionsFound: state.captionsFound,
             captionsTurnedOnByUs: state.captionsTurnedOnByUs,
             hidden: state.hidden,
+            meetingId: state.meetingId,
+            meetingTitle: state.meetingTitle,
+            sent: state.sent,
+            lastError: state.lastError,
             speakers,
             segments: state.segments,
             raw: state.raw,
@@ -219,13 +237,83 @@
         };
     }
 
+    /** Ask the extension's worker; a reloaded extension leaves this tab without one. */
+    async function tell(message) {
+        try {
+            return (await chrome.runtime.sendMessage(message)) ?? { ok: false, error: 'Sin respuesta de la extensión' };
+        } catch (error) {
+            return { ok: false, error: String(error.message ?? error) };
+        }
+    }
+
+    async function startCall() {
+        clearTimeout(startTimer);
+
+        if (!state.inCall || state.meetingId) {
+            return;
+        }
+
+        const answer = await tell({ type: 'call-start', code: state.code, joinedAt: state.joinedAt });
+
+        if (answer.ok) {
+            state.meetingId = answer.data.meeting_id;
+            state.meetingTitle = answer.data.title;
+            state.lastError = null;
+            await flush();
+        } else {
+            state.lastError = answer.error;
+            startTimer = setTimeout(startCall, RETRY_START_MS);
+        }
+    }
+
+    /** Segments sixth-sense does not have in their current version. */
+    function unsent() {
+        return state.segments
+            .filter((segment) => segment.text && sentVersions.get(segment.id) !== `${segment.final}|${segment.text}`)
+            .map((segment) => ({ client_id: segment.id, speaker: segment.speaker, text: segment.text, final: segment.final, spoken_at: segment.startedAt }));
+    }
+
+    function markSent(segments) {
+        segments.forEach((segment) => sentVersions.set(segment.client_id, `${segment.final}|${segment.text}`));
+        state.sent = sentVersions.size;
+    }
+
+    async function flush() {
+        const segments = unsent();
+
+        if (!state.meetingId || segments.length === 0) {
+            return;
+        }
+
+        const answer = await tell({ type: 'segments', meetingId: state.meetingId, segments });
+
+        // When it fails, the worker keeps them and sends them with the next batch.
+        markSent(segments);
+        state.lastError = answer.ok ? null : answer.error;
+    }
+
+    async function endCall() {
+        clearTimeout(startTimer);
+
+        if (!state.meetingId) {
+            return;
+        }
+
+        const segments = unsent();
+        const answer = await tell({ type: 'call-end', meetingId: state.meetingId, segments, leftAt: state.leftAt ?? now() });
+        markSent(segments);
+        state.lastError = answer.ok ? null : answer.error;
+    }
+
     function tick() {
         const inCall = Boolean(leaveButton());
         const code = location.pathname.match(MEETING_CODE)?.[1] ?? null;
 
         if (inCall && !state.inCall) {
-            Object.assign(state, { inCall: true, code, joinedAt: now(), leftAt: null, segments: [], raw: [], errors: [] });
+            Object.assign(state, { inCall: true, code, joinedAt: now(), leftAt: null, segments: [], raw: [], errors: [], meetingId: null, meetingTitle: null, sent: 0, lastError: null });
             live.clear();
+            sentVersions.clear();
+            void startCall();
             applyHiding();
             watchCaptions();
             setTimeout(() => !captionsRegion() && turnOnCaptions(), 1500);
@@ -237,6 +325,7 @@
             observer?.disconnect();
             state.segments.forEach((segment) => (segment.final = true));
             void save();
+            void endCall();
         }
 
         if (state.inCall) {
@@ -268,5 +357,15 @@
     });
 
     setInterval(tick, 1000);
+    setInterval(() => state.inCall && void flush(), SEND_EVERY_MS);
+
+    // The tab closes while in the call: it is over for sixth-sense too.
+    addEventListener('pagehide', () => {
+        if (state.inCall) {
+            state.leftAt = now();
+            state.segments.forEach((segment) => (segment.final = true));
+            void endCall();
+        }
+    });
     setInterval(() => state.inCall && void save(), 10_000);
 })();

@@ -63,6 +63,8 @@ Route::middleware('auth')->group(function () {
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
         Route::get('wingman', [WingmanController::class, 'edit'])->name('wingman.edit');
         Route::put('wingman', [WingmanController::class, 'update'])->name('wingman.update');
+        Route::post('wingman/token', [WingmanController::class, 'issueToken'])->name('wingman.token');
+        Route::delete('wingman/token', [WingmanController::class, 'revokeToken'])->name('wingman.token.revoke');
         Route::put('system/display', [SystemController::class, 'updateDisplay'])->name('system.display');
         Route::put('system/voice', [SystemController::class, 'updateVoice'])->name('system.voice');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');

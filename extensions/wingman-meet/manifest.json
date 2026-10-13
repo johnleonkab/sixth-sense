@@ -1,10 +1,14 @@
 {
     "manifest_version": 3,
-    "name": "Wingman para Meet (spike)",
-    "version": "0.0.1",
-    "description": "Spike H0 de Wingman: detecta la llamada de Meet y lee sus subtítulos, solo en tu navegador, para medir si bastan.",
+    "name": "Wingman para Meet",
+    "version": "0.1.0",
+    "description": "Wingman de sixth-sense: detecta tus llamadas de Meet y le pasa a sixth-sense lo que se dice, solo desde tu navegador.",
     "permissions": ["storage", "tabCapture", "activeTab"],
     "host_permissions": ["https://meet.google.com/*"],
+    "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+    "background": {
+        "service_worker": "background.js"
+    },
     "content_scripts": [
         {
             "matches": ["https://meet.google.com/*"],

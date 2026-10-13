@@ -1,6 +1,7 @@
 /**
- * The spike's window: what the Meet tab has read so far, and the exports
- * needed to judge it. Also tries option B (the tab's audio) for comparison.
+ * Wingman's window: the link with sixth-sense, what the Meet tab has read
+ * and sent so far, and exports to check it. Also tries option B (the tab's
+ * audio) for comparison.
  */
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +53,13 @@ function render(status) {
           : '—';
     $('count').textContent = `${status.segments.length} (${status.segments.filter((segment) => segment.final).length} cerradas)`;
     $('speakers').textContent = status.speakers.join(', ') || '—';
+    $('sync').innerHTML = !status.inCall
+        ? '—'
+        : status.lastError
+          ? `<span class="bad">${escape(status.lastError)}</span>`
+          : status.meetingId
+            ? `<span class="ok">${escape(status.meetingTitle ?? 'Llamada')}</span> · ${status.sent} enviadas`
+            : 'Avisando…';
     $('toggle-hidden').textContent = status.hidden ? 'Mostrar subtítulos' : 'Ocultar subtítulos';
     $('toggle-hidden').dataset.hidden = String(status.hidden);
 
@@ -131,5 +139,48 @@ $('audio-test').addEventListener('click', () => {
     });
 });
 
+/** Connect with sixth-sense: its address and the token made in Configuración → Wingman. */
+async function showConnection() {
+    const { server, token } = await chrome.storage.local.get(['server', 'token']);
+    $('server').value = server ?? '';
+    $('token').value = token ?? '';
+
+    if (!server || !token) {
+        $('connection').open = true;
+        $('connection-summary').textContent = 'Conexión con sixth-sense · sin conectar';
+
+        return;
+    }
+
+    const answer = await chrome.runtime.sendMessage({ type: 'ping' });
+    $('connection-summary').textContent = answer?.ok ? `Conectado como ${answer.data.user}` : 'Conexión con sixth-sense · revisar';
+    $('connection-status').innerHTML = answer?.ok ? '' : `<span class="bad">${escape(answer?.error ?? 'Sin respuesta')}</span>`;
+    $('connection').open = !answer?.ok;
+}
+
+$('connect').addEventListener('click', async () => {
+    let origin;
+
+    try {
+        origin = new URL($('server').value.trim()).origin;
+    } catch {
+        $('connection-status').innerHTML = '<span class="bad">El servidor no es una dirección válida.</span>';
+        return;
+    }
+
+    // Permission to talk to that server only (asked once).
+    const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+
+    if (!granted) {
+        $('connection-status').innerHTML = '<span class="bad">Sin permiso para hablar con ese servidor.</span>';
+        return;
+    }
+
+    await chrome.storage.local.set({ server: origin, token: $('token').value.trim() });
+    $('connection-status').textContent = 'Comprobando…';
+    await showConnection();
+});
+
+void showConnection();
 void refresh();
 setInterval(refresh, 1000);

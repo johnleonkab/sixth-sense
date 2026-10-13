@@ -16,8 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled', 'wingman_token_hash', 'wingman_token_used_at'])]
+#[Hidden(['password', 'remember_token', 'wingman_token_hash'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -45,6 +45,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'display_size' => DisplaySize::class,
             'wingman_enabled' => 'boolean',
+            'wingman_token_used_at' => 'immutable_datetime',
         ];
     }
 

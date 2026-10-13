@@ -122,6 +122,15 @@ Lo aprendido del HTML real: los subtítulos están en `role="region"` con `aria-
 
 **Hecho cuando:** al entrar en una llamada, Laravel registra el inicio y empiezan a llegar fragmentos con nombre.
 
+**Estado:** ✅ hecho (13/10).
+- La extensión tiene un worker (`background.js`) que envía a sixth-sense con el token personal y guarda lo que no pudo enviar para reintentarlo.
+- La página de Meet (`content.js`) avisa al entrar, manda lo nuevo cada 2 s y cierra al salir o al cerrar la pestaña.
+- API en `/api/wingman/extension/*` (`ping`, `calls`, `calls/{id}/segments`, `calls/{id}/end`), con `AuthenticateWingmanExtension`.
+- Una llamada se enlaza con su reunión del calendario por el código; si no está en ningún calendario, se sigue igual.
+- Las frases (`WingmanSegment`) se guardan por id y crecen al reenviarse. "Tú" se marca como la persona.
+- Una llamada sin noticias durante 15 min se da por terminada.
+- El token se genera y se revoca en Configuración → Wingman.
+
 ### H3 · Burbuja de Wingman (1 día)
 - Al entrar en una llamada aparece **siempre** la burbuja de Wingman en sixth-sense, aparte de la de alertas y con el mismo estilo.
 - Muestra el estado en vivo: "Wingman escuchando · 12 notas · 2 propuestas".

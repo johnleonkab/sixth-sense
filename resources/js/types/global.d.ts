@@ -5,6 +5,8 @@ declare module '@inertiajs/core' {
         sharedPageProps: SharedData;
         flashDataType: {
             toast?: Toast;
+            /** The Wingman extension's new token: shown once, right after making it. */
+            wingman_token?: string;
         };
     }
 }

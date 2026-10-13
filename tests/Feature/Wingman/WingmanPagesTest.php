@@ -80,3 +80,18 @@ test('turning wingman on looks up the calls of today at once', function () {
     expect($user->refresh()->wingman_enabled)->toBeTrue();
     Queue::assertPushed(SyncWingmanMeetings::class, fn (SyncWingmanMeetings $job) => $job->user->is($user));
 });
+
+test('the extension token is shown once when made, and can be revoked', function () {
+    $user = User::factory()->create(['wingman_enabled' => true]);
+
+    $this->actingAs($user)->post(route('settings.wingman.token'))->assertRedirect()->assertInertiaFlash('wingman_token');
+
+    expect($user->refresh()->wingman_token_hash)->not->toBeNull();
+
+    $this->actingAs($user)->get(route('settings.wingman.edit'))
+        ->assertInertia(fn ($page) => $page->where('extension.connected', true)->where('extension.server', rtrim(config('app.url'), '/')));
+
+    $this->actingAs($user)->delete(route('settings.wingman.token.revoke'))->assertRedirect();
+
+    expect($user->refresh()->wingman_token_hash)->toBeNull();
+});

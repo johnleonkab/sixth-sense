@@ -18,6 +18,9 @@ use Carbon\CarbonImmutable;
  */
 class WingmanMeetings
 {
+    /** A call in progress the extension says nothing of for this long is taken as over. */
+    private const ABANDONED_AFTER_MINUTES = 15;
+
     public function __construct(private CalendarReader $calendar) {}
 
     /**
@@ -56,6 +59,13 @@ class WingmanMeetings
                 ->whereNotIn('event_key', $found)
                 ->delete();
         }
+
+        // Followed calls the extension stopped telling about (the tab closed, the computer slept).
+        $user->wingmanMeetings()
+            ->where('status', MeetingStatus::Live)
+            ->where('updated_at', '<', now()->subMinutes(self::ABANDONED_AFTER_MINUTES))
+            ->get()
+            ->each(fn (WingmanMeeting $meeting) => $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $meeting->updated_at]));
 
         return count($found);
     }
