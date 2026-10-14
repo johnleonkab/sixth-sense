@@ -8,6 +8,7 @@ use App\Events\WingmanMeetingUpdated;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\User;
 use App\Models\WingmanMeeting;
+use App\Wingman\Copilot\WingmanAgent;
 use App\Wingman\Notes\LiveNotes;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -28,6 +29,7 @@ class WingmanCalls
     public function __construct(
         private WingmanMeetings $meetings,
         private LiveNotes $notes,
+        private WingmanAgent $agent,
     ) {}
 
     /**
@@ -107,6 +109,7 @@ class WingmanCalls
         // Still going on: what keeps it from being taken as abandoned.
         $meeting->touch();
         $this->notes->maybeTake($meeting);
+        $this->agent->maybeWatch($meeting);
 
         return count($segments);
     }

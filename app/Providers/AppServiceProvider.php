@@ -42,6 +42,9 @@ use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
 use App\Voice\VoiceSamples;
+use App\Wingman\Copilot\Detector;
+use App\Wingman\Copilot\FakeDetector;
+use App\Wingman\Copilot\GeminiDetector;
 use App\Wingman\Notes\FakeNoteTaker;
 use App\Wingman\Notes\GeminiNoteTaker;
 use App\Wingman\Notes\NoteTaker;
@@ -140,6 +143,12 @@ class AppServiceProvider extends ServiceProvider
             'gemini' => new GeminiNoteTaker([...config('alerts.judges.gemini'), 'model' => config('wingman.notes.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
             'fake' => new FakeNoteTaker,
             default => throw new InvalidArgumentException('Unsupported Wingman note-taker ['.config('wingman.notes.taker').'].'),
+        });
+
+        $this->app->bind(Detector::class, fn (): Detector => match (config('wingman.agent.detector')) {
+            'gemini' => new GeminiDetector([...config('alerts.judges.gemini'), 'model' => config('wingman.agent.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeDetector,
+            default => throw new InvalidArgumentException('Unsupported Wingman detector ['.config('wingman.agent.detector').'].'),
         });
 
         $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));

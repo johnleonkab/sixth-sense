@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 import { IssueKey, StatusChip } from '@/canvas/jira/jira-bits';
 import { dayLabel, timeRange } from '@/wingman/format';
+import InsightCard from '@/wingman/insight-card';
 import type { WingmanContext, WingmanMeeting, WingmanNotes } from '@/wingman/types';
 import WingmanLayout from '@/wingman/wingman-layout';
 
@@ -226,6 +227,18 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                     ))}
                 </ul>
             </Section>
+
+            {meeting.insights.length > 0 && (
+                <Section title={`Lo que aportó Wingman · ${meeting.insights.length}`}>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        {meeting.insights.map((insight) => (
+                            <div key={insight.id} className={insight.dismissed ? 'opacity-50' : ''}>
+                                <InsightCard insight={insight} />
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+            )}
 
             {meeting.notes && <Notes notes={meeting.notes} live={live} />}
 

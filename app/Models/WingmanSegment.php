@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Something said in a call: who said it (the person themselves, or someone
  * else by name) and what, as Meet's captions gave it.
  */
-#[Fillable(['client_id', 'speaker', 'is_me', 'text', 'final', 'noted', 'spoken_at'])]
+#[Fillable(['client_id', 'speaker', 'is_me', 'text', 'final', 'noted', 'watched', 'spoken_at'])]
 class WingmanSegment extends Model
 {
     /** @use HasFactory<WingmanSegmentFactory> */
@@ -29,6 +29,7 @@ class WingmanSegment extends Model
             'is_me' => 'boolean',
             'final' => 'boolean',
             'noted' => 'boolean',
+            'watched' => 'boolean',
             'spoken_at' => 'immutable_datetime',
         ];
     }

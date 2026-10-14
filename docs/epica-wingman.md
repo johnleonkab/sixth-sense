@@ -177,6 +177,16 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 
 **Hecho cuando:** en una llamada de prueba con esas cuatro situaciones, aparecen las cuatro tarjetas correctas y ninguna sobra.
 
+**Estado:** ✅ hecho (14/10).
+- Funciona en dos pasos: **Gemini detecta** (`GeminiDetector`, que solo dice qué merece comprobarse) y **el código comprueba con datos reales** (`Lookups`: SlotFinder con la disponibilidad de los asistentes, Jira, Notion, Slack y Gmail). Así una tarjeta nunca se inventa datos.
+- `WingmanAgent` lee lo nuevo cada 12 s mientras se habla, con el job `WatchWingmanCall`.
+- Freno de ruido: confianza ≥ 0,6, nada repetido en la misma llamada (`dedupe_key`), como mucho 2 tarjetas por lectura, y 90 s de silencio tras una tarjeta salvo que sea urgente.
+- Lo que propone (convocar, mandar un Slack o un email) se guarda en la tarjeta y se convierte en acción pendiente al revisarlo (H6), porque las acciones pendientes caducan a los 10 min.
+- Lo dicho de pasada se encuentra igual: «el 412» → CPD-412, y un nombre de página aproximado se busca acortándolo.
+- Si Gemini detecta un mensaje prometido sin su texto, lo redacta en una segunda llamada.
+- Prueba real con Gemini, con una conversación de ejemplo: 4 tarjetas correctas en ~3,5 s (CPD-412 y su bloqueo, la página del plan, el mensaje a Marta listo en Slack y el lunes 19 a las 10:00 libre para los tres).
+- La burbuja muestra las tarjetas arriba, anuncia en su píldora la nueva durante 10 s, en silencio, y permite 👍/👎 y descartar. La página de la reunión las lista todas.
+
 ### H6 · Documento de la reunión (1,5 días)
 - Durante la llamada se va formando: resumen, decisiones, notas, datos aportados y **acciones propuestas**.
 - Al terminar, Wingman lo cierra con un resumen final y la lista de acciones: crear la reunión de seguimiento, hablar con X, mandar el mensaje a Y, crear el ticket…

@@ -38,4 +38,19 @@ return [
         'model' => env('WINGMAN_NOTES_MODEL', 'gemini-3.8-flash'),
     ],
 
+    // The agent that brings in what helps during a call.
+    'agent' => [
+        // gemini or fake (tests).
+        'detector' => env('WINGMAN_AGENT', 'gemini'),
+        'model' => env('WINGMAN_AGENT_MODEL', 'gemini-3.8-flash'),
+        // New lines are read this often while people talk.
+        'every_seconds' => (int) env('WINGMAN_AGENT_EVERY_SECONDS', 12),
+        'max_lines' => 40,
+        // Only findings this sure of are checked.
+        'min_confidence' => 0.6,
+        // At most this many cards per reading; something not urgent waits this long after the last one.
+        'max_per_reading' => 2,
+        'quiet_seconds' => (int) env('WINGMAN_AGENT_QUIET_SECONDS', 90),
+    ],
+
 ];

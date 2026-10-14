@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 import { StatusChip } from '@/canvas/jira/jira-bits';
+import InsightCard from '@/wingman/insight-card';
 import { useLiveCall } from '@/wingman/use-live-call';
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
@@ -33,6 +34,36 @@ export default function WingmanBubble() {
     const { call, setPaused } = useLiveCall();
     const [open, setOpen] = useState(false);
     const elapsed = useElapsed(call?.joined_at ?? null);
+    const [dismissed, setDismissed] = useState<number[]>([]);
+    const insights = (call?.insights ?? []).filter((insight) => !dismissed.includes(insight.id));
+
+    // A new card is said by the bubble itself for a few seconds, in silence.
+    const newest = insights[0] ?? null;
+    const [seen, setSeen] = useState<number | null>(null);
+    const [announced, setAnnounced] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!newest || newest.id === seen) {
+            return;
+        }
+
+        // What was there when the page opened is not news.
+        if (seen !== null && !open) {
+            setAnnounced(newest.title);
+        }
+
+        setSeen(newest.id);
+    }, [newest, seen, open]);
+
+    useEffect(() => {
+        if (!announced) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => setAnnounced(null), 10_000);
+
+        return () => window.clearTimeout(timer);
+    }, [announced]);
 
     // Escape closes it.
     useEffect(() => {
@@ -56,12 +87,19 @@ export default function WingmanBubble() {
                 type="button"
                 aria-expanded={open}
                 aria-label={`Wingman: ${call.paused ? 'en pausa' : 'escuchando'} ${call.title}`}
-                onClick={() => setOpen(!open)}
+                onClick={() => {
+                    setOpen(!open);
+                    setAnnounced(null);
+                }}
                 className={`alerts-row-in flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-accent/30'}`}
             >
                 <span className={`relative size-[7px] rounded-full ${call.paused ? 'bg-faint text-faint' : 'alerts-ping bg-accent text-accent'}`} />
                 Wingman
-                <span className="text-muted">· {call.paused ? 'en pausa' : 'escuchando'}</span>
+                {announced ? (
+                    <span className="max-w-[260px] truncate font-medium text-accent">· {announced}</span>
+                ) : (
+                    <span className="text-muted">· {call.paused ? 'en pausa' : 'escuchando'}</span>
+                )}
             </button>
 
             {open && (
@@ -71,6 +109,14 @@ export default function WingmanBubble() {
                     </p>
                     <h3 className="mt-0.5 text-[15px] font-medium tracking-[-0.01em]">{call.title}</h3>
                     {call.attendees.length > 0 && <p className="truncate text-[12.5px] text-muted">Con {call.attendees.join(', ')}</p>}
+
+                    {insights.length > 0 && (
+                        <section aria-label="Lo que Wingman te aporta" className="mt-3 space-y-2">
+                            {insights.map((insight) => (
+                                <InsightCard key={insight.id} insight={insight} compact onDismiss={(id) => setDismissed((list) => [...list, id])} />
+                            ))}
+                        </section>
+                    )}
 
                     {call.summary && <p className="mt-2.5 text-[13px]">{call.summary}</p>}
                     {call.open_questions.length > 0 && (

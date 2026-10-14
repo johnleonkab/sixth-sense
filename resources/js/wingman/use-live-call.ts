@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { echoConnection } from '@/lib/echo';
 import { getJson, postJson } from '@/lib/http';
+import type { WingmanInsight } from '@/wingman/types';
 
 export type LiveCall = {
     id: number;
@@ -33,6 +34,8 @@ export type LiveCall = {
     summary: string;
     note_count: number;
     open_questions: string[];
+    /** Wingman's latest cards, newest first. */
+    insights: WingmanInsight[];
 };
 
 /** While in a call, it is asked for this often; otherwise, now and then in case an event was missed. */

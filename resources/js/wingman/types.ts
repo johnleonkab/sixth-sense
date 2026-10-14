@@ -34,6 +34,22 @@ export type WingmanContext = {
     failed: string[];
 };
 
+/** Something Wingman brought in during a call. */
+export type WingmanInsight = {
+    id: number;
+    kind: 'slot' | 'issue' | 'page' | 'message';
+    title: string;
+    body: string | null;
+    why: string | null;
+    links: { label: string; url: string }[];
+    /** What it proposes to do; it is reviewed and confirmed before anything happens. */
+    action: { label: string; preview: string | null } | null;
+    importance: 'normal' | 'high';
+    feedback: 'up' | 'down' | null;
+    created_at: string | null;
+    dismissed?: boolean;
+};
+
 /** The living notes of a call. In commitments, who is "Tú" for the person. */
 export type WingmanNotes = {
     summary: string;
@@ -51,6 +67,7 @@ export type WingmanMeeting = WingmanMeetingSummary & {
     paused: boolean;
     notes: WingmanNotes | null;
     notes_updated_at: string | null;
+    insights: WingmanInsight[];
     /** What was said, oldest first (the latest few hundred lines). */
     transcript: { id: number; speaker: string; is_me: boolean; text: string; at: string }[];
 };

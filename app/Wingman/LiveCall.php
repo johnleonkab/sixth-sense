@@ -3,6 +3,7 @@
 namespace App\Wingman;
 
 use App\Models\User;
+use App\Models\WingmanInsight;
 use App\Models\WingmanMeeting;
 use App\Models\WingmanSegment;
 use App\Wingman\Notes\MeetingNotes;
@@ -15,6 +16,9 @@ class LiveCall
 {
     /** Lines of what was said that the bubble shows. */
     public const LINES = 6;
+
+    /** Wingman's latest cards that the bubble shows. */
+    public const INSIGHTS = 4;
 
     /**
      * @return array<string, mixed>|null
@@ -64,6 +68,7 @@ class LiveCall
             'summary' => $notes->summary,
             'note_count' => $notes->count(),
             'open_questions' => array_slice($notes->questions, -3),
+            'insights' => $meeting->insights()->whereNull('dismissed_at')->limit(self::INSIGHTS)->get()->map(fn (WingmanInsight $insight): array => $insight->toCard())->all(),
         ];
     }
 }
