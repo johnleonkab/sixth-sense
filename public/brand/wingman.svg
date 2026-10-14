@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Wingman">
+  <title>Wingman</title>
+  <rect width="128" height="128" rx="28" fill="#141515"/>
+  <path d="M22 50 41 92 64 62 87 92 106 50" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="35" r="10" fill="#8EA6FF"/>
+</svg>

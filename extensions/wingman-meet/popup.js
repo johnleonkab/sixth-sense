@@ -35,38 +35,47 @@ function download(name, content, type) {
 }
 
 function render(status) {
-    if (!status) {
-        $('call').textContent = 'Abre una pestaña de Meet';
+    const eyebrow = $('call-eyebrow');
+
+    if (!status || status.unreachable) {
+        eyebrow.textContent = 'Llamada';
+        $('call').textContent = status?.unreachable ? 'Recarga la pestaña de Meet' : 'Abre una llamada de Meet';
+        $('sync').textContent = status?.unreachable ? 'La extensión se actualizó después de abrirla.' : 'Wingman empieza solo cuando entras en una.';
         return;
     }
 
-    if (status.unreachable) {
-        $('call').innerHTML = '<span class="bad">Recarga la pestaña de Meet</span>';
-        return;
+    if (!status.inCall) {
+        eyebrow.textContent = 'Meet';
+        $('call').textContent = 'Fuera de la llamada';
+        $('sync').textContent = 'Wingman empezará en cuanto entres.';
+    } else {
+        // What sixth-sense knows of the call, said the way the bubble says it.
+        const state = status.lastError ? 'Sin conexión' : !status.meetingId ? 'Avisando a sixth-sense…' : status.paused ? 'En pausa' : 'Escuchando';
+        eyebrow.innerHTML = `<i class="dot ${status.lastError ? 'bad' : status.meetingId && !status.paused ? 'on' : ''}" style="display:inline-block;margin-right:6px;vertical-align:1px"></i>${state}`;
+        $('call').textContent = status.meetingTitle ?? `Llamada ${status.code ?? ''}`.trim();
+        $('sync').innerHTML = status.lastError
+            ? `<span class="bad">${escape(status.lastError)}</span>`
+            : status.paused
+              ? 'No se guarda nada de lo que se dice. Reanúdalo desde la burbuja de sixth-sense.'
+              : status.meetingId
+                ? `${status.sent} frases enviadas a sixth-sense.`
+                : 'Enlazando con tu calendario…';
     }
 
-    $('call').innerHTML = status.inCall ? `<span class="ok">Dentro · ${status.code ?? 'sin código'}</span>` : 'Fuera de la llamada';
     $('captions').innerHTML = status.captionsFound
-        ? `<span class="ok">Leyendo</span>${status.hidden ? ' · ocultos' : ' · visibles'}`
+        ? `<span class="ok">Leyendo</span>${status.hidden ? ' · ocultos para ti' : ' · visibles'}`
         : status.inCall
-          ? '<span class="bad">No los encuentro</span>'
+          ? '<span class="warn">Activándolos…</span>'
           : '—';
-    $('count').textContent = `${status.segments.length} (${status.segments.filter((segment) => segment.final).length} cerradas)`;
+    $('count').textContent = status.segments.length ? `${status.segments.length} (${status.segments.filter((segment) => segment.final).length} cerradas)` : '—';
     $('speakers').textContent = status.speakers.join(', ') || '—';
-    $('sync').innerHTML = !status.inCall
-        ? '—'
-        : status.lastError
-          ? `<span class="bad">${escape(status.lastError)}</span>`
-          : status.meetingId
-            ? `<span class="ok">${escape(status.meetingTitle ?? 'Llamada')}</span> · ${status.paused ? 'en pausa desde sixth-sense' : `${status.sent} enviadas`}`
-            : 'Avisando…';
     $('toggle-hidden').textContent = status.hidden ? 'Mostrar subtítulos' : 'Ocultar subtítulos';
     $('toggle-hidden').dataset.hidden = String(status.hidden);
 
     const lines = status.segments.slice(-6);
     $('lines').innerHTML = lines.length
-        ? lines.map((segment) => `<p><b>${escape(segment.speaker)}:</b> ${escape(segment.text)}</p>`).join('')
-        : '<p>Todavía nada. Habla o espera a que alguien hable.</p>';
+        ? lines.map((segment) => `<p><b class="${segment.speaker === 'Tú' || segment.speaker === 'You' ? 'me' : ''}">${escape(segment.speaker)}:</b> ${escape(segment.text)}</p>`).join('')
+        : `<p>${status.inCall ? 'Todavía nada. En cuanto alguien hable, aparecerá aquí.' : 'Aquí verás lo último que se dice.'}</p>`;
     $('lines').scrollTop = $('lines').scrollHeight;
 }
 
@@ -140,6 +149,12 @@ $('audio-test').addEventListener('click', () => {
 });
 
 /** Connect with sixth-sense: its address and the token made in Configuración → Wingman. */
+/** The header's pill: whether this extension talks to sixth-sense. */
+function link(state, label) {
+    $('link-dot').className = `dot ${state}`;
+    $('link-label').textContent = label;
+}
+
 async function showConnection() {
     const { server, token } = await chrome.storage.local.get(['server', 'token']);
     $('server').value = server ?? '';
@@ -147,15 +162,17 @@ async function showConnection() {
 
     if (!server || !token) {
         $('connection').open = true;
-        $('connection-summary').textContent = 'Conexión con sixth-sense · sin conectar';
+        $('connection-summary').textContent = 'Conecta con tu sixth-sense';
+        link('', 'Sin conectar');
 
         return;
     }
 
     const answer = await chrome.runtime.sendMessage({ type: 'ping' });
     $('connection-summary').textContent = answer?.ok ? `Conectado como ${answer.data.user}` : 'Conexión con sixth-sense · revisar';
-    $('connection-status').innerHTML = answer?.ok ? '' : `<span class="bad">${escape(answer?.error ?? 'Sin respuesta')}</span>`;
+    $('connection-status').innerHTML = answer?.ok ? `<span>${escape(server)}</span>` : `<span class="bad">${escape(answer?.error ?? 'Sin respuesta')}</span>`;
     $('connection').open = !answer?.ok;
+    link(answer?.ok ? 'ok' : 'bad', answer?.ok ? 'Conectado' : 'Revisar');
 }
 
 $('connect').addEventListener('click', async () => {

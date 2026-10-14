@@ -75,7 +75,34 @@ async function sendSegments(meetingId, segments) {
     return all.length;
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, reply) => {
+/** How the toolbar icon says where Wingman stands in a tab. */
+const BADGES = {
+    listening: { text: '•', color: '#2e56e6' },
+    paused: { text: 'II', color: '#8b8f8d' },
+    error: { text: '!', color: '#c42b3d' },
+    off: { text: '', color: '#2e56e6' },
+};
+
+function badge(tabId, state) {
+    const { text, color } = BADGES[state] ?? BADGES.off;
+
+    if (tabId === undefined) {
+        return;
+    }
+
+    void chrome.action.setBadgeText({ tabId, text });
+    void chrome.action.setBadgeBackgroundColor({ tabId, color });
+    void chrome.action.setTitle({ tabId, title: { listening: 'Wingman · escuchando', paused: 'Wingman · en pausa', error: 'Wingman · sin conexión con sixth-sense', off: 'Wingman' }[state] ?? 'Wingman' });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+    if (message.type === 'badge') {
+        badge(sender.tab?.id, message.state);
+        reply({ ok: true });
+
+        return false;
+    }
+
     const run = async () => {
         switch (message.type) {
             case 'call-start':

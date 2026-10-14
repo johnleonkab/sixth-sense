@@ -147,11 +147,14 @@ function ExtensionCard({ extension }: { extension: WingmanSettingsProps['extensi
 
     return (
         <section className="mt-5 rounded-2xl border border-line bg-surface">
-            <header className="px-[22px] pt-[18px] pb-4">
-                <h2 className="text-[15px] font-medium tracking-[-0.01em]">Extensión «Wingman para Meet»</h2>
-                <p className="mt-0.5 max-w-[520px] text-[13px] text-muted">
-                    Detecta cuándo entras en una llamada y le pasa a Wingman lo que se dice, desde tu navegador: en la llamada nadie ve nada.
-                </p>
+            <header className="flex items-start gap-3 px-[22px] pt-[18px] pb-4">
+                <img src="/brand/wingman.svg" alt="" className="size-8 flex-none rounded-[9px]" />
+                <div>
+                    <h2 className="text-[15px] font-medium tracking-[-0.01em]">Extensión «Wingman para Meet»</h2>
+                    <p className="mt-0.5 max-w-[520px] text-[13px] text-muted">
+                        Detecta cuándo entras en una llamada y le pasa a Wingman lo que se dice, desde tu navegador: en la llamada nadie ve nada.
+                    </p>
+                </div>
             </header>
 
             <div className="space-y-4 border-t border-line px-[22px] py-4 text-[13px]">

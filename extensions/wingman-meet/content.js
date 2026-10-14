@@ -248,6 +248,18 @@
         }
     }
 
+    /** The toolbar icon of this tab says whether Wingman listens. */
+    let shownBadge = null;
+
+    function showBadge() {
+        const now = !state.inCall || !state.meetingId ? (state.inCall && state.lastError ? 'error' : 'off') : state.lastError ? 'error' : state.paused ? 'paused' : 'listening';
+
+        if (now !== shownBadge) {
+            shownBadge = now;
+            void tell({ type: 'badge', state: now });
+        }
+    }
+
     async function startCall() {
         clearTimeout(startTimer);
 
@@ -360,7 +372,10 @@
         }
     });
 
-    setInterval(tick, 1000);
+    setInterval(() => {
+        tick();
+        showBadge();
+    }, 1000);
     setInterval(() => state.inCall && void flush(), SEND_EVERY_MS);
 
     // The tab closes while in the call: it is over for sixth-sense too.
