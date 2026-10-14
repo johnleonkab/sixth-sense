@@ -32,6 +32,7 @@ final class JiraRules
             - Proyectos: CPD
             - JQL base: project = CPD AND statusCategory != Done ORDER BY updated DESC
             - Mis tareas: assignee = currentUser() AND statusCategory != Done
+            <!-- Si tu proyecto exige componentes, ponlos aquí y se añadirán a cada issue nuevo: - Componentes: coverexperiences -->
 
             ## Épicas
             - Título: el resultado que se busca, en una frase ("Pagar la reserva por adelantado").
@@ -78,6 +79,23 @@ final class JiraRules
     }
 
     /**
+     * Components every new issue gets unless others are said ("- Componentes: coverexperiences").
+     *
+     * @return list<string>
+     */
+    public function components(): array
+    {
+        if (! preg_match('/^\s*[-*]?\s*(?:componentes?|components?)\s*:\s*(.+)$/imu', $this->withoutComments(), $match)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (string $name): string => trim($name, " `\t"),
+            preg_split('/\s*(?:,|;|\by\b)\s*/u', trim($match[1])) ?: [],
+        ))));
+    }
+
+    /**
      * The JQL to start from when nothing else is said ("- JQL base: …").
      */
     public function baseJql(): ?string
@@ -110,6 +128,14 @@ final class JiraRules
      */
     public function forAssistant(): string
     {
-        return Str::limit(trim((string) preg_replace('/<!--.*?-->/s', '', $this->text)), 6000);
+        return Str::limit(trim($this->withoutComments()), 6000);
+    }
+
+    /**
+     * The rules without the comments meant for the person (the template's hints).
+     */
+    private function withoutComments(): string
+    {
+        return (string) preg_replace('/<!--.*?-->/s', '', $this->text);
     }
 }

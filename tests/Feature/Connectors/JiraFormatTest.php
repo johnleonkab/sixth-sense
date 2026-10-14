@@ -70,3 +70,9 @@ test('the rules say which projects, which jql to start from and how dependencies
         ->and($custom->baseJql())->toBeNull()
         ->and($custom->linkType())->toBe('Depends');
 });
+
+test('the rules can give every new issue its components', function () {
+    expect((new JiraRules(JiraRules::template()))->components())->toBe([])
+        ->and((new JiraRules('- Componentes: coverexperiences'))->components())->toBe(['coverexperiences'])
+        ->and((new JiraRules('* Components: Pagos, Reservas y coverexperiences'))->components())->toBe(['Pagos', 'Reservas', 'coverexperiences']);
+});

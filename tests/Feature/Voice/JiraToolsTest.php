@@ -2,6 +2,7 @@
 
 use App\Connectors\Issues\FakeIssueTracker;
 use App\Connectors\Issues\IssueTracker;
+use App\Connectors\Jira\JiraRules;
 use App\Models\User;
 use App\Voice\AssistantProfile;
 use Carbon\CarbonImmutable;
@@ -69,7 +70,7 @@ test('changing the priority shows before and after, and only changes once confir
 
     confirmJira($proposal);
 
-    expect($this->jira->writes[0])->toBe(['update', ['ref' => 'demo:CPD-412', 'summary' => null, 'description' => null, 'priority' => 'Highest', 'labels' => null, 'assigneeId' => null, 'parentKey' => null]]);
+    expect($this->jira->writes[0])->toBe(['update', ['ref' => 'demo:CPD-412', 'summary' => null, 'description' => null, 'priority' => 'Highest', 'labels' => null, 'assigneeId' => null, 'parentKey' => null, 'components' => null]]);
 
     runJiraTool('propose_jira_update', ['issue' => 'CPD-412', 'priority' => 'Medium'])->assertJsonPath('output.error', fn (string $error) => str_contains($error, 'ya está así'));
 });
@@ -100,4 +101,34 @@ test('the assistant starts each conversation knowing the jira rules', function (
     $profile = AssistantProfile::for($this->user, CarbonImmutable::now(), issues: $this->jira);
 
     expect($profile->instructions)->toContain('Reglas de Jira')->toContain('Como <rol>, quiero <acción> para <beneficio>');
+});
+
+test('a new issue takes the components the rules give every issue, or those said, as the project writes them', function () {
+    $this->app->instance(IssueTracker::class, $this->jira = new class extends FakeIssueTracker
+    {
+        public function rules(User $user): array
+        {
+            return [['account_id' => 0, 'site' => 'covermanager', 'rules' => new JiraRules("## Proyectos y filtros\n- Proyectos: CPD\n- Componentes: coverexperiences")]];
+        }
+    });
+
+    $byRules = runJiraTool('propose_jira_issue', ['project' => 'CPD', 'type' => 'Task', 'summary' => 'Añadir las keys de seats.io'])
+        ->assertJsonPath('canvas.props.issue.components', ['coverexperiences']);
+    confirmJira($byRules);
+
+    expect($this->jira->writes[0][1]['components'])->toBe(['coverexperiences']);
+
+    runJiraTool('propose_jira_issue', ['project' => 'CPD', 'type' => 'Task', 'summary' => 'Otra', 'components' => ['pagos']])
+        ->assertJsonPath('canvas.props.issue.components', ['Pagos']);
+
+    runJiraTool('propose_jira_issue', ['project' => 'CPD', 'type' => 'Task', 'summary' => 'Otra', 'components' => ['facturas']])
+        ->assertJsonPath('output.error', 'El proyecto CPD no tiene el componente «facturas». Tiene: coverexperiences, Pagos, Reservas.');
+});
+
+test('an issue\'s components can be changed', function () {
+    $proposal = runJiraTool('propose_jira_update', ['issue' => 'CPD-412', 'components' => ['coverexperiences', 'reservas']])
+        ->assertJsonPath('canvas.props.changes.0', ['label' => 'Componentes', 'before' => null, 'after' => 'coverexperiences, Reservas']);
+    confirmJira($proposal);
+
+    expect($this->jira->writes[0][1]['components'])->toBe(['coverexperiences', 'Reservas']);
 });

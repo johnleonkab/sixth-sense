@@ -70,6 +70,11 @@ class FakeIssueTracker implements IssueTracker
         ], fn (array $person): bool => Str::contains(Str::lower(Str::ascii($person['name'])), Str::lower(Str::ascii($query)))));
     }
 
+    public function components(User $user, int $accountId, string $projectKey): array
+    {
+        return ['coverexperiences', 'Pagos', 'Reservas'];
+    }
+
     public function priorities(User $user, int $accountId): array
     {
         return ['Highest', 'High', 'Medium', 'Low', 'Lowest'];

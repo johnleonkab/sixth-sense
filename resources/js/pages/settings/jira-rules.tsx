@@ -7,7 +7,7 @@ type Props = {
     rules: string;
     saved: boolean;
     template: string;
-    understood: { projects: string[]; jql: string | null; link_type: string; sections: string[] };
+    understood: { projects: string[]; jql: string | null; link_type: string; components: string[]; sections: string[] };
     max_length: number;
 };
 
@@ -85,6 +85,10 @@ export default function JiraRules({ account, rules, saved, template, understood,
                         <div>
                             <dt className="text-[12px] text-muted">JQL de partida</dt>
                             <dd className="mt-0.5 font-mono text-[12px] break-words">{understood.jql ?? 'Mis issues abiertos'}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-[12px] text-muted">Componentes de cada issue nuevo</dt>
+                            <dd className="mt-0.5 font-mono text-[12px]">{understood.components.join(', ') || '—'}</dd>
                         </div>
                         <div>
                             <dt className="text-[12px] text-muted">Enlace de dependencias</dt>

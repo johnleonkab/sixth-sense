@@ -127,6 +127,17 @@ class JiraIssueTracker implements IssueTracker
         }
     }
 
+    public function components(User $user, int $accountId, string $projectKey): array
+    {
+        $account = $user->accountsWith(Capability::JiraRead)->firstWhere('id', $accountId);
+
+        try {
+            return $account ? array_values(array_column($this->jira->get($account, "project/{$projectKey}/components"), 'name')) : [];
+        } catch (JiraError) {
+            return [];
+        }
+    }
+
     public function issueTypes(User $user, int $accountId, string $projectKey): array
     {
         $account = $user->accountsWith(Capability::JiraRead)->firstWhere('id', $accountId);
@@ -154,6 +165,7 @@ class JiraIssueTracker implements IssueTracker
                 'parent' => $issue->parentKey ? ['key' => $issue->parentKey] : null,
                 'priority' => $issue->priority ? ['name' => $issue->priority] : null,
                 'labels' => $issue->labels ?: null,
+                'components' => $issue->components ? array_map(fn (string $name): array => ['name' => $name], $issue->components) : null,
                 'assignee' => $issue->assigneeId ? ['id' => $issue->assigneeId] : null,
             ])]);
         } catch (JiraError $exception) {
@@ -173,6 +185,7 @@ class JiraIssueTracker implements IssueTracker
                 'description' => $changes->description !== null ? Adf::fromMarkdown($changes->description) : null,
                 'priority' => $changes->priority ? ['name' => $changes->priority] : null,
                 'labels' => $changes->labels,
+                'components' => $changes->components !== null ? array_map(fn (string $name): array => ['name' => $name], $changes->components) : null,
                 'assignee' => $changes->assigneeId ? ['id' => $changes->assigneeId] : null,
                 'parent' => $changes->parentKey ? ['key' => $changes->parentKey] : null,
             ], fn (mixed $value): bool => $value !== null)]);

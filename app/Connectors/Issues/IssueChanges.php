@@ -17,6 +17,8 @@ final readonly class IssueChanges
         public ?array $labels = null,
         public ?string $assigneeId = null,
         public ?string $parentKey = null,
+        /** By name: replaces the issue's components. */
+        public ?array $components = null,
     ) {}
 
     public function isEmpty(): bool

@@ -29,6 +29,7 @@ const JiraDraft: CanvasComponent<JiraDraftProps> = ({ index, ...props }) => (
                 </p>
                 <h3 className="mt-1 text-[18px] font-medium tracking-[-0.01em]">{props.issue.summary}</h3>
                 {props.issue.description && <p className="mt-2 max-h-[40vh] overflow-auto text-[13.5px] leading-[1.6] whitespace-pre-wrap">{props.issue.description}</p>}
+                {(props.issue.components ?? []).length > 0 && <p className="mt-2 text-[12px] text-muted">Componentes: {props.issue.components?.join(', ')}</p>}
                 {props.issue.labels.length > 0 && <p className="mt-2 text-[12px] text-muted">Etiquetas: {props.issue.labels.join(', ')}</p>}
             </div>
         )}

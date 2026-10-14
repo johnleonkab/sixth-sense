@@ -44,7 +44,7 @@ export type JiraListProps = { title: string; jql: string | null; issues: (JiraIs
 export type JiraDraftProps = {
     action: ActionState;
     kind: 'create' | 'update' | 'link' | 'unlink' | 'comment';
-    issue?: { projectKey: string; type: string; summary: string; description: string | null; parentKey: string | null; priority: string | null; labels: string[]; assignee: string | null };
+    issue?: { projectKey: string; type: string; summary: string; description: string | null; parentKey: string | null; priority: string | null; labels: string[]; components?: string[]; assignee: string | null };
     target?: JiraIssueSummary;
     changes?: { label: string; before: string | null; after: string }[];
     dependency?: { from: string; from_summary?: string; relation: string; to: string; to_summary?: string };

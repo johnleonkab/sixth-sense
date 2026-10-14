@@ -45,6 +45,13 @@ interface IssueTracker
     public function people(User $user, int $accountId, string $query): array;
 
     /**
+     * Components of a project, by name (some projects require one on every issue).
+     *
+     * @return list<string>
+     */
+    public function components(User $user, int $accountId, string $projectKey): array;
+
+    /**
      * Priorities the site uses, highest first.
      *
      * @return list<string>

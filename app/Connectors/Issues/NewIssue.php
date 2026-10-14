@@ -10,6 +10,7 @@ final readonly class NewIssue
     /**
      * @param  ?string  $parentKey  The epic of a story, or the story of a subtask.
      * @param  list<string>  $labels
+     * @param  list<string>  $components  By name; some projects require at least one.
      */
     public function __construct(
         public string $projectKey,
@@ -20,6 +21,7 @@ final readonly class NewIssue
         public ?string $priority = null,
         public array $labels = [],
         public ?string $assigneeId = null,
+        public array $components = [],
     ) {}
 
     /**

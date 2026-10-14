@@ -127,7 +127,8 @@ class MeetingCloser
             'detail' => "{$project} · {$type} · {$summary}",
             'type' => 'jira.create',
             'label' => "Crear «{$summary}» en {$project}",
-            'payload' => ['site' => $site['account_id'], 'issue' => (new NewIssue($project, $type, $summary, $description))->toArray()],
+            // With the components the person's rules give every new issue (some projects require them).
+            'payload' => ['site' => $site['account_id'], 'issue' => (new NewIssue($project, $type, $summary, $description, components: $site['rules']->components()))->toArray()],
             'dedupe_key' => 'issue:'.Str::limit(Str::slug($summary), 80, ''),
         ];
     }

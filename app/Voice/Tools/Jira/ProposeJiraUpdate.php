@@ -41,6 +41,7 @@ class ProposeJiraUpdate implements VoiceTool
                 'description' => ['type' => 'string', 'description' => 'La descripción completa nueva, en markdown.'],
                 'priority' => ['type' => 'string'],
                 'labels' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Las etiquetas con las que queda (sustituye las de ahora).'],
+                'components' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Los componentes con los que queda (sustituye los de ahora).'],
                 'assignee' => ['type' => 'string', 'description' => 'A quién asignarlo, por nombre.'],
                 'parent' => ['type' => 'string', 'description' => 'Clave de la nueva épica padre.'],
             ],
@@ -57,6 +58,8 @@ class ProposeJiraUpdate implements VoiceTool
             'priority' => ['nullable', 'string', 'max:60'],
             'labels' => ['nullable', 'array', 'max:10'],
             'labels.*' => ['string', 'max:60', 'regex:/^\S+$/'],
+            'components' => ['nullable', 'array', 'max:10'],
+            'components.*' => ['string', 'max:120'],
             'assignee' => ['nullable', 'string', 'max:120'],
             'parent' => ['nullable', 'string', 'regex:/^[A-Z][A-Z0-9_]{1,9}-\d+$/'],
         ];
@@ -74,6 +77,7 @@ class ProposeJiraUpdate implements VoiceTool
 
             $priority = filled($arguments['priority'] ?? null) ? $this->priorityNamed($user, self::siteOf($ref), $arguments['priority']) : null;
             $assignee = filled($arguments['assignee'] ?? null) ? $this->peopleNamed($user, self::siteOf($ref), [$arguments['assignee']]) : [];
+            $components = isset($arguments['components']) ? $this->componentsFor($user, self::siteOf($ref), Str::before($issue->summary->key, '-'), $arguments['components'], useRules: false) : null;
         } catch (RuntimeException $exception) {
             return ToolResult::error($exception->getMessage());
         }
@@ -85,6 +89,7 @@ class ProposeJiraUpdate implements VoiceTool
             labels: $arguments['labels'] ?? null,
             assigneeId: $assignee ? array_values($assignee)[0] : null,
             parentKey: $arguments['parent'] ?? null,
+            components: $components,
         );
 
         if ($changes->isEmpty()) {
@@ -94,6 +99,7 @@ class ProposeJiraUpdate implements VoiceTool
         $diff = array_values(array_filter([
             $changes->summary ? ['label' => 'Título', 'before' => $issue->summary->summary, 'after' => $changes->summary] : null,
             $changes->priority ? ['label' => 'Prioridad', 'before' => $issue->summary->priority, 'after' => $changes->priority] : null,
+            $changes->components !== null ? ['label' => 'Componentes', 'before' => null, 'after' => implode(', ', $changes->components) ?: '—'] : null,
             $changes->labels !== null ? ['label' => 'Etiquetas', 'before' => implode(', ', $issue->labels) ?: null, 'after' => implode(', ', $changes->labels) ?: '—'] : null,
             $changes->assigneeId ? ['label' => 'Asignado', 'before' => $issue->summary->assignee, 'after' => array_key_first($assignee)] : null,
             $changes->parentKey ? ['label' => 'Padre', 'before' => $issue->parent['key'] ?? null, 'after' => $changes->parentKey] : null,

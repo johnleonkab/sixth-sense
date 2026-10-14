@@ -28,7 +28,8 @@ class ProposeJiraIssue implements VoiceTool
     {
         return 'Propone crear un issue en Jira (épica, user story, tarea, subtarea…) y lo muestra como borrador; NO lo crea hasta que el usuario lo confirme. '
             .'Escríbelo SIEMPRE siguiendo las reglas de Jira del usuario para ese sitio (cómo se titulan y describen las épicas, las historias y las subtareas, en qué idioma). '
-            .'parent: la épica de una historia, o la historia de una subtarea (su clave). La descripción va en markdown (## secciones, - listas, **negrita**).';
+            .'parent: la épica de una historia, o la historia de una subtarea (su clave). La descripción va en markdown (## secciones, - listas, **negrita**). '
+            .'components: los componentes del issue (algunos proyectos los exigen); si no los das, se ponen los de las reglas del usuario. No los pongas como etiquetas.';
     }
 
     public function parameters(): array
@@ -43,6 +44,7 @@ class ProposeJiraIssue implements VoiceTool
                 'parent' => ['type' => 'string', 'description' => 'Clave de la épica o de la historia padre.'],
                 'priority' => ['type' => 'string', 'description' => 'Prioridad, tal como se llama en Jira (High, Medium…).'],
                 'labels' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'components' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Componentes de Jira, por nombre (coverexperiences…).'],
                 'assignee' => ['type' => 'string', 'description' => 'A quién asignarlo, por nombre.'],
                 'site' => ['type' => 'string', 'description' => 'site_id o nombre del Jira, si tiene varios.'],
             ],
@@ -61,6 +63,8 @@ class ProposeJiraIssue implements VoiceTool
             'priority' => ['nullable', 'string', 'max:60'],
             'labels' => ['nullable', 'array', 'max:10'],
             'labels.*' => ['string', 'max:60', 'regex:/^\S+$/'],
+            'components' => ['nullable', 'array', 'max:10'],
+            'components.*' => ['string', 'max:120'],
             'assignee' => ['nullable', 'string', 'max:120'],
             'site' => ['nullable', 'string', 'max:120'],
         ];
@@ -82,6 +86,7 @@ class ProposeJiraIssue implements VoiceTool
             }
 
             $priority = $this->priority($user, $site, $arguments['priority'] ?? null);
+            $components = $this->componentsFor($user, $site, $arguments['project'], $arguments['components'] ?? null);
             $assignee = filled($arguments['assignee'] ?? null) ? $this->peopleNamed($user, $site, [$arguments['assignee']]) : [];
         } catch (RuntimeException $exception) {
             return ToolResult::error($exception->getMessage());
@@ -96,6 +101,7 @@ class ProposeJiraIssue implements VoiceTool
             priority: $priority,
             labels: $arguments['labels'] ?? [],
             assigneeId: $assignee ? array_values($assignee)[0] : null,
+            components: $components,
         );
 
         $action = $this->actions->propose($user, 'jira.create', "Crear {$issue->type} en {$issue->projectKey}: {$issue->summary}", ['site' => $site, 'issue' => $issue->toArray()]);

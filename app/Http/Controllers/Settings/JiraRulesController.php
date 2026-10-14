@@ -35,6 +35,7 @@ class JiraRulesController extends Controller
                 'projects' => $rules->projects(),
                 'jql' => $rules->baseJql(),
                 'link_type' => $rules->linkType(),
+                'components' => $rules->components(),
                 'sections' => $rules->sections(),
             ],
             'max_length' => JiraRules::MAX_LENGTH,

@@ -157,3 +157,17 @@ test('an expired access token is refreshed, and the new refresh token kept', fun
         ->and($this->account->refresh_token)->toBe('ref-2');
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'search/jql') && $request->header('Authorization')[0] === 'Bearer tok-2');
 });
+
+test('issues are created with their components, and the project\'s components are listed', function () {
+    Http::fake([
+        JIRA.'project/CPD/components' => Http::response([['id' => '1', 'name' => 'coverexperiences'], ['id' => '2', 'name' => 'Pagos']]),
+        JIRA.'issue' => Http::response(['id' => '1', 'key' => 'CPD-9']),
+        JIRA.'issue/CPD-9*' => Http::response(jiraIssue('CPD-9')),
+    ]);
+
+    expect($this->jira->components($this->user, $this->a, 'CPD'))->toBe(['coverexperiences', 'Pagos']);
+
+    $this->jira->create($this->user, $this->a, new NewIssue('CPD', 'Task', 'Keys de seats.io', components: ['coverexperiences']));
+
+    Http::assertSent(fn (Request $request) => $request->url() === JIRA.'issue' && $request['fields']['components'] === [['name' => 'coverexperiences']]);
+});

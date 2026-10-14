@@ -59,6 +59,38 @@ trait UsesIssues
     }
 
     /**
+     * The components for an issue of a project: those named or, if none, the
+     * ones the person's rules give every new issue; checked against the
+     * project's own and written as it writes them.
+     *
+     * @param  list<string>|null  $named
+     * @return list<string>
+     *
+     * @throws RuntimeException
+     */
+    private function componentsFor(User $user, int $accountId, string $projectKey, ?array $named, bool $useRules = true): array
+    {
+        $rules = collect($this->issues->rules($user))->firstWhere('account_id', $accountId)['rules'] ?? null;
+        $wanted = $named ?? ($useRules ? ($rules?->components() ?? []) : []);
+
+        if ($wanted === []) {
+            return [];
+        }
+
+        $known = $this->issues->components($user, $accountId, $projectKey);
+
+        // Jira could not list them: they go as said, and Jira says if one is wrong.
+        if ($known === []) {
+            return array_values($wanted);
+        }
+
+        return array_values(array_map(function (string $name) use ($known, $projectKey): string {
+            return collect($known)->first(fn (string $component): bool => Str::lower(Str::ascii($component)) === Str::lower(Str::ascii(trim($name))))
+                ?? throw new RuntimeException("El proyecto {$projectKey} no tiene el componente «{$name}». Tiene: ".implode(', ', $known).'.');
+        }, $wanted));
+    }
+
+    /**
      * People named, as Jira knows them: display name => account id.
      *
      * @param  list<string>  $names
