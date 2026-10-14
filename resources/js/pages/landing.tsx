@@ -23,11 +23,11 @@ const services: { name: string; icon: Service }[] = [
 const steps = [
     {
         title: 'You speak',
-        body: '“What do I have today?” “Open Marta’s email.” “Move it to Thursday and invite Pablo.” Voice first; the keyboard is just a fallback.',
+        body: '“What do I have today?” “Open Marta’s email.” “Move it to Thursday and invite Pablo.” “Create the story in Jira.” Voice first; typing is just a fallback.',
     },
     {
         title: 'It shows what you’re talking about',
-        body: 'The assistant answers out loud and puts the calendar, the email, the Slack thread or the PDF on screen. Point at it: “open the second one”.',
+        body: 'The assistant answers out loud and puts the calendar, the email, the Slack thread, the Jira issue or the PDF on screen. Point at it: “open the second one”.',
     },
     {
         title: 'Nothing changes without your “yes”',
@@ -38,7 +38,11 @@ const steps = [
 const features = [
     {
         title: 'Alerts that wait for you',
-        body: 'Watches Gmail and Slack and only interrupts for what needs your answer, always saying why. A reply engine proposes how to handle each one.',
+        body: 'Watches Gmail, Slack and your Jira mentions, and only rings for what needs your answer, always saying why. One alert per conversation, updated as it goes, with a reply already proposed. Swipe it away when it needs nothing.',
+    },
+    {
+        title: 'Finds time for your work',
+        body: 'Ask it to “find two hours for the proposal this week” and it books the slot. With other people, it finds when everyone is free and proposes the meeting.',
     },
     {
         title: 'Knows what you’re working on',
@@ -48,10 +52,54 @@ const features = [
         title: 'Ready before your meetings',
         body: 'Reminds you early when a meeting needs preparation, and just before when it doesn’t.',
     },
+];
+
+const tools = [
     {
-        title: 'Every account, together',
-        body: 'Connect as many Google, Slack and Notion accounts as you like. Reads combine them all.',
+        service: 'jira' as Service,
+        title: 'Jira, the way your team writes it',
+        body: 'Create epics, stories and subtasks, edit them, set priority and components, mark dependencies and answer comments, following the Jira rules you write once.',
     },
+    {
+        service: 'notion' as Service,
+        title: 'Notion pages and comments',
+        body: 'Find, open, create and edit pages, read and answer comments, and get the link to share.',
+    },
+    {
+        service: 'docs' as Service,
+        title: 'Docs, PDFs and images',
+        body: 'Read a document and its comments, answer them, page through a PDF, zoom an image, or have any of it read aloud.',
+    },
+    {
+        service: 'slack' as Service,
+        title: 'Every account, together',
+        body: 'Connect as many Google, Slack, Jira and Notion accounts as you like, work and personal. Reads combine them all.',
+    },
+];
+
+const wingman = [
+    {
+        title: 'Invisible in the call',
+        body: 'A small browser extension reads Google Meet’s own captions on your screen. No bot joins, nobody sees anything different.',
+    },
+    {
+        title: 'Brings in what helps',
+        body: 'Someone asks about a ticket: its status shows up. You talk about meeting next week: a slot free for everyone. You promise a message: it’s already written.',
+    },
+    {
+        title: 'Notes that write themselves',
+        body: 'Summary, decisions, open questions and who committed to what, as the call goes. Before it starts, the context you need: issues, pages, recent emails.',
+    },
+    {
+        title: 'What’s left, ready for a “yes”',
+        body: 'When you hang up, your commitments become things ready to do: the follow-up meeting, the message, the issue, time for your own tasks.',
+    },
+];
+
+const personal = [
+    { title: 'Pick its voice', body: 'Thirty voices, each with a sample to hear before choosing.' },
+    { title: 'See what it saved you', body: 'An impact panel counts the time saved and the events it put in your calendar.' },
+    { title: 'Private by default', body: 'Meeting transcripts are deleted once in the notes; meetings you never want listened to stay paused.' },
 ];
 
 const selfHost = (repositoryUrl: string) => `git clone ${repositoryUrl}.git
@@ -64,7 +112,14 @@ npm install && npm run build
 
 docker compose up -d
 docker compose exec app php artisan migrate
-docker compose exec app php artisan app:create-user`;
+docker compose exec app php artisan app:create-user
+
+# Queues, schedule and live updates (one terminal each)
+docker compose exec app php artisan horizon
+docker compose exec app php artisan schedule:work
+docker compose exec app php artisan reverb:start
+
+# Wingman: load extensions/wingman-meet in chrome://extensions`;
 
 function GitHubIcon({ className = 'size-4' }: { className?: string }) {
     return (
@@ -143,6 +198,46 @@ function SharedScreen() {
     );
 }
 
+/** A still of Wingman during a call: its bubble and two of its cards. */
+function WingmanStill() {
+    return (
+        <div aria-hidden className="rounded-[22px] border border-line bg-bg p-3 shadow-[var(--shadow)] md:p-5">
+            <div className="flex justify-end">
+                <span className="flex items-center gap-2 rounded-full border border-accent/40 bg-surface px-3 py-1.5 text-[12.5px]">
+                    <i className="size-[7px] rounded-full bg-accent" />
+                    Wingman <span className="text-muted">· listening</span>
+                </span>
+            </div>
+            <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
+                <p className="text-[11px] font-medium tracking-wide text-muted uppercase">Listening · 18 min</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[14px] font-medium">
+                    <ServiceIcon service="meet" size={15} label={false} />
+                    Prepayment flow review
+                </p>
+                <div className="mt-3 space-y-2">
+                    <div className="rounded-xl border border-line px-3 py-2.5">
+                        <p className="flex items-center gap-2 text-[13px] font-medium">
+                            <ServiceIcon service="jira" size={15} label={false} />
+                            CPD-412 · See the total before choosing a table
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] text-muted">Still To Do · blocked by CPD-405.</p>
+                    </div>
+                    <div className="rounded-xl border border-accent/40 px-3 py-2.5">
+                        <p className="flex items-center gap-2 text-[13px] font-medium">
+                            <ServiceIcon service="calendar" size={15} label={false} />
+                            Follow-up: Monday 10:00, free for all three
+                        </p>
+                        <p className="mt-1.5 rounded-lg bg-soft px-2.5 py-1.5 text-[12px]">
+                            <span className="font-medium text-accent">Ready:</span> Invite Marta and Pablo · <span className="text-faint">nothing happens without your “yes”</span>
+                        </p>
+                    </div>
+                </div>
+                <p className="mt-3 text-[12.5px] text-muted">Summary so far: partial refunds move to the next sprint; Friday’s demo shows the full payment only.</p>
+            </div>
+        </div>
+    );
+}
+
 export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
     return (
         <>
@@ -188,7 +283,8 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                             </h1>
                             <p className="mt-5 max-w-[460px] text-[16px] leading-relaxed text-muted">
                                 You talk; the AI answers out loud and, at the same time, puts on screen exactly what you’re talking about: your
-                                calendar, an email, a Slack thread, a document.
+                                calendar, an email, a Slack thread, a Jira issue, a document. In your meetings, Wingman listens quietly and brings
+                                in what helps.
                             </p>
                             <div className="mt-8 flex flex-wrap gap-3">
                                 <a
@@ -242,6 +338,43 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                         </ul>
                     </Section>
 
+                    <Section id="wingman" eyebrow="Wingman" title="A silent copilot in your Google Meet calls.">
+                        <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+                            <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-7 sm:grid-cols-2">
+                                {wingman.map((item) => (
+                                    <div key={item.title}>
+                                        <h3 className="text-[16px] font-medium">{item.title}</h3>
+                                        <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{item.body}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <WingmanStill />
+                        </div>
+                    </Section>
+
+                    <Section id="tools" eyebrow="Your tools" title="Where your work already lives, by voice.">
+                        <div className="grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 sm:grid-cols-2">
+                            {tools.map((tool) => (
+                                <div key={tool.title} className="flex gap-3">
+                                    <ServiceIcon service={tool.service} size={22} label={false} className="mt-0.5" />
+                                    <div>
+                                        <h3 className="text-[16px] font-medium">{tool.title}</h3>
+                                        <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{tool.body}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <ul className="mt-12 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+                            {personal.map((item) => (
+                                <li key={item.title} className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+                                    <h3 className="text-[14.5px] font-medium">{item.title}</h3>
+                                    <p className="mt-1 text-[13px] leading-relaxed text-muted">{item.body}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    </Section>
+
                     <Section id="open-source" eyebrow="Open source" title="Yours to read, run and change.">
                         <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                             <div className="space-y-4 text-[14.5px] leading-relaxed text-muted">
@@ -253,7 +386,11 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                                     Run it on your own server with your own API keys: your accounts connect to your instance, OAuth tokens are stored
                                     encrypted, and audio goes straight from your browser to the voice provider, never through the server.
                                 </p>
-                                <p>Built with Laravel, Inertia, React and Gemini Live. Issues and pull requests are welcome.</p>
+                                <p>
+                                    Wingman’s extension only reads Meet’s captions in your own browser and sends them to your own instance; it never
+                                    records audio.
+                                </p>
+                                <p>Built with Laravel, Inertia, React and Gemini. Issues and pull requests are welcome.</p>
                                 <a href={repositoryUrl} className="inline-flex items-center gap-2 pt-2 font-medium text-ink underline underline-offset-4">
                                     <GitHubIcon />
                                     {repositoryUrl.replace(/^https?:\/\/(www\.)?github\.com\//, '')}
