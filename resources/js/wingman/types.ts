@@ -1,3 +1,5 @@
+import type { ActionState } from '@/actions/types';
+
 export type WingmanMeetingSummary = {
     id: number;
     title: string;
@@ -50,6 +52,20 @@ export type WingmanInsight = {
     dismissed?: boolean;
 };
 
+/** Something left to do after a call, made ready; nothing happens without the person's "sí". */
+export type WingmanAction = {
+    id: number;
+    kind: 'meeting' | 'message' | 'issue' | 'task';
+    title: string;
+    detail: string | null;
+    /** The pending change it becomes: chat.send, mail.send, calendar.change, jira.create, agenda.schedule. */
+    type: string;
+    label: string;
+    state: 'proposed' | 'reviewing' | 'running' | 'done' | 'failed' | 'dismissed';
+    /** The pending change, once reviewed. */
+    action: ActionState | null;
+};
+
 /** The living notes of a call. In commitments, who is "Tú" for the person. */
 export type WingmanNotes = {
     summary: string;
@@ -68,6 +84,8 @@ export type WingmanMeeting = WingmanMeetingSummary & {
     notes: WingmanNotes | null;
     notes_updated_at: string | null;
     insights: WingmanInsight[];
+    actions: WingmanAction[];
+    closed_at: string | null;
     /** What was said, oldest first (the latest few hundred lines). */
     transcript: { id: number; speaker: string; is_me: boolean; text: string; at: string }[];
 };

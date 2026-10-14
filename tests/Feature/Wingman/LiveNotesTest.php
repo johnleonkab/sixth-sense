@@ -2,6 +2,7 @@
 
 use App\Events\WingmanMeetingEnded;
 use App\Events\WingmanMeetingUpdated;
+use App\Jobs\CloseWingmanMeeting;
 use App\Jobs\TakeWingmanNotes;
 use App\Models\User;
 use App\Models\WingmanMeeting;
@@ -57,7 +58,7 @@ test('finished lines go into the notes, by rules of thumb in the fake: questions
     Event::assertDispatched(WingmanMeetingUpdated::class);
 });
 
-test('as lines arrive from the extension, notes are asked for every little while, and right away at the end', function () {
+test('as lines arrive from the extension, notes are asked for every little while, and the meeting is closed at the end', function () {
     Queue::fake();
     $token = app(ExtensionTokens::class)->issue($this->user);
     $send = fn (string $id, bool $final = true) => $this->withToken($token)->postJson("/api/wingman/extension/calls/{$this->meeting->id}/segments", ['segments' => [['client_id' => $id, 'speaker' => 'Marta Ruiz', 'text' => 'Hola', 'final' => $final, 'spoken_at' => now()->toIso8601String()]]]);
@@ -74,8 +75,9 @@ test('as lines arrive from the extension, notes are asked for every little while
     $send('b');
     Queue::assertNotPushed(TakeWingmanNotes::class);
 
+    // At the end, closing the meeting takes the last lines into the notes.
     $this->withToken($token)->postJson("/api/wingman/extension/calls/{$this->meeting->id}/end", ['left_at' => now()->toIso8601String()])->assertOk();
-    Queue::assertPushed(TakeWingmanNotes::class, 1);
+    Queue::assertPushed(CloseWingmanMeeting::class, 1);
 });
 
 test('gemini gets the notes so far and the new lines, and answers the whole notes', function () {

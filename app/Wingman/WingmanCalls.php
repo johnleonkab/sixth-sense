@@ -5,6 +5,7 @@ namespace App\Wingman;
 use App\Events\WingmanMeetingEnded;
 use App\Events\WingmanMeetingStarted;
 use App\Events\WingmanMeetingUpdated;
+use App\Jobs\CloseWingmanMeeting;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\User;
 use App\Models\WingmanMeeting;
@@ -121,8 +122,8 @@ class WingmanCalls
     {
         $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt, 'paused_at' => null]);
         $meeting->segments()->getQuery()->where('final', false)->update(['final' => true]);
-        // The last lines into the notes, now.
-        $this->notes->maybeTake($meeting, now: true);
+        // The last lines into the notes, and what is left to do.
+        CloseWingmanMeeting::dispatch($meeting);
 
         WingmanMeetingEnded::dispatch($meeting);
 

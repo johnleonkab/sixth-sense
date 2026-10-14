@@ -8,6 +8,7 @@ use App\Actions\Handlers\ChangeWiki;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
 use App\Actions\Handlers\ReplyDocumentComment;
+use App\Actions\Handlers\ScheduleAgendaTask;
 use App\Actions\Handlers\SendChatMessage;
 use App\Actions\Handlers\SendEmail;
 use App\Jobs\ExecutePendingAction;
@@ -46,6 +47,7 @@ class Actions
         'jira.link' => ChangeJira::class,
         'jira.unlink' => ChangeJira::class,
         'jira.comment' => ChangeJira::class,
+        'agenda.schedule' => ScheduleAgendaTask::class,
     ];
 
     public function __construct(private Container $container) {}

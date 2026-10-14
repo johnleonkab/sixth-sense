@@ -42,6 +42,9 @@ use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
 use App\Voice\VoiceSamples;
+use App\Wingman\Closing\FakeFollowUpPlanner;
+use App\Wingman\Closing\FollowUpPlanner;
+use App\Wingman\Closing\GeminiFollowUpPlanner;
 use App\Wingman\Copilot\Detector;
 use App\Wingman\Copilot\FakeDetector;
 use App\Wingman\Copilot\GeminiDetector;
@@ -149,6 +152,12 @@ class AppServiceProvider extends ServiceProvider
             'gemini' => new GeminiDetector([...config('alerts.judges.gemini'), 'model' => config('wingman.agent.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
             'fake' => new FakeDetector,
             default => throw new InvalidArgumentException('Unsupported Wingman detector ['.config('wingman.agent.detector').'].'),
+        });
+
+        $this->app->bind(FollowUpPlanner::class, fn (): FollowUpPlanner => match (config('wingman.follow_ups.planner')) {
+            'gemini' => new GeminiFollowUpPlanner([...config('alerts.judges.gemini'), 'model' => config('wingman.follow_ups.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeFollowUpPlanner,
+            default => throw new InvalidArgumentException('Unsupported Wingman follow-up planner ['.config('wingman.follow_ups.planner').'].'),
         });
 
         $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));

@@ -16,6 +16,7 @@ use App\Http\Controllers\Settings\WingmanController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
+use App\Http\Controllers\Wingman\ActionController;
 use App\Http\Controllers\Wingman\InsightController;
 use App\Http\Controllers\Wingman\LiveController;
 use App\Http\Controllers\Wingman\MeetingController;
@@ -59,6 +60,9 @@ Route::middleware('auth')->group(function () {
         Route::post('{meeting}/pause', [LiveController::class, 'pause'])->whereNumber('meeting')->name('pause');
         Route::post('insights/{insight}/feedback', [InsightController::class, 'feedback'])->whereNumber('insight')->name('insights.feedback');
         Route::post('insights/{insight}/dismiss', [InsightController::class, 'dismiss'])->whereNumber('insight')->name('insights.dismiss');
+        Route::post('actions/{action}/review', [ActionController::class, 'review'])->whereNumber('action')->name('actions.review');
+        Route::post('actions/{action}/dismiss', [ActionController::class, 'dismiss'])->whereNumber('action')->name('actions.dismiss');
+        Route::post('actions/{action}/restore', [ActionController::class, 'restore'])->whereNumber('action')->name('actions.restore');
         Route::get('{meeting}', [MeetingController::class, 'show'])->whereNumber('meeting')->name('show');
         Route::post('{meeting}/prepare', [MeetingController::class, 'prepare'])->whereNumber('meeting')->name('prepare');
     });

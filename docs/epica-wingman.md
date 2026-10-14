@@ -195,6 +195,16 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 
 **Hecho cuando:** tras una llamada de prueba, el documento tiene el resumen y las acciones, y ejecutar una la hace de verdad.
 
+**Estado:** ✅ hecho (14/10).
+- **`WingmanAction`:** lo que queda por hacer. Entra al momento lo que traen las tarjetas preparadas y, al colgar, lo que sale de tus compromisos.
+- **Cierre:** `CloseWingmanMeeting` ejecuta `MeetingCloser` cuando cuelgas o cuando la llamada se da por abandonada.
+  - Primero pasa las últimas líneas a las notas.
+  - Después `GeminiFollowUpPlanner` convierte los compromisos de «Tú» en cosas listas para revisar: un mensaje redactado (Slack o email), una reunión con hueco para todos, un ticket de Jira en el proyecto de tus reglas, o tiempo reservado para una tarea tuya (`agenda.schedule`, nuevo tipo de acción que usa el agendador).
+  - No repite nada de lo que ya estaba preparado.
+  - Prueba real: unos 5 s. Saltó el compromiso de otra persona, redactó el mensaje a Andrés y convirtió «el jueves» en fecha límite.
+- **Revisar → «Sí» → unos segundos para deshacer**, con la misma `ActionBar` de siempre; también Descartar y Recuperar. Una acción cancelada, deshecha o caducada se puede volver a revisar.
+- **Por voz:** `review_meeting` («repásame lo de la reunión», canvas `wingman.doc`), `propose_meeting_action` («ejecuta la 2») y `dismiss_meeting_actions` («descarta las demás»).
+
 ### H7 · Sección Wingman, a mano y sin ruido (1 día)
 - **Sin nada nuevo en la pantalla de inicio.** Se llega a ella:
   - desde la burbuja ("Reuniones anteriores");

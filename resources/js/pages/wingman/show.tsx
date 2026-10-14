@@ -1,9 +1,13 @@
 import { router, usePoll } from '@inertiajs/react';
 import { type ReactNode, useEffect, useState } from 'react';
 
+import { useActions } from '@/actions/use-actions';
+import { CanvasContext } from '@/canvas/canvas-context';
+
 import { IssueKey, StatusChip } from '@/canvas/jira/jira-bits';
 import { dayLabel, timeRange } from '@/wingman/format';
 import InsightCard from '@/wingman/insight-card';
+import MeetingActions from '@/wingman/meeting-actions';
 import type { WingmanContext, WingmanMeeting, WingmanNotes } from '@/wingman/types';
 import WingmanLayout from '@/wingman/wingman-layout';
 
@@ -168,13 +172,14 @@ function Preparing() {
 export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
     const preparing = meeting.context_prepared_at === null;
     const live = meeting.status === 'live';
+    const closing = meeting.status === 'ended' && !meeting.closed_at;
     const [refreshing, setRefreshing] = useState(false);
 
     // While it is being gathered, or the call goes on, ask for it every little while.
     const { start, stop } = usePoll(2500, { only: ['meeting'] }, { autoStart: false, mode: 'rest' });
 
     useEffect(() => {
-        if (preparing || live) {
+        if (preparing || live || closing) {
             start();
         } else {
             stop();
@@ -183,7 +188,10 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
         if (!preparing) {
             setRefreshing(false);
         }
-    }, [preparing, live, start, stop]);
+    }, [preparing, live, closing, start, stop]);
+
+    // The changes reviewed here: confirm, undo, outcome.
+    const actions = useActions();
 
     const prepareAgain = () => {
         setRefreshing(true);
@@ -227,6 +235,21 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                     ))}
                 </ul>
             </Section>
+
+            {meeting.actions.length > 0 && (
+                <Section title={meeting.closed_at ? 'Qué queda por hacer' : 'Preparado durante la llamada'}>
+                    <CanvasContext value={{ runTool: () => undefined, actions }}>
+                        <MeetingActions items={meeting.actions} />
+                    </CanvasContext>
+                </Section>
+            )}
+
+            {!live && meeting.status === 'ended' && !meeting.closed_at && (
+                <p className="mt-8 flex items-center gap-2 text-[13px] text-muted">
+                    <i aria-hidden className="size-[7px] animate-pulse rounded-full bg-accent" />
+                    Cerrando la reunión: notas finales y lo que queda por hacer…
+                </p>
+            )}
 
             {meeting.insights.length > 0 && (
                 <Section title={`Lo que aportó Wingman · ${meeting.insights.length}`}>

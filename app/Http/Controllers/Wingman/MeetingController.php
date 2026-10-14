@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Wingman;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\PrepareWingmanContext;
+use App\Models\WingmanAction;
 use App\Models\WingmanInsight;
 use App\Models\WingmanMeeting;
 use App\Models\WingmanSegment;
@@ -83,6 +84,8 @@ class MeetingController extends Controller
                 'paused' => $meeting->paused_at !== null,
                 'notes' => $meeting->notes === null ? null : MeetingNotes::fromArray($meeting->notes)->toArray(),
                 'notes_updated_at' => $meeting->notes_updated_at?->toIso8601String(),
+                'closed_at' => $meeting->closed_at?->toIso8601String(),
+                'actions' => $meeting->actions()->with('pendingAction')->get()->map(fn (WingmanAction $action): array => $action->toCard())->all(),
                 'insights' => $meeting->insights()->get()->map(fn (WingmanInsight $insight): array => [...$insight->toCard(), 'dismissed' => $insight->dismissed_at !== null])->all(),
                 'transcript' => $meeting->segments()->getQuery()->reorder()->latest('spoken_at')->latest('id')->limit(self::TRANSCRIPT)->get()->reverse()->values()
                     ->map(fn (WingmanSegment $segment): array => [

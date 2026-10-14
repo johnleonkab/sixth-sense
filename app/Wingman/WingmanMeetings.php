@@ -5,6 +5,7 @@ namespace App\Wingman;
 use App\Connectors\Calendar\CalendarEvent;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\EventQuery;
+use App\Jobs\CloseWingmanMeeting;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\User;
 use App\Models\WingmanMeeting;
@@ -65,7 +66,10 @@ class WingmanMeetings
             ->where('status', MeetingStatus::Live)
             ->where('updated_at', '<', now()->subMinutes(self::ABANDONED_AFTER_MINUTES))
             ->get()
-            ->each(fn (WingmanMeeting $meeting) => $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $meeting->updated_at]));
+            ->each(function (WingmanMeeting $meeting): void {
+                $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $meeting->updated_at]);
+                CloseWingmanMeeting::dispatch($meeting);
+            });
 
         return count($found);
     }

@@ -81,7 +81,21 @@ class WingmanAgent
                 continue;
             }
 
-            $brought[] = $meeting->insights()->create($card);
+            $insight = $meeting->insights()->create($card);
+            $brought[] = $insight;
+
+            // What it has ready goes to the meeting's list of things to do, to review when the person wants.
+            if ($card['action'] !== null) {
+                $meeting->actions()->firstOrCreate(['dedupe_key' => $card['dedupe_key']], [
+                    'wingman_insight_id' => $insight->id,
+                    'kind' => $card['kind'] === 'slot' ? 'meeting' : $card['kind'],
+                    'title' => $card['action']['label'],
+                    'detail' => $card['action']['preview'] ?? null,
+                    'type' => $card['action']['type'],
+                    'label' => $card['action']['label'],
+                    'payload' => $card['action']['payload'],
+                ]);
+            }
         }
 
         if ($brought !== []) {

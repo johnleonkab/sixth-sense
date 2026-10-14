@@ -53,4 +53,11 @@ return [
         'quiet_seconds' => (int) env('WINGMAN_AGENT_QUIET_SECONDS', 90),
     ],
 
+    // What is left to do, at the end of a call.
+    'follow_ups' => [
+        // gemini or fake (tests).
+        'planner' => env('WINGMAN_FOLLOW_UPS', 'gemini'),
+        'model' => env('WINGMAN_FOLLOW_UPS_MODEL', 'gemini-3.8-flash'),
+    ],
+
 ];
