@@ -21,7 +21,7 @@ class ReviewMeeting implements VoiceTool
     public function description(): string
     {
         return 'Muestra el documento de una reunión que siguió Wingman: resumen, decisiones, preguntas abiertas, compromisos y lo que queda por hacer, numerado. '
-            .'Sin argumentos, la última. title: palabras del título («la de prepago»). Para «repásame lo de la reunión».';
+            .'Sin argumentos, la última. title: palabras del título, de los asistentes o del tema («la de prepago», «la reunión con Marta»). Para «repásame lo de la reunión» o «abre las notas de la reunión con Marta».';
     }
 
     public function parameters(): array
@@ -29,7 +29,7 @@ class ReviewMeeting implements VoiceTool
         return [
             'type' => 'object',
             'properties' => [
-                'title' => ['type' => 'string', 'description' => 'Palabras del título de la reunión.'],
+                'title' => ['type' => 'string', 'description' => 'Palabras del título, de los asistentes o del tema.'],
                 'meeting_id' => ['type' => 'integer', 'description' => 'El meeting_id, si ya lo tienes.'],
             ],
         ];

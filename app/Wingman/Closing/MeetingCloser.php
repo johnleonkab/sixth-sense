@@ -11,6 +11,7 @@ use App\Wingman\Copilot\Finding;
 use App\Wingman\Copilot\Lookups;
 use App\Wingman\Notes\LiveNotes;
 use App\Wingman\Notes\MeetingNotes;
+use App\Wingman\WingmanSettings;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -47,6 +48,11 @@ class MeetingCloser
                     $ready[] = $meeting->actions()->create($action);
                 }
             }
+        }
+
+        // What was said is not kept once it is in the notes, unless the person wants it.
+        if (! WingmanSettings::for($meeting->user)->keepTranscript) {
+            $meeting->segments()->getQuery()->delete();
         }
 
         $meeting->update(['closed_at' => now()]);

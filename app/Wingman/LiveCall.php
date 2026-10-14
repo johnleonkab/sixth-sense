@@ -45,6 +45,7 @@ class LiveCall
             'status' => $meeting->status->value,
             'joined_at' => $meeting->joined_at?->toIso8601String(),
             'paused' => $meeting->paused_at !== null,
+            'paused_reason' => $meeting->paused_reason,
             'segment_count' => $meeting->segments()->count(),
             'attendees' => collect($meeting->attendees ?? [])->pluck('name')->filter()->values()->all(),
             'lines' => $meeting->segments()->getQuery()->reorder()->latest('spoken_at')->latest('id')->limit($lines)->get()->reverse()->values()

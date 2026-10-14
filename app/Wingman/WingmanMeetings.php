@@ -32,12 +32,13 @@ class WingmanMeetings
         $timezone = (string) config('agenda.timezone');
         $now = CarbonImmutable::now($timezone);
         $reading = $this->calendar->read($user, new EventQuery($now->startOfDay(), $now->endOfDay()));
+        $settings = WingmanSettings::for($user);
         $found = [];
 
         foreach ($reading->events as $event) {
             $code = WingmanMeeting::codeIn($event->meetingUrl);
 
-            if ($code === null || $event->allDay || $event->declined || $event->myResponse === 'declined') {
+            if ($code === null || $event->allDay || $event->declined || $event->myResponse === 'declined' || ! $settings->follows($event->account)) {
                 continue;
             }
 

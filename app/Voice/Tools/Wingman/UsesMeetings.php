@@ -8,7 +8,6 @@ use App\Models\WingmanMeeting;
 use App\Voice\Tools\Canvas;
 use App\Wingman\Notes\MeetingNotes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 /**
  * Finding a meeting Wingman followed, and showing its document.
@@ -26,11 +25,9 @@ trait UsesMeetings
             return (clone $followed)->find($id);
         }
 
+        // By words of its title, its attendees («la de Marta») or what it was about.
         if (filled($title)) {
-            $words = Str::of($title)->lower()->ascii()->explode(' ')->filter(fn (string $word): bool => Str::length($word) > 2);
-
-            return (clone $followed)->latest('joined_at')->limit(50)->get()
-                ->first(fn (WingmanMeeting $meeting): bool => $words->every(fn (string $word): bool => Str::contains(Str::lower(Str::ascii($meeting->title)), $word)));
+            return (clone $followed)->latest('joined_at')->limit(200)->get()->first(fn (WingmanMeeting $meeting): bool => $meeting->matches($title));
         }
 
         return (clone $followed)->latest('joined_at')->first();

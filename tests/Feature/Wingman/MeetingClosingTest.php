@@ -69,7 +69,9 @@ test('closing takes the last lines into the notes and makes the person\'s commit
     $ready = app(MeetingCloser::class)->close($this->meeting);
 
     expect($this->meeting->refresh()->closed_at)->not->toBeNull()
-        ->and($this->meeting->segments()->first()->noted)->toBeTrue()
+        // The last line made it into the notes; the transcript itself is not kept.
+        ->and(collect(MeetingNotes::fromArray($this->meeting->notes)->topics)->flatMap(fn (array $topic) => $topic['points'])->all())->toContain('Tú: Bueno, pues eso es todo por hoy')
+        ->and($this->meeting->segments()->count())->toBe(0)
         ->and(collect($ready)->pluck('kind')->all())->toBe(['message', 'issue', 'task'])
         ->and($ready[0]->type)->toBe('chat.send')
         ->and($ready[0]->payload['message']['to'])->toBe('demo:U01')

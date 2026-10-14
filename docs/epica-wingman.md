@@ -218,6 +218,15 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 
 **Hecho cuando:** cualquier reunión pasada se abre en dos pasos desde la burbuja o con una frase.
 
+**Estado:** ✅ hecho (14/10).
+- Sin nada nuevo en la pantalla de inicio.
+- Se llega a las reuniones:
+  - desde la burbuja (enlace «Reuniones»);
+  - desde Configuración;
+  - por voz, con `review_meeting`, que busca por título, asistentes o tema («la reunión con Marta»);
+  - en `/wingman`, con búsqueda en las anteriores (título, persona o tema).
+- Configuración → Wingman: interruptor, calendarios que sigue (todos por defecto), reuniones que nunca escucha (palabras del título) y transcripción (`users.wingman_settings`, `WingmanSettings`).
+
 ### H8 · Privacidad y conservación (0,5 días)
 - **Por defecto** no se guarda la transcripción: se borra al cerrar el documento. Se guardan las notas, el resumen y las acciones. Es configurable.
 - Pausar o reanudar la escucha en cualquier momento desde la burbuja.
@@ -225,6 +234,12 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 - Nada se escribe en ningún servicio durante la llamada sin tu "sí".
 
 **Hecho cuando:** con la configuración por defecto no queda transcripción tras la reunión, y la pausa corta la captura al instante.
+
+**Estado:** ✅ hecho (14/10).
+- Por defecto, `MeetingCloser` borra lo que se dijo al cerrar la reunión, después de llevarlo a las notas. Se puede guardar en Configuración.
+- Pausar descarta en el servidor lo que llega desde ese momento, y la extensión lo indica.
+- Una reunión cubierta por una regla («1:1») empieza en pausa (`paused_reason`). La burbuja dice por qué y ofrece «Escuchar esta vez».
+- Aviso claro en Configuración: el texto se procesa con Gemini, no se graba audio y en Meet nadie ve nada distinto.
 
 ### H9 · Modo demo y tests (1 día)
 - Un `Fake` que reproduce una llamada de ejemplo con los datos del prototipo: Marta, CPD-412, la página de prepago, un seguimiento la semana que viene.

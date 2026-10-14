@@ -10,6 +10,7 @@ type WingmanSettingsProps = {
     calendars: string[];
     demo: boolean;
     extension: { connected: boolean; used_at: string | null; server: string };
+    settings: { calendars: string[] | null; never_listen: string[]; keep_transcript: boolean };
 };
 
 const usedFormat = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -31,6 +32,111 @@ function CopyField({ label, value }: { label: string; value: string }) {
                 </button>
             </div>
         </div>
+    );
+}
+
+function SettingsCard({ calendars, settings }: { calendars: string[]; settings: WingmanSettingsProps['settings'] }) {
+    const [chosen, setChosen] = useState<string[] | null>(settings.calendars);
+    const [rules, setRules] = useState<string[]>(settings.never_listen);
+    const [rule, setRule] = useState('');
+    const [keepTranscript, setKeepTranscript] = useState(settings.keep_transcript);
+    const [saving, setSaving] = useState(false);
+
+    const following = (calendar: string) => chosen === null || chosen.some((item) => item.toLowerCase() === calendar.toLowerCase());
+    const toggleCalendar = (calendar: string) => {
+        const current = chosen ?? calendars;
+        const next = following(calendar) ? current.filter((item) => item.toLowerCase() !== calendar.toLowerCase()) : [...current, calendar];
+        // Every calendar chosen is the same as "all": new ones are followed too.
+        setChosen(next.length === calendars.length ? null : next);
+    };
+    const addRule = () => {
+        const value = rule.trim();
+
+        if (value && !rules.some((item) => item.toLowerCase() === value.toLowerCase())) {
+            setRules([...rules, value]);
+        }
+
+        setRule('');
+    };
+
+    const save = () => {
+        setSaving(true);
+        router.put('/settings/wingman/settings', { calendars: chosen, never_listen: rules, keep_transcript: keepTranscript }, { preserveScroll: true, onFinish: () => setSaving(false) });
+    };
+
+    return (
+        <section className="mt-5 rounded-2xl border border-line bg-surface">
+            {calendars.length > 1 && (
+                <div className="px-[22px] pt-[18px] pb-4">
+                    <h2 className="text-[15px] font-medium tracking-[-0.01em]">Calendarios</h2>
+                    <p className="mt-0.5 text-[13px] text-muted">Las llamadas de los calendarios que elijas.</p>
+                    <ul className="mt-3 space-y-1.5 text-[13.5px]">
+                        {calendars.map((calendar) => (
+                            <li key={calendar}>
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" checked={following(calendar)} onChange={() => toggleCalendar(calendar)} className="accent-[var(--accent)]" />
+                                    {calendar}
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            <div className={`px-[22px] pt-[18px] pb-4 ${calendars.length > 1 ? 'border-t border-line' : ''}`}>
+                <h2 className="text-[15px] font-medium tracking-[-0.01em]">Reuniones que nunca escucha</h2>
+                <p className="mt-0.5 text-[13px] text-muted">Si el título contiene alguna de estas palabras, Wingman entra en pausa: no guarda nada de lo que se dice. Puedes escucharla igualmente desde la burbuja.</p>
+                <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {rules.map((item) => (
+                        <li key={item} className="flex items-center gap-1 rounded-full bg-soft py-1 pr-1.5 pl-2.5 text-[13px]">
+                            {item}
+                            <button type="button" aria-label={`Quitar ${item}`} onClick={() => setRules(rules.filter((other) => other !== item))} className="rounded px-1 text-faint hover:text-ink">
+                                ✕
+                            </button>
+                        </li>
+                    ))}
+                    <li>
+                        <input
+                            value={rule}
+                            onChange={(event) => setRule(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    addRule();
+                                }
+                            }}
+                            onBlur={addRule}
+                            placeholder="1:1, RRHH, médico…"
+                            maxLength={60}
+                            className="w-[180px] rounded-full border border-line bg-surface px-3 py-1 text-[13px] outline-none focus:border-accent"
+                        />
+                    </li>
+                </ul>
+            </div>
+
+            <div className="border-t border-line px-[22px] pt-[18px] pb-4">
+                <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-[15px] font-medium tracking-[-0.01em]">Guardar la transcripción</h2>
+                        <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
+                            Por defecto, lo que se dice se borra al cerrar la reunión: quedan las notas, lo que aportó Wingman y lo que queda por hacer.
+                        </p>
+                    </div>
+                    <Switch checked={keepTranscript} onChange={setKeepTranscript} className="mt-1 flex-none">
+                        <span className="sr-only">Guardar la transcripción</span>
+                    </Switch>
+                </div>
+                <p className="mt-3 rounded-xl bg-soft px-3.5 py-2.5 text-[12.5px] text-muted">
+                    Para tomar notas y aportar en directo, el texto de la llamada (los subtítulos de Meet) se envía a Gemini, de Google. En llamadas con clientes, comprueba que encaja con la política de datos de tu empresa. Wingman no graba audio y en Meet nadie ve nada distinto.
+                </p>
+            </div>
+
+            <div className="flex justify-end border-t border-line px-[22px] py-3">
+                <button type="button" onClick={save} disabled={saving} className="rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-accent-ink disabled:opacity-50">
+                    Guardar
+                </button>
+            </div>
+        </section>
     );
 }
 
@@ -89,7 +195,7 @@ function ExtensionCard({ extension }: { extension: WingmanSettingsProps['extensi
     );
 }
 
-export default function WingmanSettings({ enabled, calendars, demo, extension }: WingmanSettingsProps) {
+export default function WingmanSettings({ enabled, calendars, demo, extension, settings }: WingmanSettingsProps) {
     const toggle = (value: boolean) => router.put('/settings/wingman', { enabled: value }, { preserveScroll: true });
     const noCalendar = calendars.length === 0 && !demo;
 
@@ -120,7 +226,7 @@ export default function WingmanSettings({ enabled, calendars, demo, extension }:
                         </p>
                     ) : (
                         <p className="text-muted">
-                            {demo ? 'Modo demo: usa el calendario de ejemplo.' : `Calendarios: ${calendars.join(', ')}.`}
+                            {demo ? 'Modo demo: usa el calendario de ejemplo.' : `Sigue: ${(settings.calendars ?? calendars).join(', ') || 'ningún calendario'}.`}
                             {enabled && (
                                 <>
                                     {' '}
@@ -134,6 +240,7 @@ export default function WingmanSettings({ enabled, calendars, demo, extension }:
                 </div>
             </section>
 
+            {enabled && <SettingsCard calendars={calendars} settings={settings} />}
             {enabled && <ExtensionCard extension={extension} />}
         </SettingsLayout>
     );

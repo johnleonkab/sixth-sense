@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 import { StatusChip } from '@/canvas/jira/jira-bits';
@@ -98,14 +98,14 @@ export default function WingmanBubble() {
                 {announced ? (
                     <span className="max-w-[260px] truncate font-medium text-accent">· {announced}</span>
                 ) : (
-                    <span className="text-muted">· {call.paused ? 'en pausa' : 'escuchando'}</span>
+                    <span className="text-muted">· {call.paused ? (call.paused_reason ? `en pausa (${call.paused_reason})` : 'en pausa') : 'escuchando'}</span>
                 )}
             </button>
 
             {open && (
                 <div className="alerts-panel-in absolute top-full right-0 z-10 mt-2 max-h-[70vh] w-[min(380px,calc(100vw-32px))] overflow-auto rounded-[16px] border border-line bg-surface p-3.5 shadow-card">
                     <p className="text-[11px] font-medium tracking-wide text-muted uppercase">
-                        {call.paused ? 'En pausa' : 'Escuchando'} · {elapsed}
+                        {call.paused ? (call.paused_reason ? `En pausa por tu ${call.paused_reason}` : 'En pausa') : 'Escuchando'} · {elapsed}
                     </p>
                     <h3 className="mt-0.5 text-[15px] font-medium tracking-[-0.01em]">{call.title}</h3>
                     {call.attendees.length > 0 && <p className="truncate text-[12.5px] text-muted">Con {call.attendees.join(', ')}</p>}
@@ -163,14 +163,17 @@ export default function WingmanBubble() {
                     </section>
 
                     <div className="mt-3 flex items-center justify-between gap-2 text-[12.5px]">
-                        <span className="text-faint">{[call.note_count > 0 && plural(call.note_count, 'nota', 'notas'), plural(call.segment_count, 'frase', 'frases')].filter(Boolean).join(' · ')}</span>
+                        <Link href="/wingman" onClick={() => setOpen(false)} className="text-faint hover:text-ink hover:underline">
+                            Reuniones
+                        </Link>
+                        <span className="ml-auto text-faint">{[call.note_count > 0 && plural(call.note_count, 'nota', 'notas'), plural(call.segment_count, 'frase', 'frases')].filter(Boolean).join(' · ')}</span>
                         <div className="flex gap-1.5">
                             <button
                                 type="button"
                                 onClick={() => void setPaused(!call.paused)}
                                 className="rounded-full border border-line px-3 py-1 text-muted hover:border-accent hover:text-accent"
                             >
-                                {call.paused ? 'Volver a escuchar' : 'Pausar'}
+                                {call.paused ? (call.paused_reason ? 'Escuchar esta vez' : 'Volver a escuchar') : 'Pausar'}
                             </button>
                             <button
                                 type="button"

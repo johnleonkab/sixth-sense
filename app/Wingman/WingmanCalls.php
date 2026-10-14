@@ -62,13 +62,18 @@ class WingmanCalls
             'attendees' => [],
         ]);
 
+        $rejoining = $meeting->status === MeetingStatus::Live;
+        // A meeting the person never wants listened to starts paused; they can still listen this once.
+        $rule = $rejoining ? null : WingmanSettings::for($user)->neverListensTo($meeting->title);
+
         $meeting->update([
             'status' => MeetingStatus::Live,
             // Joining again after dropping keeps the first time in.
             'joined_at' => $meeting->joined_at ?? $joinedAt,
             'left_at' => null,
-            // A new call starts listening, even if the last one was paused.
-            'paused_at' => $meeting->status === MeetingStatus::Live ? $meeting->paused_at : null,
+            // A new call starts listening, even if the last one was paused, unless a rule says otherwise.
+            'paused_at' => $rejoining ? $meeting->paused_at : ($rule !== null ? now() : null),
+            'paused_reason' => $rejoining ? $meeting->paused_reason : ($rule !== null ? "regla «{$rule}»" : null),
         ]);
 
         if ($meeting->context_prepared_at === null) {
@@ -120,7 +125,7 @@ class WingmanCalls
      */
     public function end(WingmanMeeting $meeting, CarbonImmutable $leftAt): WingmanMeeting
     {
-        $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt, 'paused_at' => null]);
+        $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt, 'paused_at' => null, 'paused_reason' => null]);
         $meeting->segments()->getQuery()->where('final', false)->update(['final' => true]);
         // The last lines into the notes, and what is left to do.
         CloseWingmanMeeting::dispatch($meeting);
@@ -145,7 +150,7 @@ class WingmanCalls
      */
     public function pause(WingmanMeeting $meeting, bool $paused): WingmanMeeting
     {
-        $meeting->update(['paused_at' => $paused ? now() : null]);
+        $meeting->update(['paused_at' => $paused ? now() : null, 'paused_reason' => null]);
 
         WingmanMeetingUpdated::dispatch($meeting);
 

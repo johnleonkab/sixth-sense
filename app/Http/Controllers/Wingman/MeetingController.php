@@ -22,6 +22,9 @@ class MeetingController extends Controller
     /** Past meetings listed below today's. */
     private const PAST = 30;
 
+    /** Past meetings looked through when searching. */
+    private const SEARCHED = 500;
+
     /** The latest things said that a meeting's page shows. */
     private const TRANSCRIPT = 300;
 
@@ -33,6 +36,7 @@ class MeetingController extends Controller
         $user = $request->user();
         $timezone = (string) config('agenda.timezone');
         $today = CarbonImmutable::now($timezone);
+        $query = trim((string) $request->string('q'));
 
         return Inertia::render('wingman/index', [
             'enabled' => $user->wingman_enabled,
@@ -53,12 +57,16 @@ class MeetingController extends Controller
                     ->map(fn (WingmanMeeting $meeting): array => $this->summary($meeting, $timezone))
                     ->all();
             }),
+            'q' => $query,
             'past' => $user->wingmanMeetings()
                 ->where('starts_at', '<', $today->startOfDay()->utc())
                 ->latest('starts_at')
-                ->limit(self::PAST)
+                ->limit($query === '' ? self::PAST : self::SEARCHED)
                 ->get()
+                ->filter(fn (WingmanMeeting $meeting): bool => $query === '' || $meeting->matches($query))
+                ->take(self::PAST)
                 ->map(fn (WingmanMeeting $meeting): array => $this->summary($meeting, $timezone))
+                ->values()
                 ->all(),
         ]);
     }

@@ -11,6 +11,8 @@ export type LiveCall = {
     meeting_url: string;
     joined_at: string | null;
     paused: boolean;
+    /** When a rule of the person's paused it ("regla «1:1»"). */
+    paused_reason: string | null;
     segment_count: number;
     attendees: string[];
     lines: {

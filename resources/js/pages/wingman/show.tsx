@@ -284,6 +284,10 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                 </Section>
             )}
 
+            {!live && meeting.closed_at && meeting.transcript.length === 0 && meeting.notes && (
+                <p className="mt-8 text-[12.5px] text-faint">Lo que se dijo no se guarda: se borró al cerrar la reunión (lo puedes cambiar en Configuración → Wingman).</p>
+            )}
+
             {preparing || !meeting.context ? <Preparing /> : <Context context={meeting.context} />}
         </WingmanLayout>
     );

@@ -1,4 +1,5 @@
-import { Deferred, Link } from '@inertiajs/react';
+import { Deferred, Link, router } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 
 import { dayLabel, timeRange } from '@/wingman/format';
 import type { WingmanMeetingSummary } from '@/wingman/types';
@@ -6,6 +7,7 @@ import WingmanLayout from '@/wingman/wingman-layout';
 
 type WingmanIndexProps = {
     enabled: boolean;
+    q: string;
     today?: WingmanMeetingSummary[];
     past: WingmanMeetingSummary[];
 };
@@ -46,7 +48,23 @@ function TodaySkeleton() {
     );
 }
 
-export default function WingmanIndex({ enabled, today, past }: WingmanIndexProps) {
+export default function WingmanIndex({ enabled, q, today, past }: WingmanIndexProps) {
+    const [search, setSearch] = useState(q);
+    const first = useRef(true);
+
+    // Searching past meetings as the person types.
+    useEffect(() => {
+        if (first.current) {
+            first.current = false;
+
+            return;
+        }
+
+        const timer = window.setTimeout(() => router.get('/wingman', search ? { q: search } : {}, { only: ['past', 'q'], preserveState: true, preserveScroll: true, replace: true }), 250);
+
+        return () => window.clearTimeout(timer);
+    }, [search]);
+
     const byDay = past.reduce<Record<string, WingmanMeetingSummary[]>>((days, meeting) => {
         const key = meeting.starts_at.slice(0, 10);
         (days[key] ??= []).push(meeting);
@@ -88,11 +106,21 @@ export default function WingmanIndex({ enabled, today, past }: WingmanIndexProps
                 </Deferred>
             </section>
 
-            {past.length > 0 && (
-                <section aria-labelledby="wingman-past" className="mt-10">
-                    <h2 id="wingman-past" className="mb-2 px-3 text-[13px] text-muted">
+            <section aria-labelledby="wingman-past" className="mt-10">
+                <div className="mb-2 flex items-center justify-between gap-3 px-3">
+                    <h2 id="wingman-past" className="text-[13px] text-muted">
                         Anteriores
                     </h2>
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Buscar por título, persona o tema"
+                        aria-label="Buscar reuniones anteriores"
+                        className="w-[260px] rounded-full border border-line bg-surface px-3 py-1 text-[13px] outline-none focus:border-accent"
+                    />
+                </div>
+                {past.length === 0 && <p className="px-3 text-[14px] text-faint">{search ? 'Ninguna reunión anterior encaja.' : 'Todavía no hay reuniones anteriores.'}</p>}
                     {Object.entries(byDay).map(([key, meetings]) => (
                         <div key={key} className="mb-4">
                             <h3 className="px-3 pb-1 text-[12px] text-faint">{dayLabel(meetings[0].starts_at)}</h3>
@@ -102,9 +130,8 @@ export default function WingmanIndex({ enabled, today, past }: WingmanIndexProps
                                 ))}
                             </ul>
                         </div>
-                    ))}
-                </section>
-            )}
+                ))}
+            </section>
         </WingmanLayout>
     );
 }
