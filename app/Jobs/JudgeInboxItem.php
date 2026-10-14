@@ -70,6 +70,14 @@ class JudgeInboxItem implements ShouldBeUnique, ShouldQueue
 
     private function apply(InboxItem $item, Judgement $judgement): void
     {
+        // Dismissed (or resolved) while it was being judged: the person decided, the judgement only says why.
+        if (in_array($item->status, [AlertStatus::Resolved, AlertStatus::Dismissed], true)) {
+            $item->update(['triage' => $judgement->important ? Triage::Important : Triage::Routine, 'why' => $judgement->reason, 'relevance' => $judgement->relevance]);
+            InboxItemUpdated::dispatch($item);
+
+            return;
+        }
+
         if (! $judgement->important) {
             $item->update(['triage' => Triage::Routine, 'why' => $judgement->reason, 'relevance' => $judgement->relevance]);
             InboxItemUpdated::dispatch($item);

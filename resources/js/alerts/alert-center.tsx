@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
+import { useSwipeToDismiss } from '@/alerts/use-swipe-dismiss';
+import WingmanBubble from '@/wingman/wingman-bubble';
 
 export const sourceDot: Record<Alert['source'], string> = {
     gmail: 'bg-gmail',
@@ -71,13 +73,36 @@ function messageCount(alert: Alert): string {
     return count > 1 ? ` · ${count} mensajes` : '';
 }
 
-function Row({ alert, onOpen, delay = 0 }: { alert: Alert; onOpen: (alert: Alert) => void; delay?: number }) {
+/** Dismiss control shared by rows and toasts. */
+function DismissButton({ onDismiss, className = '' }: { onDismiss: () => void; className?: string }) {
+    return (
+        <button
+            type="button"
+            aria-label="Descartar"
+            title="Descartar (o arrástrala a la derecha)"
+            onClick={(event) => {
+                event.stopPropagation();
+                onDismiss();
+            }}
+            className={`grid size-6 place-items-center rounded-full text-[12px] text-faint hover:bg-soft hover:text-ink ${className}`}
+        >
+            ✕
+        </button>
+    );
+}
+
+function Row({ alert, onOpen, onDismiss, delay = 0 }: { alert: Alert; onOpen: (alert: Alert) => void; onDismiss: (alert: Alert) => void; delay?: number }) {
     const addressed = alert.state === 'resolved' || alert.state === 'dismissed';
     const quiet = addressed || alert.state === 'routine';
+    const swipe = useSwipeToDismiss(() => onDismiss(alert));
+    const dismissable = !addressed;
 
     return (
-        <li className="alerts-row-in" style={{ animationDelay: `${delay}ms` }}>
+        <li className="alerts-row-in group relative" style={{ animationDelay: `${delay}ms` }}>
+            {dismissable && <DismissButton onDismiss={swipe.dismiss} className="absolute top-1 right-1.5 z-10 bg-soft opacity-0 group-focus-within:opacity-100 group-hover:opacity-100" />}
             <button
+                {...(dismissable ? swipe.handlers : {})}
+                style={dismissable ? swipe.style : undefined}
                 type="button"
                 onClick={() => onOpen(alert)}
                 className={`grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-soft ${quiet ? 'opacity-70' : ''}`}
@@ -123,12 +148,15 @@ function IncomingToast({
     alert,
     onOpen,
     onClose,
+    onDismiss,
     onTellMe,
     listening,
 }: {
     alert: Alert;
     onOpen: (alert: Alert) => void;
     onClose: () => void;
+    /** Closes the alert itself as dismissed (its button, or swiping it away). */
+    onDismiss: (alert: Alert) => void;
     onTellMe?: (alert: Alert) => void;
     listening: boolean;
 }) {
@@ -143,17 +171,21 @@ function IncomingToast({
     }, [alert.state]);
 
     const waiting = WAITING.has(alert.state);
+    const swipe = useSwipeToDismiss(() => onDismiss(alert));
 
     return (
         <div
             role="status"
             aria-live="polite"
-            className={`alerts-toast-in overflow-hidden rounded-[14px] border bg-surface shadow-card ${waiting ? 'border-accent/40' : 'border-line'}`}
+            {...swipe.handlers}
+            style={swipe.style}
+            className={`alerts-toast-in relative overflow-hidden rounded-[14px] border bg-surface shadow-card ${waiting ? 'border-accent/40' : 'border-line'}`}
         >
+            <DismissButton onDismiss={swipe.dismiss} className="absolute top-2 right-2 z-10" />
             <button type="button" onClick={() => onOpen(alert)} className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 py-3 text-left hover:bg-soft">
                 <i aria-hidden className={`mt-1.5 size-[9px] rounded-[3px] ${sourceDot[alert.source]}`} />
                 <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-2 text-[12px] text-muted">
+                    <div className="flex items-center justify-between gap-2 pr-6 text-[12px] text-muted">
                         <span className="truncate">
                             {alert.source_label} · {alert.actor_name}
                         </span>
@@ -238,6 +270,8 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
     const working = feed.items.some((item) => item.state === 'judging' || item.state === 'planning');
     const recent = feed.items.filter((item) => !WAITING.has(item.state)).slice(0, 20);
 
+    const dismissAlert = (alert: Alert) => void feed.dismiss(alert.id);
+
     const openAlert = (alert: Alert) => {
         setOpen(false);
         feed.dismissFresh(alert.id);
@@ -263,20 +297,25 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
 
     return (
         <div className="fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2">
-            <button
-                type="button"
-                aria-expanded={open}
-                aria-label={`Avisos: ${waiting.length} pendientes`}
-                onClick={() => setOpen(!open)}
-                className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
-            >
-                <span
-                    title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
-                    className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
-                />
-                {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
-                {working && <span className="text-muted">· analizando</span>}
-            </button>
+            <div className="flex items-start gap-2">
+                {/* Wingman's bubble, beside the alerts, only while in a call. */}
+                <WingmanBubble />
+
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-label={`Avisos: ${waiting.length} pendientes`}
+                    onClick={() => setOpen(!open)}
+                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
+                >
+                    <span
+                        title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
+                        className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
+                    />
+                    {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
+                    {working && <span className="text-muted">· analizando</span>}
+                </button>
+            </div>
 
             {open ? (
                 <div className="alerts-panel-in max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card">
@@ -285,7 +324,7 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                             <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
                             <ol>
                                 {waiting.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} delay={index * 35} />
+                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
                                 ))}
                             </ol>
                         </section>
@@ -298,7 +337,7 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                         ) : (
                             <ol>
                                 {recent.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} delay={(waiting.length + index) * 35} />
+                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={(waiting.length + index) * 35} />
                                 ))}
                             </ol>
                         )}
@@ -324,6 +363,7 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                             alert={item}
                             onOpen={openAlert}
                             onClose={() => feed.dismissFresh(item.id)}
+                            onDismiss={dismissAlert}
                             onTellMe={onTellMe}
                             listening={listening}
                         />

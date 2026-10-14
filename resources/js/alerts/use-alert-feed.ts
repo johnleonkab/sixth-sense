@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ring } from '@/alerts/sounds';
 import type { Alert } from '@/alerts/types';
 import { echoConnection } from '@/lib/echo';
-import { getJson } from '@/lib/http';
+import { getJson, postJson } from '@/lib/http';
 
 /** Ask the server for the whole feed this often, in case an event was missed. */
 const RESYNC_EVERY = 45_000;
@@ -52,6 +52,8 @@ export type AlertFeed = {
     /** Items that just arrived or changed, to show briefly. */
     fresh: Alert[];
     dismissFresh: (id: number) => void;
+    /** The person dismisses an alert from the screen: it is closed as dismissed. */
+    dismiss: (id: number) => Promise<void>;
 };
 
 type Options = {
@@ -190,5 +192,23 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
 
     const dismissFresh = useCallback((id: number) => setFresh((list) => list.filter((item) => item.id !== id)), []);
 
-    return { items, live, fresh, dismissFresh };
+    const dismiss = useCallback(
+        async (id: number) => {
+            setFresh((list) => list.filter((item) => item.id !== id));
+            // Shown as dismissed at once; the server's answer (or the next resync) settles it.
+            setItems((list) => list.map((item) => (item.id === id ? { ...item, status: 'dismissed', state: 'dismissed', resolution: 'dismissed' } : item)));
+
+            try {
+                const { item } = await postJson<{ item: Alert }>(`/alerts/${id}/dismiss`, {});
+                take(item, false);
+                setItems((list) => list.map((other) => (other.id === id ? item : other)));
+            } catch (error) {
+                console.warn('Alert dismiss failed', error);
+                void resync();
+            }
+        },
+        [take, resync],
+    );
+
+    return { items, live, fresh, dismissFresh, dismiss };
 }

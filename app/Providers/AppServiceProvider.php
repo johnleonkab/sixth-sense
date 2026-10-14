@@ -42,6 +42,15 @@ use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
 use App\Voice\VoiceSamples;
+use App\Wingman\Closing\FakeFollowUpPlanner;
+use App\Wingman\Closing\FollowUpPlanner;
+use App\Wingman\Closing\GeminiFollowUpPlanner;
+use App\Wingman\Copilot\Detector;
+use App\Wingman\Copilot\FakeDetector;
+use App\Wingman\Copilot\GeminiDetector;
+use App\Wingman\Notes\FakeNoteTaker;
+use App\Wingman\Notes\GeminiNoteTaker;
+use App\Wingman\Notes\NoteTaker;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
 use App\WorkContext\Summarizers\GeminiContextSummarizer;
@@ -131,6 +140,24 @@ class AppServiceProvider extends ServiceProvider
             'gemini' => new GeminiVoiceProvider(config('voice.providers.gemini'), config('voice.session')),
             'fake' => new FakeVoiceProvider,
             default => throw new InvalidArgumentException('Unsupported voice provider ['.config('voice.default').'].'),
+        });
+
+        $this->app->bind(NoteTaker::class, fn (): NoteTaker => match (config('wingman.notes.taker')) {
+            'gemini' => new GeminiNoteTaker([...config('alerts.judges.gemini'), 'model' => config('wingman.notes.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeNoteTaker,
+            default => throw new InvalidArgumentException('Unsupported Wingman note-taker ['.config('wingman.notes.taker').'].'),
+        });
+
+        $this->app->bind(Detector::class, fn (): Detector => match (config('wingman.agent.detector')) {
+            'gemini' => new GeminiDetector([...config('alerts.judges.gemini'), 'model' => config('wingman.agent.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeDetector,
+            default => throw new InvalidArgumentException('Unsupported Wingman detector ['.config('wingman.agent.detector').'].'),
+        });
+
+        $this->app->bind(FollowUpPlanner::class, fn (): FollowUpPlanner => match (config('wingman.follow_ups.planner')) {
+            'gemini' => new GeminiFollowUpPlanner([...config('alerts.judges.gemini'), 'model' => config('wingman.follow_ups.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeFollowUpPlanner,
+            default => throw new InvalidArgumentException('Unsupported Wingman follow-up planner ['.config('wingman.follow_ups.planner').'].'),
         });
 
         $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));

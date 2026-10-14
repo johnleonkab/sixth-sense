@@ -50,6 +50,9 @@ use App\Voice\Tools\Slack\ProposeSlackMessage;
 use App\Voice\Tools\Slack\SearchSlackMessages;
 use App\Voice\Tools\Slack\ShowSlackConversation;
 use App\Voice\Tools\Slack\ShowSlackUnread;
+use App\Voice\Tools\Wingman\DismissMeetingActions;
+use App\Voice\Tools\Wingman\ProposeMeetingAction;
+use App\Voice\Tools\Wingman\ReviewMeeting;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Validator;
 
@@ -109,6 +112,9 @@ class Toolbox
         ShowAlertHistory::class,
         ReviewAlert::class,
         ResolveAlert::class,
+        ReviewMeeting::class,
+        ProposeMeetingAction::class,
+        DismissMeetingActions::class,
     ];
 
     public function __construct(private Container $container) {}

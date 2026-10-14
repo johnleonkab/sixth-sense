@@ -131,11 +131,12 @@ class InboxItem extends Model
     public function state(): string
     {
         return match (true) {
+            // Closed by the person (or answered) says it all, whatever the judge thought.
+            $this->status === AlertStatus::Resolved => 'resolved',
+            $this->status === AlertStatus::Dismissed => 'dismissed',
             $this->source === AlertSource::Calendar => 'meeting',
             $this->triage === Triage::Judging => 'judging',
             $this->triage === Triage::Routine => 'routine',
-            $this->status === AlertStatus::Resolved => 'resolved',
-            $this->status === AlertStatus::Dismissed => 'dismissed',
             $this->planning => 'planning',
             filled($this->proposal) => 'ready',
             default => 'important',

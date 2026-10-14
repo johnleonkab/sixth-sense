@@ -96,6 +96,11 @@ Cada fase termina con algo que se puede probar hablando.
 
 ---
 
+## Épicas siguientes
+- **Wingman:** un agente que escucha tus llamadas de Meet sin que se note, toma notas y propone acciones. Ver [`docs/epica-wingman.md`](epica-wingman.md).
+
+---
+
 ## Si hay que recortar
 
 El mínimo que ya es útil en el día a día: **fases 0 a 3 + la fase 5 solo con Gmail.** Es decir, hablar con tu calendario y tu correo, con avisos de los emails importantes.

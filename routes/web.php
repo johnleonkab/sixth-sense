@@ -10,11 +10,17 @@ use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
+use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
 use App\Http\Controllers\Settings\SystemController;
+use App\Http\Controllers\Settings\WingmanController;
 use App\Http\Controllers\Settings\WorkContextController;
 use App\Http\Controllers\VoiceSessionController;
 use App\Http\Controllers\VoiceToolController;
+use App\Http\Controllers\Wingman\ActionController;
+use App\Http\Controllers\Wingman\InsightController;
+use App\Http\Controllers\Wingman\LiveController;
+use App\Http\Controllers\Wingman\MeetingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -39,6 +45,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('alerts/feed', AlertFeedController::class)->middleware('throttle:120,1')->name('alerts.feed');
     Route::get('alerts/history', [AlertFeedController::class, 'history'])->middleware('throttle:120,1')->name('alerts.history');
+    Route::post('alerts/{item}/dismiss', [AlertFeedController::class, 'dismiss'])->whereNumber('item')->name('alerts.dismiss');
     Route::get('media/chat/{file}', [MediaController::class, 'chatFile'])->name('media.chat');
     Route::get('media/mail/{message}/{index}', [MediaController::class, 'mailAttachment'])->whereNumber('index')->name('media.mail');
 
@@ -49,10 +56,29 @@ Route::middleware('auth')->group(function () {
         Route::post('undo', [PendingActionController::class, 'undo'])->name('undo');
     });
 
+    Route::prefix('wingman')->name('wingman.')->group(function () {
+        Route::get('/', [MeetingController::class, 'index'])->name('index');
+        Route::get('live', [LiveController::class, 'show'])->name('live');
+        Route::post('{meeting}/pause', [LiveController::class, 'pause'])->whereNumber('meeting')->name('pause');
+        Route::post('insights/{insight}/feedback', [InsightController::class, 'feedback'])->whereNumber('insight')->name('insights.feedback');
+        Route::post('insights/{insight}/dismiss', [InsightController::class, 'dismiss'])->whereNumber('insight')->name('insights.dismiss');
+        Route::post('actions/{action}/review', [ActionController::class, 'review'])->whereNumber('action')->name('actions.review');
+        Route::post('actions/{action}/dismiss', [ActionController::class, 'dismiss'])->whereNumber('action')->name('actions.dismiss');
+        Route::post('actions/{action}/restore', [ActionController::class, 'restore'])->whereNumber('action')->name('actions.restore');
+        Route::get('{meeting}', [MeetingController::class, 'show'])->whereNumber('meeting')->name('show');
+        Route::post('{meeting}/prepare', [MeetingController::class, 'prepare'])->whereNumber('meeting')->name('prepare');
+    });
+
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        Route::get('impact', [ImpactController::class, 'index'])->name('impact.index');
+        Route::get('wingman', [WingmanController::class, 'edit'])->name('wingman.edit');
+        Route::put('wingman', [WingmanController::class, 'update'])->name('wingman.update');
+        Route::put('wingman/settings', [WingmanController::class, 'updateSettings'])->name('wingman.settings');
+        Route::post('wingman/token', [WingmanController::class, 'issueToken'])->name('wingman.token');
+        Route::delete('wingman/token', [WingmanController::class, 'revokeToken'])->name('wingman.token.revoke');
         Route::put('system/display', [SystemController::class, 'updateDisplay'])->name('system.display');
         Route::put('system/voice', [SystemController::class, 'updateVoice'])->name('system.voice');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');

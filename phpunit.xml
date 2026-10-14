@@ -29,6 +29,9 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="ALERTS_PLANNER" value="fake"/>
+        <env name="WINGMAN_NOTES" value="fake"/>
+        <env name="WINGMAN_AGENT" value="fake"/>
+        <env name="WINGMAN_FOLLOW_UPS" value="fake"/>
         <env name="AGENDA_ASSESSOR" value="fake"/>
         <env name="WORK_CONTEXT_SUMMARIZER" value="fake"/>
         <env name="SESSION_DRIVER" value="array"/>

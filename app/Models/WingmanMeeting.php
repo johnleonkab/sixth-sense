@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Models;
+
+use App\Wingman\MeetingStatus;
+use Database\Factories\WingmanMeetingFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+
+/**
+ * A Google Meet call of the person's, found in their calendar: who is in it,
+ * what it is about, and what Wingman gathered before it starts.
+ */
+#[Fillable(['event_key', 'event_ref', 'meeting_code', 'meeting_url', 'title', 'account', 'organizer', 'starts_at', 'ends_at', 'attendees', 'description', 'status', 'joined_at', 'left_at', 'paused_at', 'paused_reason', 'context', 'context_prepared_at', 'notes', 'notes_updated_at', 'watched_at', 'closed_at'])]
+class WingmanMeeting extends Model
+{
+    /** @use HasFactory<WingmanMeetingFactory> */
+    use HasFactory;
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'starts_at' => 'immutable_datetime',
+            'ends_at' => 'immutable_datetime',
+            'attendees' => 'array',
+            'status' => MeetingStatus::class,
+            'context' => 'array',
+            'context_prepared_at' => 'immutable_datetime',
+            'joined_at' => 'immutable_datetime',
+            'left_at' => 'immutable_datetime',
+            'paused_at' => 'immutable_datetime',
+            'notes' => 'array',
+            'notes_updated_at' => 'immutable_datetime',
+            'watched_at' => 'immutable_datetime',
+            'closed_at' => 'immutable_datetime',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * What was said in it, in order.
+     *
+     * @return HasMany<WingmanSegment, $this>
+     */
+    public function segments(): HasMany
+    {
+        return $this->hasMany(WingmanSegment::class)->orderBy('spoken_at')->orderBy('id');
+    }
+
+    /**
+     * What Wingman brought in during it, newest first.
+     *
+     * @return HasMany<WingmanInsight, $this>
+     */
+    public function insights(): HasMany
+    {
+        return $this->hasMany(WingmanInsight::class)->latest('id');
+    }
+
+    /**
+     * What there is to do after it, in the order it came up.
+     *
+     * @return HasMany<WingmanAction, $this>
+     */
+    public function actions(): HasMany
+    {
+        return $this->hasMany(WingmanAction::class)->orderBy('id');
+    }
+
+    /**
+     * Whether every word searched is in its title, its attendees or its summary.
+     */
+    public function matches(string $search): bool
+    {
+        $haystack = Str::lower(Str::ascii(implode(' ', [
+            $this->title,
+            collect($this->attendees ?? [])->pluck('name')->filter()->implode(' '),
+            $this->notes['summary'] ?? '',
+        ])));
+
+        return Str::of($search)->lower()->ascii()->explode(' ')
+            ->filter(fn (string $word): bool => Str::length($word) > 1 && ! in_array($word, ['la', 'el', 'de', 'del', 'con', 'reunion', 'llamada'], true))
+            ->every(fn (string $word): bool => Str::contains($haystack, $word));
+    }
+
+    /**
+     * The Meet code in a link (https://meet.google.com/abc-defg-hij), if it is one.
+     */
+    public static function codeIn(?string $url): ?string
+    {
+        return $url !== null && preg_match('~meet\.google\.com/([a-z]{3}-[a-z]{4}-[a-z]{3})~i', $url, $match) ? strtolower($match[1]) : null;
+    }
+}
