@@ -29,6 +29,10 @@ export type LiveCall = {
     }[];
     pages: { ref: string; title: string; url: string | null }[];
     prepared: boolean;
+    /** From the living notes: what it is about so far, how many notes, what is still open. */
+    summary: string;
+    note_count: number;
+    open_questions: string[];
 };
 
 /** While in a call, it is asked for this often; otherwise, now and then in case an event was missed. */

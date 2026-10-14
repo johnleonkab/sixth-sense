@@ -8,6 +8,7 @@ use App\Events\WingmanMeetingUpdated;
 use App\Jobs\PrepareWingmanContext;
 use App\Models\User;
 use App\Models\WingmanMeeting;
+use App\Wingman\Notes\LiveNotes;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Throwable;
@@ -24,7 +25,10 @@ class WingmanCalls
     /** A call is matched to a calendar meeting starting within this margin of joining. */
     private const MATCH_HOURS = 12;
 
-    public function __construct(private WingmanMeetings $meetings) {}
+    public function __construct(
+        private WingmanMeetings $meetings,
+        private LiveNotes $notes,
+    ) {}
 
     /**
      * The person joined the call with this code: its meeting from the calendar
@@ -102,6 +106,7 @@ class WingmanCalls
 
         // Still going on: what keeps it from being taken as abandoned.
         $meeting->touch();
+        $this->notes->maybeTake($meeting);
 
         return count($segments);
     }
@@ -113,6 +118,8 @@ class WingmanCalls
     {
         $meeting->update(['status' => MeetingStatus::Ended, 'left_at' => $leftAt, 'paused_at' => null]);
         $meeting->segments()->getQuery()->where('final', false)->update(['final' => true]);
+        // The last lines into the notes, now.
+        $this->notes->maybeTake($meeting, now: true);
 
         WingmanMeetingEnded::dispatch($meeting);
 

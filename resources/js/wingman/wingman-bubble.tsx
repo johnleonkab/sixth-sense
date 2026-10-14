@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { StatusChip } from '@/canvas/jira/jira-bits';
 import { useLiveCall } from '@/wingman/use-live-call';
 
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
 function useElapsed(since: string | null): string {
     const [now, setNow] = useState(() => Date.now());
 
@@ -70,6 +72,15 @@ export default function WingmanBubble() {
                     <h3 className="mt-0.5 text-[15px] font-medium tracking-[-0.01em]">{call.title}</h3>
                     {call.attendees.length > 0 && <p className="truncate text-[12.5px] text-muted">Con {call.attendees.join(', ')}</p>}
 
+                    {call.summary && <p className="mt-2.5 text-[13px]">{call.summary}</p>}
+                    {call.open_questions.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5 text-[12.5px] text-warn">
+                            {call.open_questions.map((question) => (
+                                <li key={question}>? {question}</li>
+                            ))}
+                        </ul>
+                    )}
+
                     {(call.issues.length > 0 || call.pages.length > 0) && (
                         <ul className="mt-3 space-y-1 text-[13px]">
                             {call.issues.map((issue) => (
@@ -106,7 +117,7 @@ export default function WingmanBubble() {
                     </section>
 
                     <div className="mt-3 flex items-center justify-between gap-2 text-[12.5px]">
-                        <span className="text-faint">{call.segment_count} frases</span>
+                        <span className="text-faint">{[call.note_count > 0 && plural(call.note_count, 'nota', 'notas'), plural(call.segment_count, 'frase', 'frases')].filter(Boolean).join(' · ')}</span>
                         <div className="flex gap-1.5">
                             <button
                                 type="button"

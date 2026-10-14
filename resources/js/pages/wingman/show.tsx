@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 import { IssueKey, StatusChip } from '@/canvas/jira/jira-bits';
 import { dayLabel, timeRange } from '@/wingman/format';
-import type { WingmanContext, WingmanMeeting } from '@/wingman/types';
+import type { WingmanContext, WingmanMeeting, WingmanNotes } from '@/wingman/types';
 import WingmanLayout from '@/wingman/wingman-layout';
 
 const emailDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
@@ -100,6 +100,56 @@ function Context({ context }: { context: WingmanContext }) {
     );
 }
 
+function Notes({ notes, live }: { notes: WingmanNotes; live: boolean }) {
+    const list = (title: string, items: string[], tone = '') =>
+        items.length > 0 && (
+            <div className="mt-4">
+                <h3 className="mb-1 text-[12.5px] font-medium text-muted">{title}</h3>
+                <ul className={`list-disc space-y-0.5 pl-5 text-[14px] ${tone}`}>
+                    {items.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
+                </ul>
+            </div>
+        );
+
+    return (
+        <Section title={live ? 'Notas · se actualizan solas' : 'Notas'}>
+            <div className="rounded-xl border border-line px-4 py-3.5">
+                {notes.summary && <p className="text-[14.5px]">{notes.summary}</p>}
+
+                {notes.topics.map((topic) => (
+                    <div key={topic.title} className="mt-4">
+                        <h3 className="mb-1 text-[13.5px] font-medium">{topic.title}</h3>
+                        <ul className="list-disc space-y-0.5 pl-5 text-[14px] text-muted">
+                            {topic.points.map((point) => (
+                                <li key={point}>{point}</li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
+
+                {list('Decisiones', notes.decisions)}
+                {list('Preguntas abiertas', notes.questions, 'text-warn')}
+
+                {notes.commitments.length > 0 && (
+                    <div className="mt-4">
+                        <h3 className="mb-1 text-[12.5px] font-medium text-muted">Compromisos</h3>
+                        <ul className="space-y-0.5 text-[14px]">
+                            {notes.commitments.map((commitment) => (
+                                <li key={`${commitment.who}-${commitment.what}`}>
+                                    <b className={`font-medium ${commitment.who === 'Tú' ? 'text-accent' : ''}`}>{commitment.who}:</b> {commitment.what}
+                                    {commitment.when && <span className="text-muted"> · {commitment.when}</span>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </Section>
+    );
+}
+
 function Preparing() {
     return (
         <div aria-label="Preparando el contexto" className="mt-8 space-y-3">
@@ -176,6 +226,8 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                     ))}
                 </ul>
             </Section>
+
+            {meeting.notes && <Notes notes={meeting.notes} live={live} />}
 
             {(live || meeting.transcript.length > 0) && (
                 <Section title={live ? (meeting.paused ? 'Conversación · en pausa' : 'Conversación · en directo') : 'Conversación'}>

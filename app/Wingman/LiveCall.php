@@ -5,6 +5,7 @@ namespace App\Wingman;
 use App\Models\User;
 use App\Models\WingmanMeeting;
 use App\Models\WingmanSegment;
+use App\Wingman\Notes\MeetingNotes;
 
 /**
  * The call the person is in, as Wingman's bubble shows it: what it is,
@@ -31,6 +32,7 @@ class LiveCall
     public function describe(WingmanMeeting $meeting, int $lines): array
     {
         $context = $meeting->context ?? [];
+        $notes = MeetingNotes::fromArray($meeting->notes);
 
         return [
             'id' => $meeting->id,
@@ -59,6 +61,9 @@ class LiveCall
             ])->all(),
             'pages' => collect($context['pages'] ?? [])->map(fn (array $page): array => ['ref' => $page['ref'], 'title' => $page['title'], 'url' => $page['url'] ?? null])->all(),
             'prepared' => $meeting->context_prepared_at !== null,
+            'summary' => $notes->summary,
+            'note_count' => $notes->count(),
+            'open_questions' => array_slice($notes->questions, -3),
         ];
     }
 }

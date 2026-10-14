@@ -27,4 +27,15 @@ return [
         'email_attendees' => 4,
     ],
 
+    // The living notes of a call.
+    'notes' => [
+        // gemini or fake (tests).
+        'taker' => env('WINGMAN_NOTES', 'gemini'),
+        // New lines are taken into the notes this often while people talk.
+        'every_seconds' => (int) env('WINGMAN_NOTES_EVERY_SECONDS', 20),
+        // Lines per batch at most.
+        'max_lines' => 80,
+        'model' => env('WINGMAN_NOTES_MODEL', 'gemini-3.8-flash'),
+    ],
+
 ];

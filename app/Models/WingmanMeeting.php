@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * A Google Meet call of the person's, found in their calendar: who is in it,
  * what it is about, and what Wingman gathered before it starts.
  */
-#[Fillable(['event_key', 'event_ref', 'meeting_code', 'meeting_url', 'title', 'account', 'organizer', 'starts_at', 'ends_at', 'attendees', 'description', 'status', 'joined_at', 'left_at', 'paused_at', 'context', 'context_prepared_at'])]
+#[Fillable(['event_key', 'event_ref', 'meeting_code', 'meeting_url', 'title', 'account', 'organizer', 'starts_at', 'ends_at', 'attendees', 'description', 'status', 'joined_at', 'left_at', 'paused_at', 'context', 'context_prepared_at', 'notes', 'notes_updated_at'])]
 class WingmanMeeting extends Model
 {
     /** @use HasFactory<WingmanMeetingFactory> */
@@ -37,6 +37,8 @@ class WingmanMeeting extends Model
             'joined_at' => 'immutable_datetime',
             'left_at' => 'immutable_datetime',
             'paused_at' => 'immutable_datetime',
+            'notes' => 'array',
+            'notes_updated_at' => 'immutable_datetime',
         ];
     }
 

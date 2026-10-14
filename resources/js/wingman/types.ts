@@ -34,12 +34,23 @@ export type WingmanContext = {
     failed: string[];
 };
 
+/** The living notes of a call. In commitments, who is "Tú" for the person. */
+export type WingmanNotes = {
+    summary: string;
+    topics: { title: string; points: string[] }[];
+    decisions: string[];
+    questions: string[];
+    commitments: { who: string; what: string; when: string | null }[];
+};
+
 export type WingmanMeeting = WingmanMeetingSummary & {
     description: string | null;
     attendees: { name: string; email: string | null; response?: string | null }[];
     context: WingmanContext | null;
     context_prepared_at: string | null;
     paused: boolean;
+    notes: WingmanNotes | null;
+    notes_updated_at: string | null;
     /** What was said, oldest first (the latest few hundred lines). */
     transcript: { id: number; speaker: string; is_me: boolean; text: string; at: string }[];
 };

@@ -155,6 +155,12 @@ Lo aprendido del HTML real: los subtítulos están en `role="region"` con `aria-
 
 **Hecho cuando:** durante una llamada de prueba, las notas se actualizan solas y reflejan lo hablado.
 
+**Estado:** ✅ hecho (14/10).
+- `LiveNotes` lleva a las notas las frases cerradas que faltan: como mucho cada 20 s mientras se habla, y al colgar en el momento. Lo hace a través del job `TakeWingmanNotes`, único por reunión.
+- `GeminiNoteTaker` (`gemini-3.8-flash`, con modelo de reserva) recibe las notas hasta ahora y lo nuevo, y devuelve las notas completas: resumen, temas, decisiones, preguntas abiertas y compromisos ("Tú" para la persona). Con una conversación de ejemplo tardó unos 4 s y acertó decisiones, preguntas y compromisos.
+- Si falla, las frases quedan pendientes para la siguiente pasada.
+- La burbuja muestra el resumen, las preguntas abiertas y "N notas"; la página de la reunión, el documento entero.
+
 ### H5 · Agente Wingman (2,5 días)
 Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay algo que aportar. Con herramientas de solo lectura:
 

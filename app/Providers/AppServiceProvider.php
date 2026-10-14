@@ -42,6 +42,9 @@ use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
 use App\Voice\VoiceProvider;
 use App\Voice\VoiceSamples;
+use App\Wingman\Notes\FakeNoteTaker;
+use App\Wingman\Notes\GeminiNoteTaker;
+use App\Wingman\Notes\NoteTaker;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
 use App\WorkContext\Summarizers\GeminiContextSummarizer;
@@ -131,6 +134,12 @@ class AppServiceProvider extends ServiceProvider
             'gemini' => new GeminiVoiceProvider(config('voice.providers.gemini'), config('voice.session')),
             'fake' => new FakeVoiceProvider,
             default => throw new InvalidArgumentException('Unsupported voice provider ['.config('voice.default').'].'),
+        });
+
+        $this->app->bind(NoteTaker::class, fn (): NoteTaker => match (config('wingman.notes.taker')) {
+            'gemini' => new GeminiNoteTaker([...config('alerts.judges.gemini'), 'model' => config('wingman.notes.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
+            'fake' => new FakeNoteTaker,
+            default => throw new InvalidArgumentException('Unsupported Wingman note-taker ['.config('wingman.notes.taker').'].'),
         });
 
         $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));
