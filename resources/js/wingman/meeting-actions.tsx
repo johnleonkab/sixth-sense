@@ -2,10 +2,9 @@ import { useState } from 'react';
 
 import ActionBar from '@/actions/action-bar';
 import { useCanvas } from '@/canvas/canvas-context';
+import { ServiceIconFor } from '@/components/service-icon';
 import { postJson } from '@/lib/http';
 import type { WingmanAction } from '@/wingman/types';
-
-const kindMark: Record<WingmanAction['kind'], string> = { meeting: '◷', message: '✉', issue: 'J', task: '✓' };
 
 /** How the confirm button and the outcome read, by what the change does. */
 const wording: Record<string, { verb: string; done: string; link: string; countdown: string }> = {
@@ -43,9 +42,7 @@ function Row({ initial }: { initial: WingmanAction }) {
     return (
         <li className={`rounded-xl border border-line px-3.5 py-3 ${item.state === 'dismissed' ? 'opacity-50' : ''}`}>
             <div className="flex items-start gap-2.5">
-                <span aria-hidden className="mt-px grid size-5 flex-none place-items-center rounded-[6px] bg-accent-soft text-[11px] font-semibold text-accent">
-                    {kindMark[item.kind]}
-                </span>
+                <ServiceIconFor reference={item.type} size={18} className="mt-px" />
                 <div className="min-w-0 flex-1">
                     <p className="text-[14px] font-medium">{item.title}</p>
                     {item.detail && <p className="mt-0.5 text-[13px] whitespace-pre-line text-muted">{item.detail}</p>}

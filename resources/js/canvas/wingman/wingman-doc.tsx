@@ -4,6 +4,7 @@ import ActionBar from '@/actions/action-bar';
 import type { ActionState } from '@/actions/types';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { ServiceIconFor } from '@/components/service-icon';
 import type { WingmanAction, WingmanNotes } from '@/wingman/types';
 
 type WingmanDocProps = {
@@ -79,6 +80,7 @@ const WingmanDoc: CanvasComponent<WingmanDocProps> = ({ index, meeting, notes, a
                             <li key={item.id} className={`rounded-xl px-3 py-2 ${item.number === highlight ? 'border border-accent/50 bg-accent-soft/40' : 'bg-soft'}`}>
                                 <div className="flex items-baseline gap-2 text-[14px]">
                                     <span className="grid size-5 flex-none place-items-center rounded-full border border-line font-mono text-[11px] text-muted">{item.number}</span>
+                                    <ServiceIconFor reference={item.type} size={15} className="self-center" />
                                     <span className="min-w-0 flex-1 font-medium">{item.title}</span>
                                     {stateLabel[item.state] && <span className="flex-none text-[12px] text-muted">{stateLabel[item.state]}</span>}
                                 </div>

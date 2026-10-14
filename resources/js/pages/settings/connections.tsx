@@ -1,5 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 
+import { ServiceIconFor } from '@/components/service-icon';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
@@ -30,13 +31,6 @@ type ProviderConnections = {
     services: string[];
     connectable: boolean;
     accounts: ConnectedAccount[];
-};
-
-const providerColor: Record<ProviderConnections['key'], string> = {
-    google: 'bg-gmail',
-    slack: 'bg-slack',
-    atlassian: 'bg-jira',
-    notion: 'bg-notion',
 };
 
 const authorizeUrl = (provider: ProviderConnections) => `/settings/connections/${provider.key}/redirect`;
@@ -159,11 +153,8 @@ function ProviderCard({ provider }: { provider: ProviderConnections }) {
     return (
         <section aria-labelledby={`provider-${provider.key}`} className="rounded-2xl border border-line bg-surface">
             <header className="flex items-center gap-3 px-[22px] pt-[18px]">
-                <span
-                    aria-hidden
-                    className={`grid size-8 flex-none place-items-center rounded-[9px] text-[13px] font-semibold text-bg ${providerColor[provider.key]}`}
-                >
-                    {provider.name.charAt(0)}
+                <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[9px] border border-line bg-surface">
+                    <ServiceIconFor reference={provider.key} size={20} label={false} />
                 </span>
 
                 <div className="min-w-0">

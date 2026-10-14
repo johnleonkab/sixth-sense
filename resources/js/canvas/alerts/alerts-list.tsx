@@ -1,9 +1,9 @@
-import { sourceDot } from '@/alerts/alert-center';
 import type { Alert } from '@/alerts/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import { relativeDate } from '@/canvas/mail/types';
 import type { CanvasComponent } from '@/canvas/types';
+import { ServiceIconFor } from '@/components/service-icon';
 
 type AlertsListProps = {
     title: string;
@@ -40,7 +40,7 @@ const AlertsList: CanvasComponent<AlertsListProps> = ({ index, title, alerts }) 
                             </span>
                             <span className="min-w-0">
                                 <span className="flex items-center gap-2 text-[12px] text-muted">
-                                    <i aria-hidden className={`size-[7px] flex-none rounded-[2px] ${sourceDot[alert.source]}`} />
+                                    <ServiceIconFor reference={alert.source} size={14} />
                                     <span className="truncate">
                                         {alert.source_label} · <b className="font-medium text-ink">{alert.actor_name}</b> · {alert.title}
                                     </span>

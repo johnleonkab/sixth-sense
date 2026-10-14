@@ -1,5 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 
+import { ServiceIconFor } from '@/components/service-icon';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
@@ -13,14 +14,6 @@ type AlertSource = {
     accounts: { id: number; email: string | null; watched: boolean }[];
 };
 
-const sourceColor: Record<AlertSource['key'], string> = {
-    gmail: 'bg-gmail',
-    slack: 'bg-slack',
-    agenda: 'bg-ok',
-    jira: 'bg-jira',
-    calendar: 'bg-accent',
-};
-
 function SourceCard({ source }: { source: AlertSource }) {
     const watched = source.accounts.filter((account) => account.watched);
     const toggle = (enabled: boolean) => router.put(`/settings/alerts/${source.key}`, { enabled }, { preserveScroll: true });
@@ -28,11 +21,8 @@ function SourceCard({ source }: { source: AlertSource }) {
     return (
         <section aria-labelledby={`alerts-${source.key}`} className="rounded-2xl border border-line bg-surface">
             <header className="flex items-start gap-3 px-[22px] pt-[18px] pb-4">
-                <span
-                    aria-hidden
-                    className={`grid size-8 flex-none place-items-center rounded-[9px] text-[13px] font-semibold text-bg ${sourceColor[source.key]}`}
-                >
-                    {source.name.charAt(0)}
+                <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[9px] border border-line bg-surface">
+                    <ServiceIconFor reference={source.key} size={20} label={false} />
                 </span>
 
                 <div className="min-w-0 flex-1">

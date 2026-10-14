@@ -2,6 +2,7 @@ import { Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 import { StatusChip } from '@/canvas/jira/jira-bits';
+import ServiceIcon from '@/components/service-icon';
 import InsightCard from '@/wingman/insight-card';
 import { useLiveCall } from '@/wingman/use-live-call';
 
@@ -107,7 +108,10 @@ export default function WingmanBubble() {
                     <p className="text-[11px] font-medium tracking-wide text-muted uppercase">
                         {call.paused ? (call.paused_reason ? `En pausa por tu ${call.paused_reason}` : 'En pausa') : 'Escuchando'} · {elapsed}
                     </p>
-                    <h3 className="mt-0.5 text-[15px] font-medium tracking-[-0.01em]">{call.title}</h3>
+                    <h3 className="mt-0.5 flex items-center gap-1.5 text-[15px] font-medium tracking-[-0.01em]">
+                        <ServiceIcon service="meet" size={16} />
+                        {call.title}
+                    </h3>
                     {call.attendees.length > 0 && <p className="truncate text-[12.5px] text-muted">Con {call.attendees.join(', ')}</p>}
 
                     {insights.length > 0 && (

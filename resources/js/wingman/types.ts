@@ -45,7 +45,7 @@ export type WingmanInsight = {
     why: string | null;
     links: { label: string; url: string }[];
     /** What it proposes to do; it is reviewed and confirmed before anything happens. */
-    action: { label: string; preview: string | null } | null;
+    action: { type: string | null; label: string; preview: string | null } | null;
     importance: 'normal' | 'high';
     feedback: 'up' | 'down' | null;
     created_at: string | null;

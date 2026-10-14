@@ -3,15 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
 import { useSwipeToDismiss } from '@/alerts/use-swipe-dismiss';
+import { ServiceIconFor } from '@/components/service-icon';
 import WingmanBubble from '@/wingman/wingman-bubble';
-
-export const sourceDot: Record<Alert['source'], string> = {
-    gmail: 'bg-gmail',
-    slack: 'bg-slack',
-    calendar: 'bg-accent',
-    agenda: 'bg-ok',
-    jira: 'bg-jira',
-};
 
 const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 
@@ -108,11 +101,11 @@ function Row({ alert, onOpen, onDismiss, delay = 0 }: { alert: Alert; onOpen: (a
                 className={`grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-soft ${quiet ? 'opacity-70' : ''}`}
             >
                 {addressed ? (
-                    <span aria-label="Atendida" className="mt-px w-[8px] text-[11px] leading-none text-ok">
+                    <span aria-label="Atendida" className="mt-px grid w-[15px] place-items-center text-[11px] leading-none text-ok">
                         ✓
                     </span>
                 ) : (
-                    <i aria-hidden className={`mt-1.5 size-[8px] rounded-[3px] ${sourceDot[alert.source]}`} />
+                    <ServiceIconFor reference={alert.source} size={15} className="mt-px" />
                 )}
                 <span className="min-w-0">
                     <span className="flex items-center gap-2 text-[11.5px] text-muted">
@@ -183,7 +176,7 @@ function IncomingToast({
         >
             <DismissButton onDismiss={swipe.dismiss} className="absolute top-2 right-2 z-10" />
             <button type="button" onClick={() => onOpen(alert)} className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 py-3 text-left hover:bg-soft">
-                <i aria-hidden className={`mt-1.5 size-[9px] rounded-[3px] ${sourceDot[alert.source]}`} />
+                <ServiceIconFor reference={alert.source} size={18} className="mt-px" />
                 <div className="min-w-0">
                     <div className="flex items-center justify-between gap-2 pr-6 text-[12px] text-muted">
                         <span className="truncate">

@@ -132,10 +132,15 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
         }
     }, []);
 
+    // What the first sync finds was already there when the page opened: it is not announced again.
+    const synced = useRef(false);
+
     const resync = useCallback(async () => {
         try {
             const { items: latest } = await getJson<{ items: Alert[] }>('/alerts/feed');
-            latest.forEach((item) => take(item, Date.now() - new Date(item.received_at).getTime() < RING_WITHIN));
+            const announce = synced.current;
+            synced.current = true;
+            latest.forEach((item) => take(item, announce && Date.now() - new Date(item.received_at).getTime() < RING_WITHIN));
             setItems([...latest].sort(newestFirst));
             setFresh((list) => list.map((item) => latest.find((other) => other.id === item.id) ?? item));
         } catch (error) {

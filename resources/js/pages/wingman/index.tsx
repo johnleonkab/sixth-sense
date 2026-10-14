@@ -1,6 +1,7 @@
 import { Deferred, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
+import ServiceIcon from '@/components/service-icon';
 import { dayLabel, timeRange } from '@/wingman/format';
 import type { WingmanMeetingSummary } from '@/wingman/types';
 import WingmanLayout from '@/wingman/wingman-layout';
@@ -24,7 +25,10 @@ function MeetingRow({ meeting }: { meeting: WingmanMeetingSummary }) {
             >
                 <span className="font-mono text-[12.5px] text-muted tabular-nums">{timeRange(meeting.starts_at, meeting.ends_at)}</span>
                 <span className="min-w-0">
-                    <span className="block truncate text-[14.5px] font-medium">{meeting.title}</span>
+                    <span className="flex items-center gap-1.5 truncate text-[14.5px] font-medium">
+                        <ServiceIcon service="meet" size={15} label={false} />
+                        {meeting.title}
+                    </span>
                     <span className="block truncate text-[12.5px] text-muted">
                         {meeting.attendee_count} {meeting.attendee_count === 1 ? 'asistente' : 'asistentes'}
                         {meeting.account ? ` · ${meeting.account}` : ''}

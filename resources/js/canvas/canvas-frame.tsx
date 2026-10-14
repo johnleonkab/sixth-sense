@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { ServiceIconFor } from '@/components/service-icon';
+
 type CanvasFrameProps = {
     index: number;
     title: string;
@@ -25,7 +27,10 @@ export default function CanvasFrame({ index, title, source, aside, children }: C
                 <h3 className="min-w-0 truncate text-[15px] font-medium tracking-[-0.01em]">{title}</h3>
                 <span className="ml-auto flex flex-none items-center gap-2 text-[12px] whitespace-nowrap text-muted">
                     {aside}
-                    {source}
+                    <span className="flex items-center gap-1.5">
+                        <ServiceIconFor reference={source} size={14} label={false} />
+                        {source}
+                    </span>
                 </span>
             </header>
 

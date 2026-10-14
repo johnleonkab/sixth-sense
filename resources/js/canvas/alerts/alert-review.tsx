@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { sourceDot, StateChip } from '@/alerts/alert-center';
+import { StateChip } from '@/alerts/alert-center';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
 import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
 import type { Alert } from '@/alerts/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { ServiceIconFor } from '@/components/service-icon';
 
 type Proposal = {
     summary: string;
@@ -127,7 +128,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 <span className="text-[12.5px] text-muted">{stateLine(alert)}</span>
                 {alert.why && (
                     <span className="flex basis-full items-center gap-2 text-[13px] text-ink/85">
-                        <i aria-hidden className={`size-[8px] flex-none rounded-[3px] ${sourceDot[alert.source]}`} />
+                        <ServiceIconFor reference={alert.source} size={16} />
                         {alert.why}
                     </span>
                 )}

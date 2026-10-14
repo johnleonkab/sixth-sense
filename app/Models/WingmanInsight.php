@@ -62,7 +62,7 @@ class WingmanInsight extends Model
             'body' => $this->body,
             'why' => $this->why,
             'links' => $this->links ?? [],
-            'action' => $this->action ? ['label' => $this->action['label'], 'preview' => $this->action['preview'] ?? null] : null,
+            'action' => $this->action ? ['type' => $this->action['type'] ?? null, 'label' => $this->action['label'], 'preview' => $this->action['preview'] ?? null] : null,
             'importance' => $this->importance,
             'feedback' => $this->feedback,
             'created_at' => $this->created_at?->toIso8601String(),

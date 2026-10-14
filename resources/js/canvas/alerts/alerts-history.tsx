@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
-import { sourceDot, StateChip } from '@/alerts/alert-center';
+import { StateChip } from '@/alerts/alert-center';
 import type { Alert } from '@/alerts/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { ServiceIconFor } from '@/components/service-icon';
 import { getJson } from '@/lib/http';
 
 type Filter = 'all' | 'pending' | 'addressed' | 'routine';
@@ -125,7 +126,7 @@ const AlertsHistory: CanvasComponent<HistoryProps> = ({ index, ...props }) => {
                                             className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 rounded-[10px] px-2.5 py-2.5 text-left hover:bg-soft ${quiet ? 'opacity-60 hover:opacity-100' : ''}`}
                                         >
                                             <span className="mt-1 flex w-4 justify-center">
-                                                {addressed ? <span className="text-[13px] text-ok">✓</span> : <i aria-hidden className={`size-[8px] rounded-[3px] ${sourceDot[item.source]}`} />}
+                                                {addressed ? <span className="text-[13px] text-ok">✓</span> : <ServiceIconFor reference={item.source} size={14} />}
                                             </span>
                                             <span className="min-w-0">
                                                 <span className="flex items-baseline gap-2 text-[12px] text-muted">

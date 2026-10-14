@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 
+import { ServiceIconFor } from '@/components/service-icon';
 import SettingsLayout from '@/layouts/settings-layout';
 
 type ImpactProps = {
@@ -96,7 +97,10 @@ export default function Impact({ period, summary, weekly, rates }: ImpactProps) 
                     <ul className="space-y-1.5">
                         {summary.by_service.map((service) => (
                             <li key={service.service} className="grid grid-cols-[100px_minmax(0,1fr)_40px] items-center gap-3 text-[13px]">
-                                <span>{service.service}</span>
+                                <span className="flex items-center gap-1.5">
+                                    <ServiceIconFor reference={service.service} size={15} label={false} />
+                                    {service.service}
+                                </span>
                                 <span className="h-2 overflow-hidden rounded-full bg-soft">
                                     <span className="block h-full rounded-full bg-accent" style={{ width: `${(service.count / topService) * 100}%` }} />
                                 </span>

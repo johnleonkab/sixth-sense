@@ -1,14 +1,12 @@
 import { useState } from 'react';
 
+import ServiceIcon, { type Service, serviceOf } from '@/components/service-icon';
 import { postJson } from '@/lib/http';
 import type { WingmanInsight } from '@/wingman/types';
 
-const kindMark: Record<WingmanInsight['kind'], { label: string; mark: string; tone: string }> = {
-    slot: { label: 'Hueco', mark: '◷', tone: 'bg-accent-soft text-accent' },
-    issue: { label: 'Jira', mark: 'J', tone: 'bg-jira/15 text-jira' },
-    page: { label: 'Notion', mark: 'N', tone: 'bg-soft text-ink' },
-    message: { label: 'Mensaje', mark: '✉', tone: 'bg-accent-soft text-accent' },
-};
+/** The integration a card is about: what it prepares, or what it found. */
+const serviceFor = (insight: WingmanInsight): Service =>
+    serviceOf(insight.action?.type) ?? ({ slot: 'calendar', issue: 'jira', page: 'notion', message: 'gmail' } as const)[insight.kind];
 
 /**
  * One of Wingman's cards: what it brought in and why, its links, what it has
@@ -16,7 +14,6 @@ const kindMark: Record<WingmanInsight['kind'], { label: string; mark: string; to
  */
 export default function InsightCard({ insight, compact = false, onDismiss }: { insight: WingmanInsight; compact?: boolean; onDismiss?: (id: number) => void }) {
     const [feedback, setFeedback] = useState(insight.feedback);
-    const kind = kindMark[insight.kind];
 
     const rate = (value: 'up' | 'down') => {
         const next = feedback === value ? null : value;
@@ -32,9 +29,7 @@ export default function InsightCard({ insight, compact = false, onDismiss }: { i
     return (
         <article className={`rounded-xl border bg-surface px-3 py-2.5 ${insight.importance === 'high' ? 'border-accent/40' : 'border-line'}`}>
             <header className="flex items-start gap-2">
-                <span aria-label={kind.label} className={`mt-px grid size-5 flex-none place-items-center rounded-[6px] text-[11px] font-semibold ${kind.tone}`}>
-                    {kind.mark}
-                </span>
+                <ServiceIcon service={serviceFor(insight)} size={18} className="mt-px" />
                 <h4 className="min-w-0 flex-1 text-[13.5px] leading-snug font-medium">{insight.title}</h4>
                 {onDismiss && (
                     <button type="button" aria-label="Descartar" onClick={dismiss} className="-mt-0.5 -mr-1 flex-none rounded px-1 text-[13px] text-faint hover:text-ink">

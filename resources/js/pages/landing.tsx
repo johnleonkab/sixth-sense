@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
+import ServiceIcon, { type Service } from '@/components/service-icon';
 import VoiceOrb from '@/components/voice/voice-orb';
 import Wordmark from '@/components/wordmark';
 
@@ -9,12 +10,14 @@ type LandingProps = {
     repositoryUrl: string;
 };
 
-const services = [
-    { name: 'Google Calendar', color: 'bg-accent' },
-    { name: 'Gmail', color: 'bg-gmail' },
-    { name: 'Google Docs & Drive', color: 'bg-accent' },
-    { name: 'Slack', color: 'bg-slack' },
-    { name: 'Notion', color: 'bg-notion' },
+const services: { name: string; icon: Service }[] = [
+    { name: 'Google Calendar', icon: 'calendar' },
+    { name: 'Gmail', icon: 'gmail' },
+    { name: 'Google Docs & Drive', icon: 'drive' },
+    { name: 'Slack', icon: 'slack' },
+    { name: 'Jira', icon: 'jira' },
+    { name: 'Notion', icon: 'notion' },
+    { name: 'Google Meet', icon: 'meet' },
 ];
 
 const steps = [
@@ -232,7 +235,7 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                         <ul className="mt-12 flex flex-wrap gap-2" aria-label="Connected services">
                             {services.map((service) => (
                                 <li key={service.name} className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px]">
-                                    <i aria-hidden className={`size-2 rounded-full ${service.color}`} />
+                                    <ServiceIcon service={service.icon} size={15} label={false} />
                                     {service.name}
                                 </li>
                             ))}

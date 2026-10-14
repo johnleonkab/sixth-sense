@@ -3,6 +3,7 @@ import CanvasFrame from '@/canvas/canvas-frame';
 import SlackMessage, { ClickableRow } from '@/canvas/slack/slack-message';
 import type { SlackMessageData } from '@/canvas/slack/types';
 import type { CanvasComponent } from '@/canvas/types';
+import ServiceIcon from '@/components/service-icon';
 
 type SlackUnreadProps = {
     title: string;
@@ -32,7 +33,7 @@ const SlackUnread: CanvasComponent<SlackUnreadProps> = ({ index, ...props }) => 
                                 </span>
                                 <div className="min-w-0">
                                     <p className="mb-1 flex items-center gap-1.5 text-[12px] text-muted">
-                                        <i aria-hidden className="size-[7px] rounded-[2px] bg-slack" />
+                                        <ServiceIcon service="slack" size={13} label={false} />
                                         {item.reason === 'dm'
                                             ? `Mensaje directo${item.count > 1 ? ` · ${item.count} sin leer` : ''}`
                                             : `Te mencionan en ${item.message.conversation}`}
