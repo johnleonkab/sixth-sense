@@ -10,6 +10,7 @@ use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
+use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
 use App\Http\Controllers\Settings\SystemController;
 use App\Http\Controllers\Settings\WingmanController;
@@ -72,6 +73,7 @@ Route::middleware('auth')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        Route::get('impact', [ImpactController::class, 'index'])->name('impact.index');
         Route::get('wingman', [WingmanController::class, 'edit'])->name('wingman.edit');
         Route::put('wingman', [WingmanController::class, 'update'])->name('wingman.update');
         Route::put('wingman/settings', [WingmanController::class, 'updateSettings'])->name('wingman.settings');
