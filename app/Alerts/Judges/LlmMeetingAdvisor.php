@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Judges;
 
+use App\Ai\TextModel;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\MeetingBriefing;
 use App\Connectors\Calendar\CalendarEvent;
@@ -10,51 +11,27 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Gemini Flash reads the meeting (title, agenda, people, linked documents) and
- * decides whether it needs preparation and how early to remind.
+ * The text model reads the meeting and decides whether it needs preparation
+ * and how early to remind.
  */
-class GeminiMeetingAdvisor implements MeetingAdvisor
+class LlmMeetingAdvisor implements MeetingAdvisor
 {
-    use CallsGemini;
-
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function advise(User $user, CalendarEvent $event): MeetingBriefing
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
-
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($event)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
-                    'type' => 'OBJECT',
-                    'properties' => [
-                        'needs_preparation' => ['type' => 'BOOLEAN'],
-                        'lead_minutes' => ['type' => 'INTEGER'],
-                        'preparation' => ['type' => 'STRING'],
-                    ],
-                    'required' => ['needs_preparation', 'lead_minutes', 'preparation'],
-                ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
+        $answer = $this->model->json($this->instructions($user), $this->describe($event), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'needs_preparation' => ['type' => 'BOOLEAN'],
+                'lead_minutes' => ['type' => 'INTEGER'],
+                'preparation' => ['type' => 'STRING'],
+            ],
+            'required' => ['needs_preparation', 'lead_minutes', 'preparation'],
         ]);
 
-        if ($response->failed()) {
-            throw new RuntimeException("Gemini meeting advice failed with HTTP {$response->status()}: {$response->json('error.message')}");
-        }
-
-        $answer = json_decode((string) collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? '', true);
-
-        if (! is_array($answer) || ! isset($answer['needs_preparation'], $answer['lead_minutes'])) {
-            throw new RuntimeException('Gemini meeting advice returned an unexpected answer.');
+        if (! isset($answer['needs_preparation'], $answer['lead_minutes'])) {
+            throw new RuntimeException('Meeting advice returned an unexpected answer.');
         }
 
         return MeetingBriefing::make(

@@ -2,73 +2,50 @@
 
 namespace App\Wingman\Copilot;
 
-use App\Alerts\Judges\CallsGemini;
+use App\Ai\TextModel;
 use App\Models\WingmanMeeting;
 use App\Wingman\Notes\MeetingNotes;
 use Carbon\CarbonImmutable;
-use RuntimeException;
 
 /**
- * Gemini reads what was just said and lists what is worth looking into. It
- * does not look anything up: the app checks each finding with real data.
+ * The text model reads what was just said and lists what is worth looking
+ * into. It does not look anything up: the app checks each finding with real data.
  */
-class GeminiDetector implements Detector
+class LlmDetector implements Detector
 {
-    use CallsGemini, DraftsMessages;
+    use DraftsMessages;
 
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function detect(WingmanMeeting $meeting, array $earlier, array $new, array $known): array
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
-
         $optional = fn (string $type): array => ['type' => $type, 'nullable' => true];
 
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($meeting)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($meeting, $earlier, $new, $known)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0.1,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
+        $answer = $this->model->json($this->instructions($meeting), $this->describe($meeting, $earlier, $new, $known), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'findings' => ['type' => 'ARRAY', 'items' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'findings' => ['type' => 'ARRAY', 'items' => [
-                            'type' => 'OBJECT',
-                            'properties' => [
-                                'kind' => ['type' => 'STRING', 'enum' => Finding::KINDS],
-                                'quote' => ['type' => 'STRING'],
-                                'confidence' => ['type' => 'NUMBER'],
-                                'importance' => ['type' => 'STRING', 'enum' => ['normal', 'high']],
-                                'title' => $optional('STRING'),
-                                'duration_minutes' => $optional('INTEGER'),
-                                'from_date' => $optional('STRING'),
-                                'to_date' => $optional('STRING'),
-                                'query' => $optional('STRING'),
-                                'to' => $optional('STRING'),
-                                'about' => $optional('STRING'),
-                                'draft' => $optional('STRING'),
-                                'channel' => ['type' => 'STRING', 'enum' => ['slack', 'email'], 'nullable' => true],
-                            ],
-                            'required' => ['kind', 'quote', 'confidence', 'importance'],
-                        ]],
+                        'kind' => ['type' => 'STRING', 'enum' => Finding::KINDS],
+                        'quote' => ['type' => 'STRING'],
+                        'confidence' => ['type' => 'NUMBER'],
+                        'importance' => ['type' => 'STRING', 'enum' => ['normal', 'high']],
+                        'title' => $optional('STRING'),
+                        'duration_minutes' => $optional('INTEGER'),
+                        'from_date' => $optional('STRING'),
+                        'to_date' => $optional('STRING'),
+                        'query' => $optional('STRING'),
+                        'to' => $optional('STRING'),
+                        'about' => $optional('STRING'),
+                        'draft' => $optional('STRING'),
+                        'channel' => ['type' => 'STRING', 'enum' => ['slack', 'email'], 'nullable' => true],
                     ],
-                    'required' => ['findings'],
-                ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
-        ]);
-
-        $answer = json_decode((string) (collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? ''), true);
-
-        if ($response->failed() || ! is_array($answer)) {
-            throw new RuntimeException("Gemini Wingman failed: HTTP {$response->status()} ".($response->json('error.message') ?? ''));
-        }
+                    'required' => ['kind', 'quote', 'confidence', 'importance'],
+                ]],
+            ],
+            'required' => ['findings'],
+        ], 0.1);
 
         $findings = array_values(array_filter(array_map(
             fn (mixed $finding): ?Finding => is_array($finding) ? Finding::fromArray($finding) : null,

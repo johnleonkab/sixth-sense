@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Judges;
 
+use App\Ai\TextModel;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
 use App\Alerts\Judgement;
@@ -12,55 +13,28 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Asks Gemini Flash whether a message (an email, a Slack message) deserves an
- * alert, with structured output.
- *
- * @see https://ai.google.dev/gemini-api/docs/structured-output
+ * Asks the text model whether a message deserves an alert.
  */
-class GeminiRelevanceJudge implements RelevanceJudge
+class LlmRelevanceJudge implements RelevanceJudge
 {
-    use CallsGemini;
-
     private const MAX_EXCERPT = 2000;
 
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function judge(User $user, InboxCandidate $candidate): Judgement
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
-
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($user, $candidate)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
-                    'type' => 'OBJECT',
-                    'properties' => [
-                        'important' => ['type' => 'BOOLEAN'],
-                        'reason' => ['type' => 'STRING'],
-                        'relevance' => ['type' => 'INTEGER'],
-                    ],
-                    'required' => ['important', 'reason', 'relevance'],
-                ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
+        $answer = $this->model->json($this->instructions($user), $this->describe($user, $candidate), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'important' => ['type' => 'BOOLEAN'],
+                'reason' => ['type' => 'STRING'],
+                'relevance' => ['type' => 'INTEGER'],
+            ],
+            'required' => ['important', 'reason', 'relevance'],
         ]);
 
-        if ($response->failed()) {
-            throw new RuntimeException("Gemini relevance check failed with HTTP {$response->status()}: {$response->json('error.message')}");
-        }
-
-        $answer = json_decode((string) collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? '', true);
-
-        if (! is_array($answer) || ! isset($answer['important'], $answer['reason'])) {
-            throw new RuntimeException('Gemini relevance check returned an unexpected answer.');
+        if (! isset($answer['important'], $answer['reason'])) {
+            throw new RuntimeException('Relevance check returned an unexpected answer.');
         }
 
         return new Judgement(
