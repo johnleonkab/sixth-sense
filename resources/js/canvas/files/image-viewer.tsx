@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import CanvasFrame from '@/canvas/canvas-frame';
-import { nextZoom, ToolbarButton, type FileProps } from '@/canvas/files/viewer-toolbar';
+import { nextZoom, ToolbarButton, usePinchZoom, type FileProps } from '@/canvas/files/viewer-toolbar';
 import type { CanvasComponent } from '@/canvas/types';
 import { registerViewer } from '@/canvas/viewers';
 
@@ -12,8 +12,10 @@ import { registerViewer } from '@/canvas/viewers';
 const ImageViewer: CanvasComponent<FileProps> = ({ index, ...props }) => {
     const [zoom, setZoom] = useState(1);
     const [failed, setFailed] = useState(false);
+    const frame = useRef<HTMLDivElement>(null);
     const zoomRef = useRef(zoom);
     zoomRef.current = zoom;
+    usePinchZoom(frame, (direction) => setZoom((current) => nextZoom(current, direction)));
 
     useEffect(
         () =>
@@ -58,7 +60,7 @@ const ImageViewer: CanvasComponent<FileProps> = ({ index, ...props }) => {
                 </ToolbarButton>
             </div>
 
-            <div className="grid max-h-[68vh] place-items-center overflow-auto rounded-xl bg-soft">
+            <div ref={frame} className="grid max-h-[68vh] place-items-center overflow-auto rounded-xl bg-soft touch-[pan-x_pan-y]">
                 {failed ? (
                     <p className="p-10 text-[13px] text-muted">No he podido cargar la imagen.</p>
                 ) : (
