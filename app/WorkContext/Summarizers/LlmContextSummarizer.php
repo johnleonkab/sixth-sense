@@ -2,7 +2,7 @@
 
 namespace App\WorkContext\Summarizers;
 
-use App\Alerts\Judges\CallsGemini;
+use App\Ai\TextModel;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\MailMessage;
@@ -15,64 +15,41 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Gemini reads a week of Slack, email, documents and pages and writes the
- * processes the person is in, why, with whom and where.
+ * The text model reads a week of Slack, email, documents and pages and writes
+ * the processes the person is in, why, with whom and where.
  */
-class GeminiContextSummarizer implements ContextSummarizer
+class LlmContextSummarizer implements ContextSummarizer
 {
-    use CallsGemini;
-
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function summarize(User $user, WorkActivity $activity): WorkDigest
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
-
         $text = ['type' => 'STRING'];
         $texts = ['type' => 'ARRAY', 'items' => $text];
 
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($user, $activity)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0.2,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
+        $answer = $this->model->json($this->instructions($user), $this->describe($user, $activity), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'summary' => $text,
+                'workstreams' => ['type' => 'ARRAY', 'items' => [
                     'type' => 'OBJECT',
-                    'properties' => [
-                        'summary' => $text,
-                        'workstreams' => ['type' => 'ARRAY', 'items' => [
-                            'type' => 'OBJECT',
-                            'properties' => ['name' => $text, 'what' => $text, 'why' => $text, 'with' => $texts, 'where' => $texts, 'next' => $text],
-                            'required' => ['name', 'what', 'why', 'with', 'where', 'next'],
-                        ]],
-                        'people' => ['type' => 'ARRAY', 'items' => [
-                            'type' => 'OBJECT',
-                            'properties' => ['name' => $text, 'relation' => $text],
-                            'required' => ['name', 'relation'],
-                        ]],
-                        'open_loops' => $texts,
-                    ],
-                    'required' => ['summary', 'workstreams', 'people', 'open_loops'],
-                ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
-        ]);
+                    'properties' => ['name' => $text, 'what' => $text, 'why' => $text, 'with' => $texts, 'where' => $texts, 'next' => $text],
+                    'required' => ['name', 'what', 'why', 'with', 'where', 'next'],
+                ]],
+                'people' => ['type' => 'ARRAY', 'items' => [
+                    'type' => 'OBJECT',
+                    'properties' => ['name' => $text, 'relation' => $text],
+                    'required' => ['name', 'relation'],
+                ]],
+                'open_loops' => $texts,
+            ],
+            'required' => ['summary', 'workstreams', 'people', 'open_loops'],
+        ], 0.2);
 
-        if ($response->failed()) {
-            throw new RuntimeException("Gemini work context failed with HTTP {$response->status()}: {$response->json('error.message')}");
-        }
+        $digest = WorkDigest::fromArray($answer);
 
-        $answer = json_decode((string) (collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? ''), true);
-        $digest = is_array($answer) ? WorkDigest::fromArray($answer) : null;
-
-        if ($digest === null || $digest->summary === '') {
-            throw new RuntimeException('Gemini work context returned an unexpected answer.');
+        if ($digest->summary === '') {
+            throw new RuntimeException('Work context returned an unexpected answer.');
         }
 
         return $digest;

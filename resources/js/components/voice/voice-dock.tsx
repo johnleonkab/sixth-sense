@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import VoiceOrb from '@/components/voice/voice-orb';
 import { useTypewriter } from '@/voice/use-typewriter';
@@ -74,7 +74,7 @@ function SaidLine({ voice }: { voice: VoiceSession }) {
                     aria-label="Escribe lo que dirías en voz alta"
                     placeholder="Escribe lo que dirías en voz alta"
                     autoComplete="off"
-                    className="mx-auto block min-h-[23px] w-full max-w-[560px] border-0 bg-transparent p-0 text-center text-[15px] text-ink caret-accent outline-none placeholder:text-faint"
+                    className="mx-auto block min-h-11 w-full max-w-[560px] border-0 bg-transparent p-0 text-center text-base text-ink caret-accent outline-none placeholder:text-faint md:min-h-[23px] md:text-[15px]"
                 />
             </form>
         );
@@ -93,15 +93,78 @@ function SaidLine({ voice }: { voice: VoiceSession }) {
 }
 
 /**
+ * How far the on-screen keyboard covers the bottom of the layout, on a phone.
+ * The dock rises by that much so typing stays visible.
+ */
+function useKeyboardLift(): number {
+    const [lift, setLift] = useState(0);
+
+    useEffect(() => {
+        const viewport = window.visualViewport;
+
+        if (!viewport) {
+            return;
+        }
+
+        const update = () => {
+            if (window.matchMedia('(min-width: 768px)').matches) {
+                setLift(0);
+
+                return;
+            }
+
+            const covered = window.innerHeight - viewport.height - viewport.offsetTop;
+            setLift(covered > 80 ? covered : 0);
+        };
+
+        viewport.addEventListener('resize', update);
+        viewport.addEventListener('scroll', update);
+        update();
+
+        return () => {
+            viewport.removeEventListener('resize', update);
+            viewport.removeEventListener('scroll', update);
+        };
+    }, []);
+
+    return lift;
+}
+
+/**
  * Bottom voice zone: what the person says, what the assistant answers, and
  * the control to start or end the conversation.
  */
 export default function VoiceDock({ voice }: { voice: VoiceSession }) {
     const showsReply = voice.status !== 'error' && voice.reply !== '';
     const typedReply = useTypewriter(showsReply ? voice.reply : '');
+    const lift = useKeyboardLift();
+    const dock = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        const element = dock.current;
+
+        if (!element) {
+            return;
+        }
+
+        const apply = () => document.documentElement.style.setProperty('--voice-dock-height', `${element.offsetHeight}px`);
+        apply();
+        const observer = new ResizeObserver(apply);
+        observer.observe(element);
+
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        document.documentElement.style.setProperty('--keyboard-lift', `${lift}px`);
+    }, [lift]);
 
     return (
-        <section className="relative mx-auto w-full max-w-[760px] pt-3.5 pb-[22px] text-center">
+        <section
+            ref={dock}
+            style={lift > 0 ? { transform: `translateY(-${lift}px)` } : undefined}
+            className="chrome relative mx-auto w-full max-w-[760px] pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-center"
+        >
             <div
                 aria-hidden
                 className="pointer-events-none absolute -inset-x-4 -top-10 h-10 bg-linear-to-b from-transparent to-bg"
@@ -121,7 +184,7 @@ export default function VoiceDock({ voice }: { voice: VoiceSession }) {
                 aria-hidden
                 data-reply
                 className={
-                    'mx-auto mt-1.5 min-h-[30px] max-w-[680px] text-[21px] leading-[1.4] tracking-[-0.015em] text-pretty ' +
+                    'mx-auto mt-1.5 min-h-[30px] max-w-[680px] text-[18px] leading-[1.35] tracking-[-0.015em] text-pretty md:text-[21px] md:leading-[1.4] ' +
                     (voice.status === 'error' ? 'text-crit' : showsReply ? 'text-ink' : 'text-faint')
                 }
             >
@@ -133,7 +196,7 @@ export default function VoiceDock({ voice }: { voice: VoiceSession }) {
                     <button
                         type="button"
                         onClick={voice.stop}
-                        className="rounded-full border border-line bg-surface px-4 py-1.5 text-[13px] text-ink hover:bg-soft"
+                        className="min-h-11 rounded-full border border-line bg-surface px-6 text-[15px] text-ink hover:bg-soft md:min-h-0 md:px-4 md:py-1.5 md:text-[13px]"
                     >
                         Terminar
                     </button>
@@ -141,7 +204,7 @@ export default function VoiceDock({ voice }: { voice: VoiceSession }) {
                     <button
                         type="button"
                         onClick={() => void voice.start('voice')}
-                        className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-[14px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-8 text-[16px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:px-5 md:py-2 md:text-[14px]"
                     >
                         <MicrophoneIcon />
                         Hablar

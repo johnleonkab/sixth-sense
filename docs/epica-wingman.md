@@ -157,7 +157,7 @@ Lo aprendido del HTML real: los subtítulos están en `role="region"` con `aria-
 
 **Estado:** ✅ hecho (14/10).
 - `LiveNotes` lleva a las notas las frases cerradas que faltan: como mucho cada 20 s mientras se habla, y al colgar en el momento. Lo hace a través del job `TakeWingmanNotes`, único por reunión.
-- `GeminiNoteTaker` (`gemini-3.8-flash`, con modelo de reserva) recibe las notas hasta ahora y lo nuevo, y devuelve las notas completas: resumen, temas, decisiones, preguntas abiertas y compromisos ("Tú" para la persona). Con una conversación de ejemplo tardó unos 4 s y acertó decisiones, preguntas y compromisos.
+- `LlmNoteTaker` (el modelo capaz del proveedor de texto, con modelo de reserva) recibe las notas hasta ahora y lo nuevo, y devuelve las notas completas: resumen, temas, decisiones, preguntas abiertas y compromisos ("Tú" para la persona). Con una conversación de ejemplo tardó unos 4 s y acertó decisiones, preguntas y compromisos.
 - Si falla, las frases quedan pendientes para la siguiente pasada.
 - La burbuja muestra el resumen, las preguntas abiertas y "N notas"; la página de la reunión, el documento entero.
 
@@ -178,7 +178,7 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 **Hecho cuando:** en una llamada de prueba con esas cuatro situaciones, aparecen las cuatro tarjetas correctas y ninguna sobra.
 
 **Estado:** ✅ hecho (14/10).
-- Funciona en dos pasos: **Gemini detecta** (`GeminiDetector`, que solo dice qué merece comprobarse) y **el código comprueba con datos reales** (`Lookups`: SlotFinder con la disponibilidad de los asistentes, Jira, Notion, Slack y Gmail). Así una tarjeta nunca se inventa datos.
+- Funciona en dos pasos: **Gemini detecta** (`LlmDetector`, que solo dice qué merece comprobarse) y **el código comprueba con datos reales** (`Lookups`: SlotFinder con la disponibilidad de los asistentes, Jira, Notion, Slack y Gmail). Así una tarjeta nunca se inventa datos.
 - `WingmanAgent` lee lo nuevo cada 12 s mientras se habla, con el job `WatchWingmanCall`.
 - Freno de ruido: confianza ≥ 0,6, nada repetido en la misma llamada (`dedupe_key`), como mucho 2 tarjetas por lectura, y 90 s de silencio tras una tarjeta salvo que sea urgente.
 - Lo que propone (convocar, mandar un Slack o un email) se guarda en la tarjeta y se convierte en acción pendiente al revisarlo (H6), porque las acciones pendientes caducan a los 10 min.
@@ -199,7 +199,7 @@ Es un agente distinto del de voz. Lee los bloques y el contexto y decide si hay 
 - **`WingmanAction`:** lo que queda por hacer. Entra al momento lo que traen las tarjetas preparadas y, al colgar, lo que sale de tus compromisos.
 - **Cierre:** `CloseWingmanMeeting` ejecuta `MeetingCloser` cuando cuelgas o cuando la llamada se da por abandonada.
   - Primero pasa las últimas líneas a las notas.
-  - Después `GeminiFollowUpPlanner` convierte los compromisos de «Tú» en cosas listas para revisar: un mensaje redactado (Slack o email), una reunión con hueco para todos, un ticket de Jira en el proyecto de tus reglas, o tiempo reservado para una tarea tuya (`agenda.schedule`, nuevo tipo de acción que usa el agendador).
+  - Después `LlmFollowUpPlanner` convierte los compromisos de «Tú» en cosas listas para revisar: un mensaje redactado (Slack o email), una reunión con hueco para todos, un ticket de Jira en el proyecto de tus reglas, o tiempo reservado para una tarea tuya (`agenda.schedule`, nuevo tipo de acción que usa el agendador).
   - No repite nada de lo que ya estaba preparado.
   - Prueba real: unos 5 s. Saltó el compromiso de otra persona, redactó el mensaje a Andrés y convirtió «el jueves» en fecha límite.
 - **Revisar → «Sí» → unos segundos para deshacer**, con la misma `ActionBar` de siempre; también Descartar y Recuperar. Una acción cancelada, deshecha o caducada se puede volver a revisar.

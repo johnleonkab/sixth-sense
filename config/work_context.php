@@ -8,13 +8,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | Reads the person's recent activity and writes what they are working on,
-    | why and with whom. It uses the Gemini settings of the alerts.
+    | why and with whom. It uses the capable model of the text provider.
     |
-    | Supported: "gemini", "fake"
+    | Supported: "llm", "fake". "gemini" is an alias of "llm".
     |
     */
 
-    'summarizer' => env('WORK_CONTEXT_SUMMARIZER', 'gemini'),
+    'summarizer' => env('WORK_CONTEXT_SUMMARIZER', 'llm'),
 
     // A whole week of activity is a long read: more time than the alerts get.
     'timeout' => (int) env('WORK_CONTEXT_TIMEOUT', 120),

@@ -99,8 +99,9 @@ flowchart LR
 - **Proveedor de voz intercambiable**, detrás de `VoiceProvider` (PHP) y `VoiceTransport` (TS). Hoy es Gemini Live.
 - **Herramientas declaradas una sola vez** en `app/Voice/Tools` y traducidas al formato de cada proveedor. Cada una devuelve `output` para el modelo y, si procede, un **canvas**: una vista preconfigurada que el frontend sabe pintar (`calendar.day`, `mail.message`, `pdf.viewer`, `alerts.review`…).
 - **Toda la lógica de un servicio vive en su conector** (`app/Connectors`), cada uno con un `Fake` para los tests y para el **modo demo**.
-- **Motor de respuestas aislado** tras `ReplyPlanner`. Hoy usa Gemini Flash; se puede sustituir por otro agente con acceso a tu base de conocimiento.
-- **Contexto de trabajo** tras `ContextSummarizer`: un job nocturno lee la semana con los conectores (solo métodos de lectura), Gemini la resume, y el resultado se añade a las instrucciones de cada sesión de voz.
+- **Texto intercambiable** tras `TextModel` (`AI_TEXT_PROVIDER`). Alertas, borradores, contexto, agenda y Wingman usan DeepSeek por defecto. La voz no pasa por ahí.
+- **Motor de respuestas aislado** tras `ReplyPlanner`. Se puede sustituir por otro agente con acceso a tu base de conocimiento.
+- **Contexto de trabajo** tras `ContextSummarizer`: un job nocturno lee la semana con los conectores (solo métodos de lectura), el modelo de texto la resume, y el resultado se añade a las instrucciones de cada sesión de voz.
 
 ## Puesta en marcha
 
@@ -139,9 +140,11 @@ Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
 
 | Variable | Para qué |
 |---|---|
-| `GEMINI_API_KEY` | Voz (Gemini Live), juez de alertas y motor de respuestas. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
+| `GEMINI_API_KEY` | Voz (Gemini Live) y las muestras de voz. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
 | `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE` | Modelo y voz de la conversación. |
-| `ALERTS_GEMINI_MODEL` | Modelo del juez, del motor de respuestas y del contexto de trabajo. El nivel gratuito de Flash tiene un límite diario bajo. |
+| `AI_TEXT_PROVIDER` | Quién escribe el texto que no es voz: `deepseek` (por defecto) o `gemini`. |
+| `DEEPSEEK_API_KEY` | Clave del texto. Se obtiene en [DeepSeek](https://platform.deepseek.com/api_keys). |
+| `DEEPSEEK_MODEL`, `DEEPSEEK_LIGHT_MODEL` | Modelo capaz (respuestas, contexto, Wingman) y modelo ligero (juez de alertas y reuniones). |
 | `WORK_CONTEXT_RUN_AT` | Hora a la que se genera el contexto de trabajo cada noche (por defecto `04:30`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Cliente OAuth web de Google Cloud, con las APIs de Calendar, Gmail, Docs y Drive activadas. |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | App de Slack con *user token scopes*. La redirección debe ser HTTPS, así que en local se usa un túnel. |

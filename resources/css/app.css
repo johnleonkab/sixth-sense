@@ -116,15 +116,36 @@
     body,
     #app {
         height: 100%;
+        height: 100dvh;
     }
 
     body {
         @apply bg-bg font-sans text-[14px] leading-normal text-ink antialiased;
+        overscroll-behavior: none;
     }
 
     :focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
+    }
+
+    /* A phone should not bounce the whole window, zoom a field, or flash a grey tap. */
+    @media (max-width: 767px) {
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
+        button,
+        a,
+        [role='button'] {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .chrome {
+            -webkit-user-select: none;
+            user-select: none;
+        }
     }
 }
 
@@ -323,5 +344,14 @@
     100% {
         opacity: 0;
         transform: scale(1.9);
+    }
+}
+
+/* Beats utility font sizes so iOS does not zoom a focused field. Checkboxes stay small. */
+@media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']),
+    textarea,
+    select {
+        font-size: 16px;
     }
 }

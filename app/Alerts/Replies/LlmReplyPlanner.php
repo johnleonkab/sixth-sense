@@ -2,74 +2,48 @@
 
 namespace App\Alerts\Replies;
 
+use App\Ai\TextModel;
 use App\Alerts\AlertSource;
-use App\Alerts\Judges\CallsGemini;
 use App\Models\User;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * The reply engine on Gemini Flash, with structured output.
- *
- * @see https://ai.google.dev/gemini-api/docs/structured-output
+ * The reply engine, with structured output.
  */
-class GeminiReplyPlanner implements ReplyPlanner
+class LlmReplyPlanner implements ReplyPlanner
 {
-    use CallsGemini;
-
     private const MAX_TEXT = 4000;
 
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function plan(User $user, AlertBrief $brief): ReplyPlan
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
-
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($user, $brief)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($brief)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0.3,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
+        $answer = $this->model->json($this->instructions($user, $brief), $this->describe($brief), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'summary' => ['type' => 'STRING'],
+                'reply_to' => ['type' => 'STRING', 'enum' => [...ReplyPlan::AUDIENCES, 'none']],
+                'reply_text' => ['type' => 'STRING'],
+                'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
+                'question' => ['type' => 'STRING'],
+                'manual_task' => [
                     'type' => 'OBJECT',
                     'properties' => [
-                        'summary' => ['type' => 'STRING'],
-                        'reply_to' => ['type' => 'STRING', 'enum' => [...ReplyPlan::AUDIENCES, 'none']],
-                        'reply_text' => ['type' => 'STRING'],
-                        'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
-                        'question' => ['type' => 'STRING'],
-                        'manual_task' => [
-                            'type' => 'OBJECT',
-                            'properties' => [
-                                'needed' => ['type' => 'BOOLEAN'],
-                                'title' => ['type' => 'STRING'],
-                                'effort_minutes' => ['type' => 'INTEGER'],
-                                'deadline' => ['type' => 'STRING'],
-                                'people' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
-                            ],
-                            'required' => ['needed', 'title', 'effort_minutes', 'deadline', 'people'],
-                        ],
+                        'needed' => ['type' => 'BOOLEAN'],
+                        'title' => ['type' => 'STRING'],
+                        'effort_minutes' => ['type' => 'INTEGER'],
+                        'deadline' => ['type' => 'STRING'],
+                        'people' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                     ],
-                    'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'manual_task'],
+                    'required' => ['needed', 'title', 'effort_minutes', 'deadline', 'people'],
                 ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
-        ]);
+            ],
+            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'manual_task'],
+        ], 0.3);
 
-        if ($response->failed()) {
-            throw new RuntimeException("Gemini reply plan failed with HTTP {$response->status()}: {$response->json('error.message')}");
-        }
-
-        $answer = json_decode((string) collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? '', true);
-
-        if (! is_array($answer) || blank($answer['summary'] ?? null)) {
-            throw new RuntimeException('Gemini reply plan returned an unexpected answer.');
+        if (blank($answer['summary'] ?? null)) {
+            throw new RuntimeException('Reply plan returned an unexpected answer.');
         }
 
         $audience = in_array($answer['reply_to'] ?? null, ReplyPlan::AUDIENCES, true) ? $answer['reply_to'] : null;

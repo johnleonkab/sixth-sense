@@ -36,8 +36,8 @@ export default function SettingsLayout({ title, description, children }: Setting
         <>
             <Head title={`${title} · Configuración`} />
 
-            <div className="min-h-full px-4">
-                <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between gap-3 border-b border-line pt-4 pb-3.5 text-[13px] text-muted">
+            <div className="flex h-dvh flex-col px-4">
+                <header className="chrome sticky top-0 z-20 mx-auto flex w-full max-w-[1120px] items-center justify-between gap-3 border-b border-line bg-bg pt-[max(1rem,env(safe-area-inset-top))] pb-3.5 text-[13px] text-muted">
                     <div className="flex min-w-0 items-center gap-2">
                         <Wordmark />
                         <span aria-hidden className="text-faint">
@@ -48,14 +48,14 @@ export default function SettingsLayout({ title, description, children }: Setting
 
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 hover:bg-soft hover:text-ink md:min-h-0 md:py-1"
                     >
                         <span aria-hidden>←</span>
                         Volver al asistente
                     </Link>
                 </header>
 
-                <div className="mx-auto grid w-full max-w-[1120px] gap-8 py-8 md:grid-cols-[200px_minmax(0,1fr)] md:gap-12 md:py-10">
+                <div className="mx-auto grid min-h-0 w-full max-w-[1120px] flex-1 gap-8 overflow-auto py-8 md:grid-cols-[200px_minmax(0,1fr)] md:gap-12 md:py-10">
                     <nav aria-label="Secciones de configuración">
                         <ul className="flex gap-1 overflow-x-auto md:flex-col">
                             {sections.map((section) => {
@@ -66,7 +66,7 @@ export default function SettingsLayout({ title, description, children }: Setting
                                         <Link
                                             href={section.href}
                                             aria-current={current ? 'page' : undefined}
-                                            className="block rounded-lg px-3 py-1.5 text-[13.5px] whitespace-nowrap text-muted hover:bg-soft hover:text-ink aria-[current=page]:bg-soft aria-[current=page]:font-medium aria-[current=page]:text-ink"
+                                            className="inline-flex min-h-11 items-center rounded-lg px-3 text-[13.5px] whitespace-nowrap text-muted hover:bg-soft hover:text-ink aria-[current=page]:bg-soft aria-[current=page]:font-medium aria-[current=page]:text-ink md:min-h-0 md:py-1.5"
                                         >
                                             {section.label}
                                         </Link>

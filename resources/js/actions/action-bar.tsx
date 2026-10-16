@@ -44,7 +44,8 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
         }
     }, [initial.id]);
 
-    const base = 'mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-[13px]';
+    const base = 'mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-[13px] max-md:sticky max-md:bottom-0 max-md:z-10 max-md:flex-col max-md:items-stretch max-md:bg-surface max-md:pb-3';
+    const thumb = 'max-md:min-h-11 max-md:text-[15px]';
 
     switch (action.status) {
         case 'pending':
@@ -53,14 +54,14 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                     <button
                         type="button"
                         onClick={() => void actions.confirm(action.id)}
-                        className="rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90"
+                        className={`rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90 ${thumb}`}
                     >
                         Sí, {verb}
                     </button>
                     <button
                         type="button"
                         onClick={() => void actions.cancel(action.id)}
-                        className="rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft"
+                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
                     >
                         Cancelar
                     </button>
@@ -80,7 +81,7 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                     <button
                         type="button"
                         onClick={() => void actions.undo(action.id)}
-                        className="rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft"
+                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
                     >
                         Deshacer
                     </button>

@@ -2,14 +2,17 @@
 
 namespace App\Providers;
 
+use App\Ai\DeepSeekTextModel;
+use App\Ai\GeminiTextModel;
+use App\Ai\TextModel;
 use App\Alerts\Judges\FakeMeetingAdvisor;
 use App\Alerts\Judges\FakeRelevanceJudge;
-use App\Alerts\Judges\GeminiMeetingAdvisor;
-use App\Alerts\Judges\GeminiRelevanceJudge;
+use App\Alerts\Judges\LlmMeetingAdvisor;
+use App\Alerts\Judges\LlmRelevanceJudge;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Replies\FakeReplyPlanner;
-use App\Alerts\Replies\GeminiReplyPlanner;
+use App\Alerts\Replies\LlmReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
@@ -36,7 +39,7 @@ use App\Connectors\Slack\SlackChats;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
 use App\Scheduling\Assessors\FakeTaskAssessor;
-use App\Scheduling\Assessors\GeminiTaskAssessor;
+use App\Scheduling\Assessors\LlmTaskAssessor;
 use App\Scheduling\TaskAssessor;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
@@ -44,16 +47,16 @@ use App\Voice\VoiceProvider;
 use App\Voice\VoiceSamples;
 use App\Wingman\Closing\FakeFollowUpPlanner;
 use App\Wingman\Closing\FollowUpPlanner;
-use App\Wingman\Closing\GeminiFollowUpPlanner;
+use App\Wingman\Closing\LlmFollowUpPlanner;
 use App\Wingman\Copilot\Detector;
 use App\Wingman\Copilot\FakeDetector;
-use App\Wingman\Copilot\GeminiDetector;
+use App\Wingman\Copilot\LlmDetector;
 use App\Wingman\Notes\FakeNoteTaker;
-use App\Wingman\Notes\GeminiNoteTaker;
+use App\Wingman\Notes\LlmNoteTaker;
 use App\Wingman\Notes\NoteTaker;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
-use App\WorkContext\Summarizers\GeminiContextSummarizer;
+use App\WorkContext\Summarizers\LlmContextSummarizer;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -99,40 +102,36 @@ class AppServiceProvider extends ServiceProvider
             ? new FakeDocuments
             : $this->app->make(GoogleDocs::class));
 
-        $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (config('alerts.judge')) {
-            'gemini' => new GeminiRelevanceJudge(self::lightGemini()),
-            'fake' => new FakeRelevanceJudge,
+        $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (true) {
+            $this->usesTextModel(config('alerts.judge')) => new LlmRelevanceJudge($this->textModel('light')),
+            config('alerts.judge') === 'fake' => new FakeRelevanceJudge,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         // The reply engine is its own piece: it can become another agent without touching the alerts.
-        $this->app->bind(ReplyPlanner::class, fn (): ReplyPlanner => match (config('alerts.planner')) {
-            'gemini' => new GeminiReplyPlanner([...config('alerts.judges.gemini'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
-            'fake' => new FakeReplyPlanner,
+        $this->app->bind(ReplyPlanner::class, fn (): ReplyPlanner => match (true) {
+            $this->usesTextModel(config('alerts.planner')) => new LlmReplyPlanner($this->textModel('capable')),
+            config('alerts.planner') === 'fake' => new FakeReplyPlanner,
             default => throw new InvalidArgumentException('Unsupported reply planner ['.config('alerts.planner').'].'),
         });
 
         // The scheduler's judgement is its own piece too: urgency and length of each task.
-        $this->app->bind(TaskAssessor::class, fn (): TaskAssessor => match (config('agenda.assessor')) {
-            'gemini' => new GeminiTaskAssessor([...config('alerts.judges.gemini'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
-            'fake' => new FakeTaskAssessor,
+        $this->app->bind(TaskAssessor::class, fn (): TaskAssessor => match (true) {
+            $this->usesTextModel(config('agenda.assessor')) => new LlmTaskAssessor($this->textModel('capable')),
+            config('agenda.assessor') === 'fake' => new FakeTaskAssessor,
             default => throw new InvalidArgumentException('Unsupported task assessor ['.config('agenda.assessor').'].'),
         });
 
-        $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (config('alerts.judge')) {
-            'gemini' => new GeminiMeetingAdvisor(self::lightGemini()),
-            'fake' => new FakeMeetingAdvisor,
+        $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (true) {
+            $this->usesTextModel(config('alerts.judge')) => new LlmMeetingAdvisor($this->textModel('light')),
+            config('alerts.judge') === 'fake' => new FakeMeetingAdvisor,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         // A week of activity is a long read: the capable model, with more time.
-        $this->app->bind(ContextSummarizer::class, fn (): ContextSummarizer => match (config('work_context.summarizer')) {
-            'gemini' => new GeminiContextSummarizer([
-                ...config('alerts.judges.gemini'),
-                'fallback_model' => config('alerts.judges.gemini.judge_model'),
-                'timeout' => config('work_context.timeout'),
-            ]),
-            'fake' => new FakeContextSummarizer,
+        $this->app->bind(ContextSummarizer::class, fn (): ContextSummarizer => match (true) {
+            $this->usesTextModel(config('work_context.summarizer')) => new LlmContextSummarizer($this->textModel('capable', (int) config('work_context.timeout'))),
+            config('work_context.summarizer') === 'fake' => new FakeContextSummarizer,
             default => throw new InvalidArgumentException('Unsupported work context summarizer ['.config('work_context.summarizer').'].'),
         });
 
@@ -142,21 +141,21 @@ class AppServiceProvider extends ServiceProvider
             default => throw new InvalidArgumentException('Unsupported voice provider ['.config('voice.default').'].'),
         });
 
-        $this->app->bind(NoteTaker::class, fn (): NoteTaker => match (config('wingman.notes.taker')) {
-            'gemini' => new GeminiNoteTaker([...config('alerts.judges.gemini'), 'model' => config('wingman.notes.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
-            'fake' => new FakeNoteTaker,
+        $this->app->bind(NoteTaker::class, fn (): NoteTaker => match (true) {
+            $this->usesTextModel(config('wingman.notes.taker')) => new LlmNoteTaker($this->textModel('capable', model: config('wingman.notes.model'))),
+            config('wingman.notes.taker') === 'fake' => new FakeNoteTaker,
             default => throw new InvalidArgumentException('Unsupported Wingman note-taker ['.config('wingman.notes.taker').'].'),
         });
 
-        $this->app->bind(Detector::class, fn (): Detector => match (config('wingman.agent.detector')) {
-            'gemini' => new GeminiDetector([...config('alerts.judges.gemini'), 'model' => config('wingman.agent.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
-            'fake' => new FakeDetector,
+        $this->app->bind(Detector::class, fn (): Detector => match (true) {
+            $this->usesTextModel(config('wingman.agent.detector')) => new LlmDetector($this->textModel('capable', model: config('wingman.agent.model'))),
+            config('wingman.agent.detector') === 'fake' => new FakeDetector,
             default => throw new InvalidArgumentException('Unsupported Wingman detector ['.config('wingman.agent.detector').'].'),
         });
 
-        $this->app->bind(FollowUpPlanner::class, fn (): FollowUpPlanner => match (config('wingman.follow_ups.planner')) {
-            'gemini' => new GeminiFollowUpPlanner([...config('alerts.judges.gemini'), 'model' => config('wingman.follow_ups.model'), 'fallback_model' => config('alerts.judges.gemini.judge_model')]),
-            'fake' => new FakeFollowUpPlanner,
+        $this->app->bind(FollowUpPlanner::class, fn (): FollowUpPlanner => match (true) {
+            $this->usesTextModel(config('wingman.follow_ups.planner')) => new LlmFollowUpPlanner($this->textModel('capable', model: config('wingman.follow_ups.model'))),
+            config('wingman.follow_ups.planner') === 'fake' => new FakeFollowUpPlanner,
             default => throw new InvalidArgumentException('Unsupported Wingman follow-up planner ['.config('wingman.follow_ups.planner').'].'),
         });
 
@@ -164,15 +163,47 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Gemini settings for the calls made on every new message: the light model.
-     *
-     * @return array<string, mixed>
+     * "gemini" remains an alias of the real model, so an existing env still works.
+     * Which HTTP provider answers is AI_TEXT_PROVIDER, not this driver.
      */
-    private static function lightGemini(): array
+    private function usesTextModel(mixed $driver): bool
     {
-        $config = config('alerts.judges.gemini');
+        return in_array($driver, ['llm', 'gemini'], true);
+    }
 
-        return [...$config, 'model' => $config['judge_model']];
+    /**
+     * The light model answers every new message. The capable one thinks a proposal through.
+     */
+    private function textModel(string $tier, ?int $timeout = null, ?string $model = null): TextModel
+    {
+        $provider = config('ai.text');
+        $config = config("ai.providers.{$provider}");
+
+        if (! is_array($config)) {
+            throw new InvalidArgumentException("Unsupported text provider [{$provider}].");
+        }
+
+        $options = [
+            'api_key' => $config['api_key'],
+            'base_url' => $config['base_url'],
+            'model' => filled($model) ? $model : ($tier === 'light' ? $config['light_model'] : $config['model']),
+            'fallback_model' => $config['fallback_model'],
+            'timeout' => $timeout ?? $config['timeout'],
+        ];
+
+        if ($provider === 'deepseek') {
+            return new DeepSeekTextModel([
+                ...$options,
+                'max_tokens' => $tier === 'light' ? $config['light_max_tokens'] : $config['max_tokens'],
+                'thinking' => $tier === 'light' ? 'disabled' : $config['thinking'],
+            ]);
+        }
+
+        if ($provider === 'gemini') {
+            return new GeminiTextModel([...$options, 'thinking_level' => $config['thinking_level']]);
+        }
+
+        throw new InvalidArgumentException("Unsupported text provider [{$provider}].");
     }
 
     /**

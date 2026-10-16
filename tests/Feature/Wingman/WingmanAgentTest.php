@@ -23,15 +23,14 @@ use App\Models\WingmanSegment;
 use App\Wingman\Copilot\Detector;
 use App\Wingman\Copilot\FakeDetector;
 use App\Wingman\Copilot\Finding;
-use App\Wingman\Copilot\GeminiDetector;
+use App\Wingman\Copilot\LlmDetector;
 use App\Wingman\Copilot\WingmanAgent;
 use App\Wingman\ExtensionTokens;
 use App\Wingman\MeetingStatus;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\RecordingTextModel;
 
 beforeEach(function () {
     // A Wednesday morning in Madrid.
@@ -181,22 +180,22 @@ test('lines from the extension have the call read every little while', function 
     Queue::assertNotPushed(WatchWingmanCall::class);
 });
 
-test('gemini reads the new lines with what came before and what was already brought', function () {
-    Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['findings' => [
+test('the detector reads the new lines with what came before and what was already brought', function () {
+    $model = new RecordingTextModel(['findings' => [
         ['kind' => 'issue', 'quote' => '¿Cómo va CPD-412?', 'confidence' => 0.9, 'importance' => 'normal', 'query' => 'CPD-412'],
         ['kind' => 'nonsense', 'quote' => 'x', 'confidence' => 1, 'importance' => 'normal'],
-    ]])]]]]]])]);
+    ]]);
     $this->meeting->insights()->create(['kind' => 'page', 'title' => 'Plan de lanzamiento: prepago', 'dedupe_key' => 'page:x']);
-    $detector = new GeminiDetector(['api_key' => 'k', 'base_url' => 'https://generativelanguage.googleapis.com', 'model' => 'm', 'thinking_level' => null, 'timeout' => 5]);
+    $detector = new LlmDetector($model);
 
     $findings = $detector->detect($this->meeting, [['at' => '09:58', 'speaker' => 'Tú', 'is_me' => true, 'text' => 'Hola']], [['at' => '10:00', 'speaker' => 'Marta Ruiz', 'is_me' => false, 'text' => '¿Cómo va CPD-412?']], ['Plan de lanzamiento: prepago']);
 
     expect($findings)->toHaveCount(1)
         ->and($findings[0]->kind)->toBe('issue')
-        ->and($findings[0]->details)->toBe(['query' => 'CPD-412']);
-    Http::assertSent(fn (Request $request) => str_contains($request['contents'][0]['parts'][0]['text'], "Líneas NUEVAS:\n[10:00] Marta Ruiz: ¿Cómo va CPD-412?")
-        && str_contains($request['contents'][0]['parts'][0]['text'], 'Ya aportado en esta reunión:')
-        && str_contains($request['systemInstruction']['parts'][0]['text'], '«Tú» en las líneas es John León'));
+        ->and($findings[0]->details)->toBe(['query' => 'CPD-412'])
+        ->and($model->calls[0]['user'])->toContain("Líneas NUEVAS:\n[10:00] Marta Ruiz: ¿Cómo va CPD-412?")
+        ->and($model->calls[0]['user'])->toContain('Ya aportado en esta reunión:')
+        ->and($model->calls[0]['system'])->toContain('«Tú» en las líneas es John León');
 });
 
 test('cards can be rated and dropped, only by their owner, and dropped ones leave the bubble', function () {
@@ -232,17 +231,16 @@ test('said in passing still finds it: a bare issue number, and a page name that 
 });
 
 test('a promised message without its text has it written apart; without one, it stays as a reminder', function () {
-    Http::fake([
-        '*' => Http::sequence()
-            ->push(['candidates' => [['content' => ['parts' => [['text' => json_encode(['findings' => [['kind' => 'message', 'quote' => 'Le escribo a Marta', 'confidence' => 0.9, 'importance' => 'high', 'to' => 'Marta']]])]]]]]])
-            ->push(['candidates' => [['content' => ['parts' => [['text' => json_encode(['about' => 'el alcance', 'draft' => 'Hola Marta, te resumo el alcance.'])]]]]]]),
+    $model = new RecordingTextModel([
+        ['findings' => [['kind' => 'message', 'quote' => 'Le escribo a Marta', 'confidence' => 0.9, 'importance' => 'high', 'to' => 'Marta']]],
+        ['about' => 'el alcance', 'draft' => 'Hola Marta, te resumo el alcance.'],
     ]);
-    $detector = new GeminiDetector(['api_key' => 'k', 'base_url' => 'https://generativelanguage.googleapis.com', 'model' => 'm', 'thinking_level' => null, 'timeout' => 5]);
+    $detector = new LlmDetector($model);
 
     [$finding] = $detector->detect($this->meeting, [], [['at' => '10:00', 'speaker' => 'Tú', 'is_me' => true, 'text' => 'Le escribo a Marta']], []);
 
     expect($finding->details)->toMatchArray(['to' => 'Marta', 'about' => 'el alcance', 'draft' => 'Hola Marta, te resumo el alcance.']);
-    Http::assertSentCount(2);
+    expect($model->calls)->toHaveCount(2);
 
     $this->app->instance(Detector::class, new class implements Detector
     {

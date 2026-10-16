@@ -43,10 +43,11 @@ return [
     | Task assessor
     |--------------------------------------------------------------------------
     |
-    | Decides urgency, length and kind of each task. Supported: "gemini", "fake"
+    | Decides urgency, length and kind of each task.
+    | Supported: "llm", "fake". "gemini" is an alias of "llm".
     |
     */
 
-    'assessor' => env('AGENDA_ASSESSOR', 'gemini'),
+    'assessor' => env('AGENDA_ASSESSOR', 'llm'),
 
 ];

@@ -2,7 +2,7 @@
 
 namespace App\Scheduling\Assessors;
 
-use App\Alerts\Judges\CallsGemini;
+use App\Ai\TextModel;
 use App\Models\User;
 use App\Scheduling\SchedulingRequest;
 use App\Scheduling\TaskAssessment;
@@ -14,58 +14,33 @@ use RuntimeException;
 use Throwable;
 
 /**
- * The scheduler's judgement on Gemini, with structured output.
- *
- * @see https://ai.google.dev/gemini-api/docs/structured-output
+ * The scheduler's judgement, with structured output.
  */
-class GeminiTaskAssessor implements TaskAssessor
+class LlmTaskAssessor implements TaskAssessor
 {
-    use CallsGemini;
-
-    /**
-     * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, thinking_level: ?string, timeout: int}  $config
-     */
-    public function __construct(private array $config) {}
+    public function __construct(private TextModel $model) {}
 
     public function assess(User $user, SchedulingRequest $request, CarbonImmutable $now, ?string $workContext, array $calendarLoad): TaskAssessment
     {
-        if (blank($this->config['api_key'])) {
-            throw new RuntimeException('GEMINI_API_KEY is not set.');
-        }
+        $answer = $this->model->json($this->instructions($user), $this->describe($request, $now, $workContext, $calendarLoad), [
+            'type' => 'OBJECT',
+            'properties' => [
+                'title' => ['type' => 'STRING'],
+                'urgency' => ['type' => 'STRING', 'enum' => array_column(Urgency::cases(), 'value')],
+                'reason' => ['type' => 'STRING'],
+                'duration_minutes' => ['type' => 'INTEGER'],
+                'kind' => ['type' => 'STRING', 'enum' => ['task', 'meeting']],
+                'deadline' => ['type' => 'STRING'],
+                'people' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
+                'description' => ['type' => 'STRING'],
+            ],
+            'required' => ['title', 'urgency', 'reason', 'duration_minutes', 'kind', 'deadline', 'people', 'description'],
+        ], 0.2);
 
-        $response = $this->generate([
-            'systemInstruction' => ['parts' => [['text' => $this->instructions($user)]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $this->describe($request, $now, $workContext, $calendarLoad)]]]],
-            'generationConfig' => array_filter([
-                'temperature' => 0.2,
-                'responseMimeType' => 'application/json',
-                'responseSchema' => [
-                    'type' => 'OBJECT',
-                    'properties' => [
-                        'title' => ['type' => 'STRING'],
-                        'urgency' => ['type' => 'STRING', 'enum' => array_column(Urgency::cases(), 'value')],
-                        'reason' => ['type' => 'STRING'],
-                        'duration_minutes' => ['type' => 'INTEGER'],
-                        'kind' => ['type' => 'STRING', 'enum' => ['task', 'meeting']],
-                        'deadline' => ['type' => 'STRING'],
-                        'people' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
-                        'description' => ['type' => 'STRING'],
-                    ],
-                    'required' => ['title', 'urgency', 'reason', 'duration_minutes', 'kind', 'deadline', 'people', 'description'],
-                ],
-                'thinkingConfig' => $this->config['thinking_level'] ? ['thinkingLevel' => $this->config['thinking_level']] : null,
-            ]),
-        ]);
-
-        if ($response->failed()) {
-            throw new RuntimeException("Gemini task assessment failed with HTTP {$response->status()}: {$response->json('error.message')}");
-        }
-
-        $answer = json_decode((string) collect($response->json('candidates.0.content.parts', []))->last()['text'] ?? '', true);
-        $urgency = is_array($answer) ? Urgency::tryFrom((string) ($answer['urgency'] ?? '')) : null;
+        $urgency = Urgency::tryFrom((string) ($answer['urgency'] ?? ''));
 
         if ($urgency === null || blank($answer['title'] ?? null)) {
-            throw new RuntimeException('Gemini task assessment returned an unexpected answer.');
+            throw new RuntimeException('Task assessment returned an unexpected answer.');
         }
 
         $deadline = null;

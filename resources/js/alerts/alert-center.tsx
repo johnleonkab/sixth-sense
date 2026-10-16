@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
@@ -251,7 +251,7 @@ type AlertCenterProps = {
  * waits for the person's answer rings. The button keeps count of what is
  * still pending and opens the list with where each one stands.
  */
-export default function AlertCenter({ pending: initial = [], onOpen, onHistory, onArrive, onTellMe, listening = false }: AlertCenterProps) {
+export default function AlertCenter({ pending: initial = [], onOpen, onHistory, onArrive, onTellMe, listening = false, embedInHeader = false }: AlertCenterProps & { embedInHeader?: boolean }) {
     const feed = useAlertFeed({
         initial,
         onArrive: (alert) => alert.state === 'meeting' && onArrive?.(alert),
@@ -288,81 +288,167 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
         return () => window.removeEventListener('keydown', onKey);
     }, [open]);
 
+    useEffect(() => {
+        if (!open || window.matchMedia('(min-width: 768px)').matches) {
+            return;
+        }
+
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previous;
+        };
+    }, [open]);
+
+    const inbox = (
+        <>
+            {waiting.length > 0 && (
+                <section aria-label="Pendientes de responder">
+                    <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
+                    <ol>
+                        {waiting.map((item, index) => (
+                            <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
+                        ))}
+                    </ol>
+                </section>
+            )}
+
+            <section aria-label="Entrantes">
+                <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
+                {recent.length === 0 ? (
+                    <p className="px-2.5 pb-3 text-[13px] text-faint">Nada nuevo en las últimas 48 horas.</p>
+                ) : (
+                    <ol>
+                        {recent.map((item, index) => (
+                            <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={(waiting.length + index) * 35} />
+                        ))}
+                    </ol>
+                )}
+            </section>
+
+            {onHistory && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setOpen(false);
+                        onHistory();
+                    }}
+                    className="mt-1 min-h-11 w-full rounded-[10px] border-t border-line px-2.5 py-2.5 text-center text-[12.5px] text-accent hover:bg-soft"
+                >
+                    Ver todo el historial
+                </button>
+            )}
+        </>
+    );
+
+    const toasts = feed.fresh.map((item) => (
+        <div key={item.id} className="w-full">
+            <IncomingToast
+                alert={item}
+                onOpen={openAlert}
+                onClose={() => feed.dismissFresh(item.id)}
+                onDismiss={dismissAlert}
+                onTellMe={onTellMe}
+                listening={listening}
+            />
+        </div>
+    ));
+
+    const cluster = embedInHeader
+        ? 'max-md:contents md:fixed md:top-[60px] md:right-4 md:z-50 md:flex md:w-[min(380px,calc(100vw-32px))] md:flex-col md:items-end md:gap-2'
+        : 'fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2';
+
     return (
-        <div className="fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2">
-            <div className="flex items-start gap-2">
-                {/* Wingman's bubble, beside the alerts, only while in a call. */}
-                <WingmanBubble />
+        <div className={cluster}>
+            <div className={`flex items-start gap-2 ${embedInHeader ? 'max-md:contents' : ''}`}>
+                <div className={embedInHeader ? 'max-md:fixed max-md:top-[calc(env(safe-area-inset-top)+3.25rem)] max-md:right-4 max-md:z-40' : ''}>
+                    <WingmanBubble />
+                </div>
 
                 <button
                     type="button"
                     aria-expanded={open}
                     aria-label={`Avisos: ${waiting.length} pendientes`}
                     onClick={() => setOpen(!open)}
-                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
+                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${embedInHeader ? 'max-md:size-11 max-md:justify-center max-md:px-0 max-md:py-0' : ''} ${open ? 'border-accent/50' : 'border-line'}`}
                 >
                     <span
                         title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
                         className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
                     />
-                    {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
-                    {working && <span className="text-muted">· analizando</span>}
+                    <span className={embedInHeader ? 'max-md:sr-only' : ''}>
+                        {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
+                        {working && <span className="text-muted"> · analizando</span>}
+                    </span>
                 </button>
             </div>
 
-            {open ? (
-                <div className="alerts-panel-in max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card">
-                    {waiting.length > 0 && (
-                        <section aria-label="Pendientes de responder">
-                            <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
-                            <ol>
-                                {waiting.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
-                                ))}
-                            </ol>
-                        </section>
-                    )}
-
-                    <section aria-label="Entrantes">
-                        <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
-                        {recent.length === 0 ? (
-                            <p className="px-2.5 pb-3 text-[13px] text-faint">Nada nuevo en las últimas 48 horas.</p>
-                        ) : (
-                            <ol>
-                                {recent.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={(waiting.length + index) * 35} />
-                                ))}
-                            </ol>
-                        )}
-                    </section>
-
-                    {onHistory && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setOpen(false);
-                                onHistory();
-                            }}
-                            className="mt-1 w-full rounded-[10px] border-t border-line px-2.5 py-2.5 text-center text-[12.5px] text-accent hover:bg-soft"
-                        >
-                            Ver todo el historial
-                        </button>
-                    )}
+            {open && (
+                <div className="alerts-panel-in hidden max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card md:block">
+                    {inbox}
                 </div>
-            ) : (
-                feed.fresh.map((item) => (
-                    <div key={item.id} className="w-full">
-                        <IncomingToast
-                            alert={item}
-                            onOpen={openAlert}
-                            onClose={() => feed.dismissFresh(item.id)}
-                            onDismiss={dismissAlert}
-                            onTellMe={onTellMe}
-                            listening={listening}
-                        />
-                    </div>
-                ))
             )}
+
+            {open && <AlertSheet onClose={() => setOpen(false)}>{inbox}</AlertSheet>}
+
+            {!open && (
+                <div
+                    className={
+                        embedInHeader
+                            ? 'flex w-full flex-col items-end gap-2 max-md:fixed max-md:inset-x-4 max-md:bottom-[calc(var(--voice-dock-height,9rem)+var(--keyboard-lift,0px)+0.75rem)] max-md:z-40 max-md:w-auto'
+                            : 'flex w-full flex-col items-end gap-2'
+                    }
+                >
+                    {toasts}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** The alert list on a phone: a sheet from the bottom, closed by the backdrop or a downward drag. */
+function AlertSheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+    const startY = useRef<number | null>(null);
+    const [drag, setDrag] = useState(0);
+
+    return (
+        <div className="fixed inset-0 z-50 md:hidden">
+            <button type="button" aria-label="Cerrar avisos" className="absolute inset-0 bg-ink/40" onClick={onClose} />
+            <div
+                className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card"
+                style={{ transform: drag > 0 ? `translateY(${drag}px)` : undefined }}
+            >
+                <div
+                    className="flex shrink-0 justify-center py-3"
+                    onPointerDown={(event) => {
+                        startY.current = event.clientY;
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                        if (startY.current === null) {
+                            return;
+                        }
+
+                        setDrag(Math.max(0, event.clientY - startY.current));
+                    }}
+                    onPointerUp={() => {
+                        if (drag > 72) {
+                            onClose();
+                        }
+
+                        startY.current = null;
+                        setDrag(0);
+                    }}
+                    onPointerCancel={() => {
+                        startY.current = null;
+                        setDrag(0);
+                    }}
+                >
+                    <span aria-hidden className="h-1 w-10 rounded-full bg-line" />
+                </div>
+                <div className="min-h-0 overflow-auto p-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{children}</div>
+            </div>
         </div>
     );
 }
