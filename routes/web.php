@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\PendingActionController;
+use App\Http\Controllers\PwaController;
 use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
@@ -22,6 +23,9 @@ use App\Http\Controllers\Wingman\InsightController;
 use App\Http\Controllers\Wingman\LiveController;
 use App\Http\Controllers\Wingman\MeetingController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('site.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
+Route::get('sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.worker');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');

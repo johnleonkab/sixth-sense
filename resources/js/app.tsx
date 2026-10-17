@@ -9,6 +9,10 @@ const appName = import.meta.env.VITE_APP_NAME || 'sixth-sense';
  * After a rebuild or deploy, an open tab may ask for lazy chunks that no longer
  * exist. Reload once to pick up the new build instead of failing.
  */
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+}
+
 window.addEventListener('vite:preloadError', () => {
     const key = 'reloaded-for-new-build-at';
     const lastReload = Number(sessionStorage.getItem(key) ?? 0);
