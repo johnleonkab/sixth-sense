@@ -65,6 +65,29 @@ test('a capable call keeps a little thinking on', function () {
         && $request['reasoning_effort'] === 'low');
 });
 
+test('json wrapped in prose is still read', function () {
+    Http::fake([
+        'https://api.deepseek.com/chat/completions' => Http::response(['choices' => [['message' => ['content' => "Aquí va:\n{\"ok\":true}\nlisto"]]]]),
+    ]);
+
+    expect(deepSeekModel()->json('Decide.', 'El email.', ['type' => 'OBJECT']))->toBe(['ok' => true]);
+    Http::assertSentCount(1);
+});
+
+test('a broken json answer is asked again without thinking', function () {
+    Http::fake([
+        'https://api.deepseek.com/chat/completions' => Http::sequence()
+            ->push(['choices' => [['finish_reason' => 'length', 'message' => ['content' => '{"ok":']]]])
+            ->push(['choices' => [['message' => ['content' => '{"ok":true}']]]]),
+    ]);
+
+    expect(deepSeekModel()->json('Decide.', 'El email.', ['type' => 'OBJECT']))->toBe(['ok' => true]);
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request) => $request['thinking'] === ['type' => 'disabled']
+        && $request['reasoning_effort'] === 'none');
+});
+
 test('an empty json body is asked for once more', function () {
     Http::fake([
         'https://api.deepseek.com/chat/completions' => Http::sequence()

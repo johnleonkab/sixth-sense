@@ -40,18 +40,34 @@ class DeepSeekTextModel implements TextModel
         ];
 
         [$response, $model] = $this->post($body);
-        $content = $this->content($response);
-
-        if ($content === '' && $response->successful()) {
-            $response = $this->request($model, $body);
-            $content = $this->content($response);
-        }
 
         if ($response->failed()) {
             throw new RuntimeException("Text model failed with HTTP {$response->status()}: ".($response->json('error.message') ?? ''));
         }
 
-        return $this->decode($content);
+        $answer = $this->object($response);
+
+        // Thinking spends the token budget before the json. One more try, with
+        // that budget left for the answer itself.
+        if ($answer === null) {
+            $response = $this->request($model, [...$body, ...$this->thinking(false)]);
+
+            if ($response->failed()) {
+                throw new RuntimeException("Text model failed with HTTP {$response->status()}: ".($response->json('error.message') ?? ''));
+            }
+
+            $answer = $this->object($response);
+        }
+
+        if ($answer === null) {
+            $cutOff = $response->json('choices.0.finish_reason') === 'length';
+
+            throw new RuntimeException($cutOff
+                ? 'Text model returned an unexpected answer: it was cut off.'
+                : 'Text model returned an unexpected answer.');
+        }
+
+        return $answer;
     }
 
     /**
@@ -84,9 +100,9 @@ class DeepSeekTextModel implements TextModel
      *
      * @return array<string, mixed>
      */
-    private function thinking(): array
+    private function thinking(bool $enabled = true): array
     {
-        if (($this->config['thinking'] ?? 'disabled') === 'disabled') {
+        if (! $enabled || ($this->config['thinking'] ?? 'disabled') === 'disabled') {
             return [
                 'thinking' => ['type' => 'disabled'],
                 'reasoning_effort' => 'none',
@@ -143,20 +159,40 @@ class DeepSeekTextModel implements TextModel
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    private function decode(string $content): array
+    private function object(Response $response): ?array
     {
+        $content = $this->content($response);
+
         if (preg_match('/```(?:json)?\s*(.*?)```/s', $content, $fenced) === 1) {
             $content = trim($fenced[1]);
         }
 
-        $answer = json_decode($content, true);
+        foreach ([$content, $this->sliceObject($content)] as $candidate) {
+            if (! is_string($candidate) || $candidate === '') {
+                continue;
+            }
 
-        if (! is_array($answer)) {
-            throw new RuntimeException('Text model returned an unexpected answer.');
+            $answer = json_decode($candidate, true);
+
+            if (is_array($answer)) {
+                return $answer;
+            }
         }
 
-        return $answer;
+        return null;
+    }
+
+    private function sliceObject(string $content): ?string
+    {
+        $start = strpos($content, '{');
+        $end = strrpos($content, '}');
+
+        if ($start === false || $end === false || $end <= $start) {
+            return null;
+        }
+
+        return substr($content, $start, $end - $start + 1);
     }
 }

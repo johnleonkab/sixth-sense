@@ -28,7 +28,9 @@ return [
             'fallback_model' => env('DEEPSEEK_FALLBACK_MODEL', 'deepseek-flash'),
             'timeout' => (int) env('DEEPSEEK_TIMEOUT', 30),
             'light_max_tokens' => 1024,
-            'max_tokens' => 4096,
+            // Includes the thinking tokens. The digest is asked again without
+            // thinking when this budget cuts the json off.
+            'max_tokens' => 8192,
             // Capable calls only. The light model always disables thinking.
             'thinking' => 'low',
         ],
