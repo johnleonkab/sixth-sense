@@ -12,6 +12,7 @@ enum Provider: string
     case Slack = 'slack';
     case Atlassian = 'atlassian';
     case Notion = 'notion';
+    case GitHub = 'github';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum Provider: string
             self::Slack => 'Slack',
             self::Atlassian => 'Atlassian',
             self::Notion => 'Notion',
+            self::GitHub => 'GitHub',
         };
     }
 
@@ -35,6 +37,7 @@ enum Provider: string
             self::Slack => ['Canales', 'Mensajes directos', 'Archivos'],
             self::Atlassian => ['Jira', 'Comentarios', 'Avisos de menciones'],
             self::Notion => ['Páginas', 'Comentarios', 'Enlaces'],
+            self::GitHub => ['Repositorios', 'Código'],
         };
     }
 
@@ -43,7 +46,7 @@ enum Provider: string
      */
     public function isConnectable(): bool
     {
-        return in_array($this, [self::Google, self::Slack, self::Notion, self::Atlassian], true);
+        return in_array($this, [self::Google, self::Slack, self::Notion, self::Atlassian, self::GitHub], true);
     }
 
     /**

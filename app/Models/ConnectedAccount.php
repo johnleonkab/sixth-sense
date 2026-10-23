@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * An external account (Google, Slack…) a user has authorised. A user can
@@ -68,6 +69,16 @@ class ConnectedAccount extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Repositories seen through a GitHub account, and what the person allows on each.
+     *
+     * @return HasMany<GithubRepository, $this>
+     */
+    public function githubRepositories(): HasMany
+    {
+        return $this->hasMany(GithubRepository::class)->orderBy('full_name');
     }
 
     /**

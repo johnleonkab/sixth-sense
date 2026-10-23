@@ -30,9 +30,26 @@ type ActionBarProps = {
     verb?: string;
     /** "Se aplicará", "Se enviará"… before the countdown. */
     countdownLabel?: string;
+    /** Replaces "Sí, {verb}" when the screen saves something the person edited. */
+    confirmLabel?: string;
+    /** Runs instead of the plain confirm, for example after editing the proposal. */
+    onConfirm?: () => void;
+    busy?: boolean;
+    /** Replaces "o di «sí» / «cancela»". */
+    hint?: string;
 };
 
-export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Docs', verb = 'aplicar', countdownLabel }: ActionBarProps) {
+export default function ActionBar({
+    initial,
+    doneLabel,
+    linkLabel = 'Abrir en Docs',
+    verb = 'aplicar',
+    countdownLabel,
+    confirmLabel,
+    onConfirm,
+    busy = false,
+    hint = 'o di «sí» / «cancela»',
+}: ActionBarProps) {
     const { actions } = useCanvas();
     const action = actions.actions[initial.id] ?? initial;
     const secondsLeft = useSecondsLeft(action.status === 'confirmed' ? action.undo_until : null);
@@ -53,10 +70,11 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                 <div className={base}>
                     <button
                         type="button"
-                        onClick={() => void actions.confirm(action.id)}
-                        className={`rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90 ${thumb}`}
+                        disabled={busy}
+                        onClick={() => (onConfirm ? onConfirm() : void actions.confirm(action.id))}
+                        className={`rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90 disabled:opacity-40 ${thumb}`}
                     >
-                        Sí, {verb}
+                        {busy ? 'Guardando…' : (confirmLabel ?? `Sí, ${verb}`)}
                     </button>
                     <button
                         type="button"
@@ -65,7 +83,7 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                     >
                         Cancelar
                     </button>
-                    <span className="text-muted">o di «sí» / «cancela»</span>
+                    <span className="text-muted">{hint}</span>
                 </div>
             );
         case 'confirmed':

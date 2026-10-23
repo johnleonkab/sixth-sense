@@ -67,6 +67,82 @@ class NotionWiki implements Wiki
         return array_slice($found, 0, $limit);
     }
 
+    public function outline(User $user, array $widths): array
+    {
+        $widths = array_values(array_filter($widths, fn (int $width): bool => $width > 0));
+
+        if ($widths === []) {
+            return [];
+        }
+
+        $listed = [];
+
+        foreach ($user->accountsWith(Capability::NotionRead) as $account) {
+            try {
+                $results = $this->notion->post($account, 'search', [
+                    'filter' => ['property' => 'object', 'value' => 'page'],
+                    'sort' => ['direction' => 'descending', 'timestamp' => 'last_edited_time'],
+                    'page_size' => 50,
+                ])['results'] ?? [];
+            } catch (Throwable $exception) {
+                report($exception);
+
+                continue;
+            }
+
+            foreach ($results as $page) {
+                if ($page['in_trash'] ?? $page['archived'] ?? false) {
+                    continue;
+                }
+
+                $listed[] = ['account' => $account, 'page' => $page, 'summary' => $this->summary($account, $page)];
+            }
+        }
+
+        $known = [];
+
+        foreach ($listed as $item) {
+            $known[(string) $item['page']['id']] = true;
+        }
+
+        $roots = array_values(array_filter($listed, function (array $item) use ($known): bool {
+            $parent = $item['page']['parent']['type'] ?? 'workspace';
+
+            if ($parent === 'page_id') {
+                return ! isset($known[(string) ($item['page']['parent']['page_id'] ?? '')]);
+            }
+
+            return true;
+        }));
+
+        $outline = [];
+        $reads = 0;
+        $walk = function (array $items, int $depth) use (&$walk, &$outline, &$reads, $widths): void {
+            foreach (array_slice($items, 0, $widths[$depth]) as $item) {
+                $outline[] = ['page' => $item['summary'], 'depth' => $depth];
+
+                if (! isset($widths[$depth + 1]) || $reads >= 24) {
+                    continue;
+                }
+
+                $reads++;
+
+                try {
+                    $children = $this->childPages($item['account'], (string) ($item['id'] ?? $item['page']['id']), $item['summary']->title, $widths[$depth + 1]);
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    continue;
+                }
+
+                $walk($children, $depth + 1);
+            }
+        };
+        $walk($roots, 0);
+
+        return $outline;
+    }
+
     public function page(User $user, string $reference): ?WikiPage
     {
         [$account, $id] = $this->resolve($user, $reference, Capability::NotionRead);
@@ -294,6 +370,42 @@ class NotionWiki implements Wiki
         $hex = str_replace('-', '', strtolower($match[1]));
 
         return substr($hex, 0, 8).'-'.substr($hex, 8, 4).'-'.substr($hex, 12, 4).'-'.substr($hex, 16, 4).'-'.substr($hex, 20);
+    }
+
+    /**
+     * Child pages directly under this one, at most `$limit`.
+     *
+     * @return list<array{account: ConnectedAccount, id: string, summary: WikiPageSummary}>
+     */
+    private function childPages(ConnectedAccount $account, string $pageId, string $parentTitle, int $limit): array
+    {
+        $blocks = $this->notion->get($account, "blocks/{$pageId}/children", ['page_size' => 50])['results'] ?? [];
+        $children = [];
+
+        foreach ($blocks as $block) {
+            if (($block['type'] ?? null) !== 'child_page' || ! is_string($block['id'] ?? null)) {
+                continue;
+            }
+
+            $children[] = [
+                'account' => $account,
+                'id' => $block['id'],
+                'summary' => new WikiPageSummary(
+                    ref: "{$account->id}:{$block['id']}",
+                    title: is_string($block['child_page']['title'] ?? null) ? $block['child_page']['title'] : 'Sin título',
+                    icon: null,
+                    url: null,
+                    workspace: self::workspace($account),
+                    parentTitle: $parentTitle,
+                ),
+            ];
+
+            if (count($children) >= $limit) {
+                break;
+            }
+        }
+
+        return $children;
     }
 
     /**

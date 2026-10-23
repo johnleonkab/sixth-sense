@@ -7,6 +7,8 @@ export type ActionsStore = {
     actions: Record<number, ActionState>;
     track: (action: ActionState) => void;
     confirm: (id: number) => Promise<void>;
+    /** Save a markdown proposal as rewritten on screen, then confirm it. */
+    override: (id: number, contents: string) => Promise<void>;
     cancel: (id: number) => Promise<void>;
     undo: (id: number) => Promise<void>;
     /** The newest proposal still waiting for an answer. */
@@ -98,6 +100,14 @@ export function useActions({ onExecuted }: { onExecuted?: (action: ActionState) 
         actions,
         track: save,
         confirm: (id) => answer(id, 'confirm'),
+        override: async (id, contents) => {
+            const action = await postJson<ActionState>(`/actions/${id}/sense`, { contents });
+            save(action);
+
+            if (!isFinished(action.status)) {
+                void poll(id);
+            }
+        },
         cancel: (id) => answer(id, 'cancel'),
         undo: (id) => answer(id, 'undo'),
         awaitingAnswer: () => newest((action) => action.status === 'pending' && Date.parse(action.expires_at) > Date.now()),

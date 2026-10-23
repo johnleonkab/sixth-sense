@@ -24,6 +24,7 @@ import SlackConversation from '@/canvas/slack/slack-conversation';
 import SlackDraft from '@/canvas/slack/slack-draft';
 import SlackResults from '@/canvas/slack/slack-results';
 import WingmanDoc from '@/canvas/wingman/wingman-doc';
+import SenseFile from '@/canvas/sense/sense-file';
 import SlackUnread from '@/canvas/slack/slack-unread';
 import MailMessage from '@/canvas/mail/mail-message';
 import MailResults from '@/canvas/mail/mail-results';
@@ -63,6 +64,7 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'notion.page': NotionPage,
     'notion.new': NotionNew,
     'wingman.doc': WingmanDoc,
+    'sense.file': SenseFile,
 };
 
 export function Canvas({ directive, index }: { directive: CanvasDirective; index: number }) {

@@ -44,6 +44,7 @@ final readonly class AssistantProfile
                 $instructions,
                 $chats ? self::familiarChats($chats->familiar($user)) : '',
                 self::workContext($user),
+                self::sense($user),
                 $issues ? self::jiraRules($issues->rules($user)) : '',
             ]))),
             tools: $toolbox?->declarations() ?? [],
@@ -110,5 +111,35 @@ final readonly class AssistantProfile
         }
 
         return WorkDigest::fromArray($context->digest ?? ['summary' => $context->summary])->forAssistant($context->generated_at);
+    }
+
+    /**
+     * The work archive and the agents copied from it, so the assistant can
+     * hand a turn to one of them instead of reading GitHub.
+     */
+    private static function sense(User $user): string
+    {
+        $repository = $user->workRepository();
+        $agents = $user->senseAgents()->orderBy('name')->get();
+
+        if ($repository === null && $agents->isEmpty()) {
+            return '';
+        }
+
+        $lines = [];
+
+        if ($repository !== null) {
+            $lines[] = "Archivo de trabajo en GitHub ({$repository->full_name}). Para ver qué hay: list_sense_files. Para leer un archivo: read_sense_file. Para crearlo o cambiarlo: propose_sense_file. Para borrarlo: propose_sense_delete. Nada se escribe hasta que la persona diga que sí. Un documento con tipo obedece types/{tipo}.yml: where, name y required.";
+        }
+
+        if ($agents->isNotEmpty()) {
+            $lines[] = 'Agentes del archivo. Si el tema encaja con uno, llama a focus_sense_agent con su slug antes de responder y sigue las instrucciones que devuelva. Con slug vacío vuelves al asistente general. Después de crear o cambiar un agente, llama a sync_sense_agents.';
+
+            foreach ($agents as $agent) {
+                $lines[] = "- {$agent->slug}: {$agent->name}. {$agent->purpose} Úsalo cuando: {$agent->cue}";
+            }
+        }
+
+        return implode("\n", $lines);
     }
 }

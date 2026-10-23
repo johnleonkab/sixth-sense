@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type Service = 'slack' | 'gmail' | 'calendar' | 'meet' | 'docs' | 'sheets' | 'drive' | 'google' | 'jira' | 'notion' | 'agenda' | 'wingman';
+export type Service = 'slack' | 'gmail' | 'calendar' | 'meet' | 'docs' | 'sheets' | 'drive' | 'google' | 'jira' | 'notion' | 'github' | 'agenda' | 'wingman';
 
 const labels: Record<Service, string> = {
     slack: 'Slack',
@@ -13,6 +13,7 @@ const labels: Record<Service, string> = {
     google: 'Google',
     jira: 'Jira',
     notion: 'Notion',
+    github: 'GitHub',
     agenda: 'Agendador',
     wingman: 'Wingman',
 };
@@ -97,6 +98,12 @@ const marks: Record<Service, ReactNode> = {
             <path d="M8.6 16.6V7.6l6.8 9V7.4" fill="none" stroke="#191919" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
         </>
     ),
+    github: (
+        <path
+            fill="currentColor"
+            d="M12 2C6.48 2 2 6.58 2 12.26c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.27 2.75 1.05a9.3 9.3 0 0 1 2.5.67 9.3 9.3 0 0 1 2.5-.67c1.91-1.32 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.38-.01 2.49-.01 2.83 0 .26.18.59.69.48A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2Z"
+        />
+    ),
     agenda: (
         <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
@@ -124,6 +131,7 @@ const prefixes: [string, Service][] = [
     ['jira', 'jira'],
     ['atlassian', 'jira'],
     ['notion', 'notion'],
+    ['github', 'github'],
     ['agenda', 'agenda'],
     ['agendador', 'agenda'],
     ['wingman', 'wingman'],
@@ -159,7 +167,7 @@ export default function ServiceIcon({ service, size = 16, className = '', label 
             role={name ? 'img' : undefined}
             aria-label={name}
             aria-hidden={name ? undefined : true}
-            className={`inline-block flex-none ${service === 'agenda' || service === 'wingman' ? 'text-accent' : ''} ${className}`}
+            className={`inline-block flex-none ${service === 'agenda' || service === 'wingman' ? 'text-accent' : ''} ${service === 'github' ? 'text-ink' : ''} ${className}`}
         >
             {name && <title>{name}</title>}
             {marks[service]}

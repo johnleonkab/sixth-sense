@@ -6,10 +6,12 @@ use App\Connections\AccountStatus;
 use App\Connections\AuthorizationCancelled;
 use App\Connections\AuthorizedAccount;
 use App\Connections\Authorizers\AtlassianAuthorizer;
+use App\Connections\Authorizers\GithubAuthorizer;
 use App\Connections\Authorizers\GoogleAuthorizer;
 use App\Connections\Authorizers\NotionAuthorizer;
 use App\Connections\Authorizers\SlackAuthorizer;
 use App\Connections\Provider;
+use App\Connectors\GitHub\GithubRepositories;
 use App\Http\Controllers\Controller;
 use App\Jobs\WarmChats;
 use App\Models\ConnectedAccount;
@@ -38,7 +40,7 @@ class AccountAuthorizationController extends Controller
     /**
      * Store the account the provider sends back.
      */
-    public function callback(Request $request, Provider $provider): RedirectResponse
+    public function callback(Request $request, Provider $provider, GithubRepositories $repositories): RedirectResponse
     {
         abort_unless($provider->isConnectable(), 404);
 
@@ -58,6 +60,14 @@ class AccountAuthorizationController extends Controller
             WarmChats::dispatch($user);
         }
 
+        if ($provider === Provider::GitHub) {
+            try {
+                $repositories->sync($account);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
         if ($account->missingScopes() !== []) {
             return $this->backWith($request, 'warning', "Cuenta {$account->email} conectada, pero sin todos los permisos. Vuelve a conectarla y acéptalos todos.");
         }
@@ -67,14 +77,14 @@ class AccountAuthorizationController extends Controller
             : "Cuenta {$account->email} actualizada.");
     }
 
-    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer|AtlassianAuthorizer
+    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer|AtlassianAuthorizer|GithubAuthorizer
     {
         return match ($provider) {
             Provider::Google => app(GoogleAuthorizer::class),
             Provider::Slack => app(SlackAuthorizer::class),
             Provider::Notion => app(NotionAuthorizer::class),
             Provider::Atlassian => app(AtlassianAuthorizer::class),
-            default => abort(404),
+            Provider::GitHub => app(GithubAuthorizer::class),
         };
     }
 

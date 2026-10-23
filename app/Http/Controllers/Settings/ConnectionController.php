@@ -7,6 +7,7 @@ use App\Connections\Capability;
 use App\Connections\Provider;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Models\GithubRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -22,7 +23,7 @@ class ConnectionController extends Controller
     public function index(Request $request): Response
     {
         /** @var Collection<string, Collection<int, ConnectedAccount>> $accounts */
-        $accounts = $request->user()->connectedAccounts()->oldest()->get()
+        $accounts = $request->user()->connectedAccounts()->with('githubRepositories')->oldest()->get()
             ->groupBy(fn (ConnectedAccount $account): string => $account->provider->value);
 
         return Inertia::render('settings/connections', [
@@ -35,7 +36,18 @@ class ConnectionController extends Controller
                     'id' => $account->id,
                     'name' => $account->name,
                     'email' => $account->email,
-                    'workspace' => $account->metadata['team_name'] ?? $account->metadata['workspace_name'] ?? $account->metadata['site_name'] ?? null,
+                    'workspace' => $account->metadata['team_name'] ?? $account->metadata['workspace_name'] ?? $account->metadata['site_name'] ?? $account->metadata['login'] ?? null,
+                    'repositories' => $provider === Provider::GitHub
+                        ? $account->githubRepositories->map(fn (GithubRepository $repository): array => [
+                            'id' => $repository->id,
+                            'full_name' => $repository->full_name,
+                            'private' => $repository->is_private,
+                            'can_push' => $repository->can_push,
+                            'included' => $repository->included,
+                            'writes_code' => $repository->writes_code,
+                            'is_work' => $repository->is_work,
+                        ])->values()->all()
+                        : null,
                     'has_rules' => $provider === Provider::Atlassian ? filled($account->rules) : null,
                     'avatar_url' => $account->avatar_url,
                     'status' => $account->status->value,

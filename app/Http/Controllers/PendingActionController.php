@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Actions;
 use App\Models\PendingAction;
+use App\Sense\OverrideFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +23,18 @@ class PendingActionController extends Controller
     public function confirm(Request $request, Actions $actions, int $action): JsonResponse
     {
         return response()->json($actions->confirm($this->find($request, $action))->toState());
+    }
+
+    /**
+     * The person rewrote a markdown proposal on screen and wants that text saved.
+     */
+    public function override(Request $request, OverrideFile $override, int $action): JsonResponse
+    {
+        $contents = $request->validate([
+            'contents' => ['required', 'string', 'max:100000'],
+        ])['contents'];
+
+        return response()->json($override->apply($this->find($request, $action), $contents)->toState());
     }
 
     public function cancel(Request $request, Actions $actions, int $action): JsonResponse

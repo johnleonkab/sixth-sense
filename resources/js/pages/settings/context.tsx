@@ -22,12 +22,17 @@ type WorkContext = {
     generated_at: string | null;
     /** On, built and recent enough: the assistant gets it in every conversation. */
     usable: boolean;
-    sources: { slack?: number; gmail?: number; docs?: number; notion?: number; failed?: string[] } | null;
+    sources: { slack?: number; gmail?: number; docs?: number; notion?: number; jira?: number; failed?: string[] } | null;
     digest: {
         summary: string;
         workstreams: Workstream[];
         people: { name: string; relation: string }[];
         open_loops: string[];
+        writing?: { slack: string; gmail: string };
+        contacts?: { name: string; language: string; where: string; note: string }[];
+        hot_files?: { title: string; why: string }[];
+        hot_pages?: { title: string; why: string }[];
+        jira?: string[];
     } | null;
 };
 
@@ -41,8 +46,9 @@ const statusDot: Record<WorkContext['status'], string> = {
 const sourceNames: [keyof NonNullable<WorkContext['sources']>, string, string][] = [
     ['slack', 'Slack', 'mensajes'],
     ['gmail', 'Gmail', 'emails'],
-    ['docs', 'Google Docs', 'documentos'],
+    ['docs', 'Drive', 'archivos'],
     ['notion', 'Notion', 'páginas'],
+    ['jira', 'Jira', 'issues'],
 ];
 
 const formatMoment = (iso: string) =>
@@ -167,6 +173,61 @@ function Digest({ digest, usable }: { digest: NonNullable<WorkContext['digest']>
                 </>
             )}
 
+            {(digest.writing?.slack || digest.writing?.gmail) && (
+                <>
+                    <h3 className="mt-6 mb-2 text-[13px] text-muted">Cómo escribes</h3>
+                    {digest.writing.slack && <p className="text-[13px]"><span className="text-faint">Slack. </span>{digest.writing.slack}</p>}
+                    {digest.writing.gmail && <p className="mt-1 text-[13px]"><span className="text-faint">Gmail. </span>{digest.writing.gmail}</p>}
+                </>
+            )}
+
+            {(digest.contacts?.length ?? 0) > 0 && (
+                <>
+                    <h3 className="mt-6 mb-2 text-[13px] text-muted">Contactos frecuentes</h3>
+                    <ul className="flex flex-wrap gap-1.5">
+                        {digest.contacts?.map((contact) => (
+                            <li key={contact.name} className="rounded-full bg-soft px-2.5 py-1 text-[12.5px]">
+                                {contact.name}
+                                {contact.language && <span className="text-muted"> · {contact.language}</span>}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
+            {(digest.hot_files?.length ?? 0) > 0 && (
+                <>
+                    <h3 className="mt-6 mb-2 text-[13px] text-muted">Archivos calientes</h3>
+                    <ul className="list-disc space-y-1 pl-5 text-[13px]">
+                        {digest.hot_files?.map((file) => (
+                            <li key={file.title}>{file.title}{file.why && <span className="text-muted"> · {file.why}</span>}</li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
+            {(digest.hot_pages?.length ?? 0) > 0 && (
+                <>
+                    <h3 className="mt-6 mb-2 text-[13px] text-muted">Páginas calientes</h3>
+                    <ul className="list-disc space-y-1 pl-5 text-[13px]">
+                        {digest.hot_pages?.map((page) => (
+                            <li key={page.title}>{page.title}{page.why && <span className="text-muted"> · {page.why}</span>}</li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
+            {(digest.jira?.length ?? 0) > 0 && (
+                <>
+                    <h3 className="mt-6 mb-2 text-[13px] text-muted">Jira</h3>
+                    <ul className="list-disc space-y-1 pl-5 text-[13px]">
+                        {digest.jira?.map((update) => (
+                            <li key={update}>{update}</li>
+                        ))}
+                    </ul>
+                </>
+            )}
+
             {digest.open_loops.length > 0 && (
                 <>
                     <h3 className="mt-6 mb-2 text-[13px] text-muted">Pendiente</h3>
@@ -200,7 +261,7 @@ export default function Context({ context, run_at: runAt }: { context: WorkConte
     return (
         <SettingsLayout
             title="Contexto"
-            description="Cada noche, sixth-sense repasa tu semana para que el asistente sepa en qué estás, por qué y con quién, sin que tengas que explicárselo."
+            description="Cada noche, sixth-sense repasa cómo escribes, con quién hablas y qué tienes caliente, para que el asistente no tenga que preguntártelo."
         >
             <div className="flex flex-col gap-4">
                 <section aria-labelledby="context-nightly" className="rounded-2xl border border-line bg-surface">
@@ -210,8 +271,7 @@ export default function Context({ context, run_at: runAt }: { context: WorkConte
                                 Contexto de trabajo
                             </h2>
                             <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
-                                Lee los últimos 5 días de Slack, 7 de Gmail y los documentos de Google Docs y Notion que se han creado, compartido o
-                                editado esta semana. Solo lectura: nunca cambia nada en tus servicios.
+                                Lee Slack y Gmail por conversación, cómo escribes en cada uno, el Drive de los últimos 30 días y Notion desde las páginas más altas. Jira entra con las reglas que escribiste. Si el archivo de trabajo está conectado, actualiza allí el ahora y los agentes que escriben y revisan.
                             </p>
                         </div>
 
