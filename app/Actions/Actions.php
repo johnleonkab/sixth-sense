@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Handlers\ChangeCalendar;
 use App\Actions\Handlers\ChangeJira;
+use App\Actions\Handlers\ChangeSense;
 use App\Actions\Handlers\ChangeWiki;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
@@ -48,6 +49,8 @@ class Actions
         'jira.unlink' => ChangeJira::class,
         'jira.comment' => ChangeJira::class,
         'agenda.schedule' => ScheduleAgendaTask::class,
+        'sense.write' => ChangeSense::class,
+        'sense.delete' => ChangeSense::class,
     ];
 
     public function __construct(private Container $container) {}

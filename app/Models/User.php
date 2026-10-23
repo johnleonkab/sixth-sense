@@ -118,6 +118,27 @@ class User extends Authenticatable
     }
 
     /**
+     * Agents copied from the work repository.
+     *
+     * @return HasMany<SenseAgent, $this>
+     */
+    public function senseAgents(): HasMany
+    {
+        return $this->hasMany(SenseAgent::class);
+    }
+
+    /**
+     * The one GitHub repository this person uses as their work archive.
+     */
+    public function workRepository(): ?GithubRepository
+    {
+        return GithubRepository::query()
+            ->where('is_work', true)
+            ->whereIn('connected_account_id', $this->connectedAccounts()->select('id'))
+            ->first();
+    }
+
+    /**
      * Alerts raised for this user, newest first.
      *
      * @return HasMany<InboxItem, $this>

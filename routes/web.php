@@ -11,8 +11,10 @@ use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
 use App\Http\Controllers\Settings\ConnectionController;
+use App\Http\Controllers\Settings\GithubRepositoryController;
 use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
+use App\Http\Controllers\Settings\SenseWorkspaceController;
 use App\Http\Controllers\Settings\SystemController;
 use App\Http\Controllers\Settings\WingmanController;
 use App\Http\Controllers\Settings\WorkContextController;
@@ -56,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('actions/{action}')->whereNumber('action')->name('actions.')->group(function () {
         Route::get('/', [PendingActionController::class, 'show'])->name('show');
         Route::post('confirm', [PendingActionController::class, 'confirm'])->name('confirm');
+        Route::post('sense', [PendingActionController::class, 'override'])->name('sense');
         Route::post('cancel', [PendingActionController::class, 'cancel'])->name('cancel');
         Route::post('undo', [PendingActionController::class, 'undo'])->name('undo');
     });
@@ -100,6 +103,24 @@ Route::middleware('auth')->group(function () {
         Route::put('connections/{account}/capabilities/{capability}', [AccountCapabilityController::class, 'update'])
             ->whereNumber('account')
             ->name('connections.capabilities.update');
+        Route::post('connections/{account}/repositories', [GithubRepositoryController::class, 'refresh'])
+            ->whereNumber('account')
+            ->name('connections.repositories.refresh');
+        Route::put('connections/{account}/repositories/{repository}', [GithubRepositoryController::class, 'update'])
+            ->whereNumber(['account', 'repository'])
+            ->name('connections.repositories.update');
+        Route::post('connections/{account}/sense', [SenseWorkspaceController::class, 'store'])
+            ->whereNumber('account')
+            ->name('connections.sense.store');
+        Route::post('connections/{account}/repositories/{repository}/sense', [SenseWorkspaceController::class, 'adopt'])
+            ->whereNumber(['account', 'repository'])
+            ->name('connections.sense.adopt');
+        Route::post('connections/{account}/repositories/{repository}/sense/fill', [SenseWorkspaceController::class, 'fill'])
+            ->whereNumber(['account', 'repository'])
+            ->name('connections.sense.fill');
+        Route::post('connections/{account}/repositories/{repository}/sense/sync', [SenseWorkspaceController::class, 'sync'])
+            ->whereNumber(['account', 'repository'])
+            ->name('connections.sense.sync');
         Route::get('connections/{account}/rules', [JiraRulesController::class, 'edit'])->whereNumber('account')->name('connections.rules.edit');
         Route::put('connections/{account}/rules', [JiraRulesController::class, 'update'])->whereNumber('account')->name('connections.rules.update');
         Route::get('connections/{provider}/redirect', [AccountAuthorizationController::class, 'redirect'])

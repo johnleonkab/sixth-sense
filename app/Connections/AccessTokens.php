@@ -3,13 +3,13 @@
 namespace App\Connections;
 
 use App\Connections\Google\GoogleTokens;
+use App\Connectors\GitHub\GithubTokens;
 use App\Connectors\Jira\AtlassianTokens;
 use App\Connectors\Notion\NotionTokens;
 use App\Connectors\Slack\SlackTokens;
 use App\Models\ConnectedAccount;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Cache;
-use InvalidArgumentException;
 
 /**
  * Hands out valid access tokens for connected accounts, refreshing them
@@ -124,7 +124,7 @@ class AccessTokens
             Provider::Slack => $this->container->make(SlackTokens::class),
             Provider::Notion => $this->container->make(NotionTokens::class),
             Provider::Atlassian => $this->container->make(AtlassianTokens::class),
-            default => throw new InvalidArgumentException("No token operations for [{$provider->value}]."),
+            Provider::GitHub => $this->container->make(GithubTokens::class),
         };
     }
 }

@@ -98,7 +98,17 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
     const actions = useActions({ onExecuted: (action) => ring(['mail.send', 'chat.send'].includes(action.type) ? 'sent' : 'done') });
 
     // For now each canvas replaces what was on screen; layouts with two come with the agent protocol.
+    const [agent, setAgent] = useState<string | null>(null);
+
     const show = (directive: CanvasDirective) => {
+        if (directive.view === 'sense.agent') {
+            const name = directive.props.name;
+
+            setAgent(typeof name === 'string' && name !== '' ? name : null);
+
+            return;
+        }
+
         if (directive.props.action) {
             actions.track(directive.props.action as ActionState);
         }
@@ -155,6 +165,12 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
         onUtterance: answer,
         screen: () => describeCanvases(onScreen.current.map((canvas) => canvas.directive)),
     });
+
+    useEffect(() => {
+        if (!voice.active) {
+            setAgent(null);
+        }
+    }, [voice.active]);
 
     // One thing opens at a time from the screen: further clicks wait for it, and it shows.
     const [opening, setOpening] = useState<string | null>(null);
@@ -254,7 +270,7 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                     )}
                 </main>
 
-                <VoiceDock voice={voice} />
+                <VoiceDock voice={voice} agent={agent} />
             </div>
         </>
     );

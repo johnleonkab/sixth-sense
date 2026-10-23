@@ -54,6 +54,7 @@ use App\Wingman\Copilot\LlmDetector;
 use App\Wingman\Notes\FakeNoteTaker;
 use App\Wingman\Notes\LlmNoteTaker;
 use App\Wingman\Notes\NoteTaker;
+use App\WorkContext\ActivityBrief;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
 use App\WorkContext\Summarizers\LlmContextSummarizer;
@@ -130,7 +131,11 @@ class AppServiceProvider extends ServiceProvider
 
         // A week of activity is a long read: the capable model, with more time.
         $this->app->bind(ContextSummarizer::class, fn (): ContextSummarizer => match (true) {
-            $this->usesTextModel(config('work_context.summarizer')) => new LlmContextSummarizer($this->textModel('capable', (int) config('work_context.timeout'))),
+            $this->usesTextModel(config('work_context.summarizer')) => new LlmContextSummarizer(
+                $this->textModel('capable', (int) config('work_context.timeout')),
+                $this->app->make(ActivityBrief::class),
+                $this->app->make(IssueTracker::class),
+            ),
             config('work_context.summarizer') === 'fake' => new FakeContextSummarizer,
             default => throw new InvalidArgumentException('Unsupported work context summarizer ['.config('work_context.summarizer').'].'),
         });

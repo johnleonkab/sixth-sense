@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\User;
 use App\Models\WorkContext;
+use App\Sense\PublishContext;
 use App\WorkContext\ContextSummarizer;
 use App\WorkContext\WorkActivityCollector;
 use App\WorkContext\WorkContextStatus;
@@ -16,9 +17,11 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Reads the person's recent activity (read only) and writes what they are
- * working on, for the voice assistant. When it fails, the previous context
- * is kept until it gets too old.
+ * Reads the person's recent activity and writes what they are working on,
+ * for the voice assistant. Slack, Gmail, Drive, Notion and Jira stay
+ * read-only. When the work archive allows code updates, the same digest
+ * refreshes now.md and the writing and review agents. When it fails, the
+ * previous context is kept until it gets too old.
  */
 class BuildWorkContext implements ShouldBeUnique, ShouldQueue
 {
@@ -37,7 +40,7 @@ class BuildWorkContext implements ShouldBeUnique, ShouldQueue
         return (string) $this->user->id;
     }
 
-    public function handle(WorkActivityCollector $collector, ContextSummarizer $summarizer): void
+    public function handle(WorkActivityCollector $collector, ContextSummarizer $summarizer, PublishContext $archive): void
     {
         $context = $this->context();
 
@@ -64,6 +67,12 @@ class BuildWorkContext implements ShouldBeUnique, ShouldQueue
             'sources' => [...$activity->counts(), 'failed' => $activity->failedSources],
             'generated_at' => now(),
         ]);
+
+        try {
+            $archive->publish($this->user, $digest);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

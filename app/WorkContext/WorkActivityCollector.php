@@ -6,6 +6,7 @@ use App\Connectors\Chat\Chats;
 use App\Connectors\Docs\Documents;
 use App\Connectors\Docs\DocumentSearch;
 use App\Connectors\Docs\DocumentSummary;
+use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Mail\FoundMessage;
 use App\Connectors\Mail\Mailbox;
 use App\Connectors\Mail\MailMessage;
@@ -18,9 +19,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Reads the person's recent activity from Slack, Gmail, Google Docs and
- * Notion. Only read methods: it never changes anything in the services.
- * A source that fails is left out; the others are still read.
+ * Reads recent Slack, Gmail, Drive, Notion and Jira. Only read methods: it
+ * never changes those services. A source that fails is left out; the others
+ * are still read.
  */
 class WorkActivityCollector
 {
@@ -29,6 +30,7 @@ class WorkActivityCollector
         private Mailbox $mailbox,
         private Documents $documents,
         private Wiki $wiki,
+        private IssueTracker $issues,
     ) {}
 
     public function collect(User $user, CarbonImmutable $now): WorkActivity
@@ -50,8 +52,9 @@ class WorkActivityCollector
             messages: $read('slack', fn (): array => $this->chats->activity($user, $now->subDays(config('work_context.days.slack')), config('work_context.limits.slack'))),
             emails: $read('gmail', fn (): array => $this->emails($user, $now->subDays(config('work_context.days.gmail')))),
             documents: $read('docs', fn (): array => $this->documents($user, $now->subDays(config('work_context.days.documents')))),
-            pages: $read('notion', fn (): array => $this->pages($user, $now->subDays(config('work_context.days.documents')))),
+            pages: $read('notion', fn (): array => $this->pages($user)),
             failedSources: $failed,
+            issues: $read('jira', fn (): array => $this->issues->search($user, null, null, (int) config('work_context.limits.issues'))),
         );
     }
 
@@ -75,7 +78,8 @@ class WorkActivityCollector
     }
 
     /**
-     * Documents created, edited or shared lately (all of them show as modified).
+     * Files created, edited or shared in the window. Drive reports all of
+     * them as modified.
      *
      * @return list<array{document: DocumentSummary, excerpt: ?string}>
      */
@@ -92,23 +96,26 @@ class WorkActivityCollector
     }
 
     /**
-     * Notion pages edited lately.
+     * Notion from the highest pages downward, with an excerpt only of the
+     * first roots. Deeper levels are titles, so the crawl stays small.
      *
-     * @return list<array{page: WikiPageSummary, excerpt: ?string}>
+     * @return list<array{page: WikiPageSummary, depth: int, excerpt: ?string}>
      */
-    private function pages(User $user, CarbonImmutable $since): array
+    private function pages(User $user): array
     {
-        $pages = array_values(array_filter(
-            $this->wiki->search($user, null, config('work_context.limits.pages')),
-            fn (WikiPageSummary $page): bool => $page->editedAt === null || $page->editedAt->greaterThanOrEqualTo($since),
-        ));
+        $outline = $this->wiki->outline($user, config('work_context.limits.notion_depths'));
+        $excerpts = 0;
 
-        return array_map(fn (WikiPageSummary $page, int $position): array => [
-            'page' => $page,
-            'excerpt' => $position < config('work_context.limits.excerpts')
-                ? $this->excerpt(fn (): ?string => $this->wiki->page($user, $page->ref)?->markdown)
-                : null,
-        ], $pages, array_keys($pages));
+        return array_map(function (array $item) use ($user, &$excerpts): array {
+            $excerpt = null;
+
+            if ($item['depth'] === 0 && $excerpts < config('work_context.limits.excerpts')) {
+                $excerpts++;
+                $excerpt = $this->excerpt(fn (): ?string => $this->wiki->page($user, $item['page']->ref)?->markdown);
+            }
+
+            return ['page' => $item['page'], 'depth' => $item['depth'], 'excerpt' => $excerpt];
+        }, $outline);
     }
 
     /**

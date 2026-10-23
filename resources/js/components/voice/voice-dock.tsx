@@ -134,7 +134,7 @@ function useKeyboardLift(): number {
  * Bottom voice zone: what the person says, what the assistant answers, and
  * the control to start or end the conversation.
  */
-export default function VoiceDock({ voice }: { voice: VoiceSession }) {
+export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent?: string | null }) {
     const showsReply = voice.status !== 'error' && voice.reply !== '';
     const typedReply = useTypewriter(showsReply ? voice.reply : '');
     const lift = useKeyboardLift();
@@ -173,6 +173,13 @@ export default function VoiceDock({ voice }: { voice: VoiceSession }) {
             <div className="mb-2.5">
                 <VoiceOrb status={voice.status} />
             </div>
+
+            {agent && (
+                <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink">
+                    <i aria-hidden className="size-1.5 rounded-full bg-accent" />
+                    {agent}
+                </p>
+            )}
 
             <SaidLine voice={voice} />
 

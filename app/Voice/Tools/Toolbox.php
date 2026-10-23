@@ -43,6 +43,12 @@ use App\Voice\Tools\Notion\ProposeNotionEdit;
 use App\Voice\Tools\Notion\ProposeNotionPage;
 use App\Voice\Tools\Notion\SearchNotion;
 use App\Voice\Tools\Screen\ControlViewer;
+use App\Voice\Tools\Sense\FocusSenseAgent;
+use App\Voice\Tools\Sense\ListSenseFiles;
+use App\Voice\Tools\Sense\ProposeSenseDelete;
+use App\Voice\Tools\Sense\ProposeSenseFile;
+use App\Voice\Tools\Sense\ReadSenseFile;
+use App\Voice\Tools\Sense\SyncSenseAgents;
 use App\Voice\Tools\Slack\FindSlackConversations;
 use App\Voice\Tools\Slack\FindSlackPeople;
 use App\Voice\Tools\Slack\OpenSlackFile;
@@ -115,6 +121,12 @@ class Toolbox
         ReviewMeeting::class,
         ProposeMeetingAction::class,
         DismissMeetingActions::class,
+        ListSenseFiles::class,
+        ReadSenseFile::class,
+        ProposeSenseFile::class,
+        ProposeSenseDelete::class,
+        SyncSenseAgents::class,
+        FocusSenseAgent::class,
     ];
 
     public function __construct(private Container $container) {}
