@@ -68,8 +68,18 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            // Longer than the longest job (BuildWorkContext, 300 s), or it is picked up twice.
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 360),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
+        // BuildWorkContext blocks inside HTTP longer than its own alarm can
+        // fire. Redis must not hand that job to a second worker meanwhile.
+        'redis-long' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'context',
+            'retry_after' => 720,
             'block_for' => null,
             'after_commit' => false,
         ],

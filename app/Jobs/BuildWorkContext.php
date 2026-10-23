@@ -29,11 +29,16 @@ class BuildWorkContext implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 300;
+    public int $timeout = 540;
 
-    public int $uniqueFor = 600;
+    public int $uniqueFor = 900;
 
-    public function __construct(public User $user) {}
+    public bool $failOnTimeout = true;
+
+    public function __construct(public User $user)
+    {
+        $this->onConnection('redis-long')->onQueue('context');
+    }
 
     public function uniqueId(): string
     {

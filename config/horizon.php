@@ -212,6 +212,21 @@ return [
             'nice' => 0,
         ],
 
+        // The nightly context outlives the default worker. Its timeout sits
+        // below this supervisor, and this supervisor sits below redis-long.
+        'supervisor-context' => [
+            'connection' => 'redis-long',
+            'queue' => ['context'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
+
         // Confirmed actions (send, move, comment) run on their own worker,
         // so slow AI jobs on the default queue never hold them back.
         'supervisor-actions' => [
