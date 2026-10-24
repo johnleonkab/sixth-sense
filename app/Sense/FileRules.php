@@ -13,15 +13,15 @@ class FileRules
 {
     public function __construct(private GithubContents $contents) {}
 
-    public function violation(GithubRepository $repository, string $path, string $contents): ?string
+    public function violation(GithubRepository $repository, string $path, string $contents, ?string $branch = null): ?string
     {
-        return DocumentRules::violation($path, $contents, $this->spec($repository, $path, $contents));
+        return DocumentRules::violation($path, $contents, $this->spec($repository, $path, $contents, $branch));
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    private function spec(GithubRepository $repository, string $path, string $contents): ?array
+    private function spec(GithubRepository $repository, string $path, string $contents, ?string $branch): ?array
     {
         if (str_starts_with($path, 'types/')) {
             return null;
@@ -34,7 +34,7 @@ class FileRules
             return null;
         }
 
-        $file = $this->contents->read($repository, "types/{$type}.yml");
+        $file = $this->contents->read($repository, "types/{$type}.yml", $branch);
 
         return is_array($file) ? DocumentRules::parse($file['content']) : null;
     }

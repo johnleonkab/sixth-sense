@@ -10,6 +10,8 @@ use App\Http\Controllers\PwaController;
 use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
+use App\Http\Controllers\Settings\ArchiveAgentController;
+use App\Http\Controllers\Settings\ArchiveFileController;
 use App\Http\Controllers\Settings\ConnectionController;
 use App\Http\Controllers\Settings\GithubRepositoryController;
 use App\Http\Controllers\Settings\ImpactController;
@@ -96,6 +98,24 @@ Route::middleware('auth')->group(function () {
         Route::post('context/build', [WorkContextController::class, 'build'])
             ->middleware('throttle:5,10')
             ->name('context.build');
+        Route::redirect('archive', '/settings/archive/agents')->name('archive.index');
+        Route::get('archive/agents', [ArchiveAgentController::class, 'index'])->name('archive.agents.index');
+        Route::post('archive/agents/sync', [ArchiveAgentController::class, 'sync'])->name('archive.agents.sync');
+        Route::get('archive/agents/create', [ArchiveAgentController::class, 'create'])->name('archive.agents.create');
+        Route::post('archive/agents', [ArchiveAgentController::class, 'store'])->name('archive.agents.store');
+        Route::get('archive/agents/{slug}', [ArchiveAgentController::class, 'edit'])
+            ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->name('archive.agents.edit');
+        Route::put('archive/agents/{slug}', [ArchiveAgentController::class, 'update'])
+            ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->name('archive.agents.update');
+        Route::get('archive/files', [ArchiveFileController::class, 'index'])->name('archive.files.index');
+        Route::get('archive/files/{path}', [ArchiveFileController::class, 'show'])
+            ->where('path', '.*')
+            ->name('archive.files.show');
+        Route::put('archive/files/{path}', [ArchiveFileController::class, 'update'])
+            ->where('path', '.*')
+            ->name('archive.files.update');
         Route::get('connections', [ConnectionController::class, 'index'])->name('connections.index');
         Route::delete('connections/{account}', [ConnectionController::class, 'destroy'])
             ->whereNumber('account')

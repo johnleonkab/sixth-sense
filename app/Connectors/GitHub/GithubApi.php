@@ -102,15 +102,16 @@ class GithubApi
 
     /**
      * Every file path in the branch. An empty repository has none.
+     * The branch defaults to the repository's default branch.
      *
      * @return list<string>
      */
-    public function paths(GithubRepository $repository): array
+    public function paths(GithubRepository $repository, ?string $branch = null): array
     {
         $response = $this->send(
             $repository->account,
             'get',
-            '/repos/'.rawurlencode($repository->owner).'/'.rawurlencode($repository->name).'/git/trees/'.rawurlencode($repository->default_branch),
+            '/repos/'.rawurlencode($repository->owner).'/'.rawurlencode($repository->name).'/git/trees/'.rawurlencode($branch ?? $repository->default_branch),
             ['recursive' => 1],
         );
 
