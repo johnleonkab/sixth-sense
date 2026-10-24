@@ -110,6 +110,8 @@ Route::middleware('auth')->group(function () {
             ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
             ->name('archive.agents.update');
         Route::get('archive/files', [ArchiveFileController::class, 'index'])->name('archive.files.index');
+        Route::get('archive/files/create', [ArchiveFileController::class, 'create'])->name('archive.files.create');
+        Route::post('archive/files', [ArchiveFileController::class, 'store'])->name('archive.files.store');
         Route::get('archive/files/{path}', [ArchiveFileController::class, 'show'])
             ->where('path', '.*')
             ->name('archive.files.show');

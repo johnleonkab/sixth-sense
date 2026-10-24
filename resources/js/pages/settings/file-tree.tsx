@@ -18,11 +18,15 @@ export default function FileTree({
     selected,
     dirty,
     repository,
+    creatable,
+    creating,
 }: {
     files: string[];
     selected: string | null;
     dirty: boolean;
     repository: string;
+    creatable: boolean;
+    creating: boolean;
 }) {
     const [open, setOpen] = useState<Set<string>>(() => ancestors(selected));
 
@@ -42,7 +46,23 @@ export default function FileTree({
 
     return (
         <nav aria-label="Árbol de archivos" className="flex max-h-56 shrink-0 flex-col overflow-auto border-b border-line md:max-h-none md:w-60 md:border-r md:border-b-0">
-            <p className="sticky top-0 truncate bg-surface px-3 py-2 font-mono text-[11px] text-faint">{repository}</p>
+            <div className="sticky top-0 flex items-center justify-between gap-2 bg-surface px-3 py-2">
+                <p className="truncate font-mono text-[11px] text-faint">{repository}</p>
+                {creatable && (
+                    <Link
+                        href="/settings/archive/files/create"
+                        aria-current={creating ? 'page' : undefined}
+                        onClick={(event) => {
+                            if (dirty && !creating && !window.confirm('Hay cambios sin guardar en main. ¿Abres otro documento?')) {
+                                event.preventDefault();
+                            }
+                        }}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium ${creating ? 'bg-ink text-bg' : 'text-ink hover:bg-soft'}`}
+                    >
+                        Nuevo
+                    </Link>
+                )}
+            </div>
             {nodes.length === 0 ? (
                 <p className="px-3 py-2 text-[13px] text-muted">No hay documentos en main.</p>
             ) : (

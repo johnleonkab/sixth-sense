@@ -22,7 +22,7 @@ class FocusSenseAgent implements VoiceTool
     public function description(): string
     {
         return 'Elige el agente del archivo que debe llevar este turno, cuando el tema encaja con su "cuándo". '
-            .'Devuelve sus instrucciones: síguelas a partir de aquí. Con slug vacío vuelves al asistente general y quitas el agente de la pantalla.';
+            .'Devuelve sus instrucciones y las referencias de agents/{slug}/references/: síguelas a partir de aquí. Con slug vacío vuelves al asistente general y quitas el agente de la pantalla.';
     }
 
     public function parameters(): array
@@ -64,7 +64,7 @@ class FocusSenseAgent implements VoiceTool
             output: [
                 'agent' => $agent->slug,
                 'name' => $agent->name,
-                'instructions' => $agent->instructions !== '' ? $agent->instructions : $agent->purpose,
+                'instructions' => $agent->briefing(),
             ],
             canvas: new Canvas('sense.agent', [
                 'name' => $agent->name,

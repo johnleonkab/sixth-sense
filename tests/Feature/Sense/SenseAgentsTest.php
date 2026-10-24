@@ -141,6 +141,59 @@ test('deleting a file is proposed and then removed', function () {
     Http::assertSent(fn (Request $request) => $request->method() === 'DELETE' && $request['sha'] === 'abc');
 });
 
+test('focusing an agent returns its references with the instructions', function () {
+    SenseAgent::factory()->create([
+        'user_id' => $this->user->id,
+        'slug' => 'jira-writer',
+        'name' => 'Jira',
+        'instructions' => 'Sigue la plantilla.',
+        'references' => "# references/contexto.md\n\nPilares.",
+    ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['slug' => 'jira-writer']])
+        ->assertJsonPath('output.instructions', fn (string $text): bool => str_contains($text, 'Sigue la plantilla.')
+            && str_contains($text, 'references/contexto.md')
+            && str_contains($text, 'Pilares.'));
+});
+
+test('syncing an agent copies the markdown in its references folder', function () {
+    $agent = "---\ntype: agent\nname: Jira\npurpose: Escribe historias.\nwhen: Cuando pidan una historia.\n---\n\nSigue la plantilla.\n";
+
+    Http::fake([
+        'api.github.com/*/git/trees/*' => Http::response(['tree' => [
+            ['path' => 'agents/jira-writer/agent.md', 'type' => 'blob'],
+            ['path' => 'agents/jira-writer/references/plantilla.md', 'type' => 'blob'],
+            ['path' => 'agents/jira-writer/references/contexto.md', 'type' => 'blob'],
+        ]]),
+        'api.github.com/*/contents/agents/jira-writer/agent.md*' => Http::response([
+            'content' => base64_encode($agent),
+            'sha' => 'a',
+        ]),
+        'api.github.com/*/contents/agents/jira-writer/references/contexto.md*' => Http::response([
+            'content' => base64_encode("# Contexto\n\nPilares.\n"),
+            'sha' => 'c',
+        ]),
+        'api.github.com/*/contents/agents/jira-writer/references/plantilla.md*' => Http::response([
+            'content' => base64_encode("# Plantilla\n\nComo rol.\n"),
+            'sha' => 'p',
+        ]),
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('settings.connections.sense.sync', [$this->repository->account, $this->repository]))
+        ->assertRedirect();
+
+    $stored = $this->user->senseAgents()->where('slug', 'jira-writer')->first();
+
+    expect($stored)->not->toBeNull()
+        ->and($stored->instructions)->toBe('Sigue la plantilla.')
+        ->and($stored->references)->toBe("# references/contexto.md\n\n# Contexto\n\nPilares.\n\n# references/plantilla.md\n\n# Plantilla\n\nComo rol.")
+        ->and($stored->briefing())->toContain('Sigue la plantilla.')
+        ->and($stored->briefing())->toContain('Pilares.')
+        ->and($stored->briefing())->toContain('Como rol.');
+});
+
 test('focusing an agent puts its name on screen and returns its instructions', function () {
     SenseAgent::factory()->create([
         'user_id' => $this->user->id,

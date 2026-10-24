@@ -26,6 +26,117 @@ class DocumentRules
     }
 
     /**
+     * Placeholders a type uses in its folder or its file name.
+     *
+     * @return list<'project'|'slug'|'date'>
+     */
+    public static function slots(string $where, string $name): array
+    {
+        $found = [];
+
+        if (preg_match_all('/\{(project|slug|date)\}/', $where.' '.$name, $matches) === false) {
+            return [];
+        }
+
+        foreach ($matches[1] as $slot) {
+            $found[$slot] = true;
+        }
+
+        return array_values(array_filter(
+            ['project', 'slug', 'date'],
+            fn (string $slot): bool => isset($found[$slot]),
+        ));
+    }
+
+    /**
+     * Why these slots cannot fill the type, or null when they can.
+     *
+     * @param  array<string, mixed>  $spec
+     * @param  array<string, string>  $slots
+     */
+    public static function slotProblem(array $spec, array $slots): ?string
+    {
+        $where = $spec['where'] ?? null;
+        $name = $spec['name'] ?? null;
+
+        if (! is_string($where) || ! is_string($name)) {
+            return 'Las reglas del tipo no dicen dónde va el archivo.';
+        }
+
+        foreach (self::slots($where, $name) as $slot) {
+            if (! self::slotValue($slot, $slots[$slot] ?? '')) {
+                return match ($slot) {
+                    'project' => 'El proyecto va en minúsculas, números y guiones.',
+                    'slug' => 'El nombre va en minúsculas, números y guiones.',
+                    'date' => 'La fecha tiene que ser AAAA-MM-DD.',
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The path a type and its slots produce, or null when they do not fit.
+     *
+     * @param  array<string, mixed>  $spec
+     * @param  array<string, string>  $slots
+     */
+    public static function locate(array $spec, array $slots): ?string
+    {
+        if (self::slotProblem($spec, $slots) !== null) {
+            return null;
+        }
+
+        $where = self::fill((string) $spec['where'], $slots);
+        $name = self::fill((string) $spec['name'], $slots);
+
+        if ($where === null || $name === null || $name === '' || str_contains($name, '/')) {
+            return null;
+        }
+
+        return self::path($where === '' ? $name : $where.'/'.$name);
+    }
+
+    /**
+     * A typed markdown document. Optional fields are left out when blank.
+     *
+     * @param  array<string, mixed>  $spec
+     * @param  array<string, string>  $fields
+     */
+    public static function compose(string $type, array $spec, array $fields, string $body): string
+    {
+        $document = ['type' => $type];
+
+        foreach (['required', 'optional'] as $group) {
+            $keys = $spec[$group] ?? null;
+
+            if (! is_array($keys)) {
+                continue;
+            }
+
+            foreach ($keys as $key => $label) {
+                if (! is_string($key) || $key === '' || $key === 'type') {
+                    continue;
+                }
+
+                $value = trim($fields[$key] ?? '');
+
+                if ($value === '' && $group === 'optional') {
+                    continue;
+                }
+
+                $document[$key] = $value;
+            }
+        }
+
+        $yaml = trim(Yaml::dump($document, 2, 2));
+        $body = trim($body);
+
+        return "---\n{$yaml}\n---\n\n".($body === '' ? '' : $body."\n");
+    }
+
+    /**
      * Why this file cannot be written, or null when it follows the rules.
      *
      * @param  array<string, mixed>|null  $spec  The parsed types/{type}.yml, when the file declares a type.
@@ -192,5 +303,32 @@ class DocumentRules
         }
 
         return null;
+    }
+
+    /**
+     * Replace {project}, {slug} and {date}. Unknown placeholders stay put.
+     *
+     * @param  array<string, string>  $slots
+     */
+    private static function fill(string $pattern, array $slots): ?string
+    {
+        $value = preg_replace_callback('/\{(project|slug|date)\}/', function (array $match) use ($slots): string {
+            return $slots[$match[1]] ?? $match[0];
+        }, $pattern);
+
+        return is_string($value) ? $value : null;
+    }
+
+    private static function slotValue(string $slot, string $value): bool
+    {
+        if ($slot === 'date') {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+                return false;
+            }
+
+            return checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4));
+        }
+
+        return preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value) === 1;
     }
 }

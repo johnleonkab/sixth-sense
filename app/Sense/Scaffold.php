@@ -23,7 +23,7 @@ class Scaffold
                 - `{date}` es AAAA-MM-DD.
                 - `{slug}` es el nombre en minúsculas y guiones.
 
-                Un proyecto nuevo copia `projects/_template`. Un agente nuevo copia `agents/_template` y se sincroniza con sixth-sense. El agente `keeper` mantiene este archivo: crea, actualiza y borra. Nada se escribe sin que la persona diga que sí.
+                Un proyecto nuevo copia `projects/_template`. Un agente nuevo copia `agents/_template` y se sincroniza con sixth-sense. Sus referencias viven en `agents/{slug}/references/` y se cargan cuando se usa el agente. El agente `keeper` mantiene este archivo: crea, actualiza y borra. Nada se escribe sin que la persona diga que sí.
 
                 `now.md` es el estado vivo. `map.md` dice dónde está cada cosa. `vertical` en el proyecto dice si es finance, product, delivery u operations.
                 MD,
@@ -172,7 +172,8 @@ class Scaffold
                 Lee `types/` antes de crear un documento y cumple `where`, `name` y `required`.
                 Para escribir o actualizar usa propose_sense_file. Para borrar, propose_sense_delete.
                 Un agente nuevo es `agents/{slug}/agent.md` copiado de `agents/_template/agent.md`, con name, purpose y when.
-                Después de crearlo o cambiarlo, llama a sync_sense_agents.
+                Sus referencias son markdown en `agents/{slug}/references/{nombre}.md`, sin tipo. Se cargan al usar el agente.
+                Después de crearlo o cambiarlo, o de cambiar una referencia, llama a sync_sense_agents.
                 No inventes un tipo: si no existe en `types/`, proponlo primero como `types/{tipo}.yml` con type, where, name y required.
                 MD,
             'inbox/.gitkeep' => '',

@@ -133,7 +133,7 @@ final readonly class AssistantProfile
         }
 
         if ($agents->isNotEmpty()) {
-            $lines[] = 'Agentes del archivo. Si el tema encaja con uno, llama a focus_sense_agent con su slug antes de responder y sigue las instrucciones que devuelva. Con slug vacío vuelves al asistente general. Después de crear o cambiar un agente, llama a sync_sense_agents.';
+            $lines[] = 'Agentes del archivo. Si el tema encaja con uno, llama a focus_sense_agent con su slug antes de responder y sigue las instrucciones que devuelva, referencias incluidas. Con slug vacío vuelves al asistente general. Después de crear o cambiar un agente o una referencia, llama a sync_sense_agents.';
 
             foreach ($agents as $agent) {
                 $lines[] = "- {$agent->slug}: {$agent->name}. {$agent->purpose} Úsalo cuando: {$agent->cue}";
