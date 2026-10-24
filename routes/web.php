@@ -7,6 +7,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\PendingActionController;
 use App\Http\Controllers\PwaController;
+use App\Http\Controllers\SceneController;
 use App\Http\Controllers\Settings\AccountAuthorizationController;
 use App\Http\Controllers\Settings\AccountCapabilityController;
 use App\Http\Controllers\Settings\AlertController;
@@ -56,6 +57,11 @@ Route::middleware('auth')->group(function () {
     Route::post('alerts/{item}/dismiss', [AlertFeedController::class, 'dismiss'])->whereNumber('item')->name('alerts.dismiss');
     Route::get('media/chat/{file}', [MediaController::class, 'chatFile'])->name('media.chat');
     Route::get('media/mail/{message}/{index}', [MediaController::class, 'mailAttachment'])->whereNumber('index')->name('media.mail');
+
+    Route::prefix('scenes/{scene}')->whereNumber('scene')->name('scenes.')->group(function () {
+        Route::get('/', [SceneController::class, 'show'])->name('show');
+        Route::post('confirm', [SceneController::class, 'confirm'])->name('confirm');
+    });
 
     Route::prefix('actions/{action}')->whereNumber('action')->name('actions.')->group(function () {
         Route::get('/', [PendingActionController::class, 'show'])->name('show');

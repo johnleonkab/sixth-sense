@@ -15,6 +15,7 @@ use App\Jobs\ScheduleTask;
 use App\Models\AgendaTask;
 use App\Models\InboxItem;
 use App\Models\User;
+use App\Scenes\SceneMatch;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -33,6 +34,7 @@ class AlertFollowUp
         private Mailbox $mailbox,
         private Chats $chats,
         private IssueTracker $issues,
+        private SceneMatch $scenes,
     ) {}
 
     /**
@@ -42,6 +44,21 @@ class AlertFollowUp
     {
         if ($item->status !== AlertStatus::Pending) {
             $this->stopPlanning($item);
+
+            return;
+        }
+
+        $scene = $this->scenes->openFor($item);
+
+        if ($scene !== null) {
+            $item->update([
+                'proposal' => [
+                    'summary' => 'Hay una escena preparada en este aviso.',
+                    'scene_id' => $scene->id,
+                ],
+                'planning' => false,
+            ]);
+            InboxItemUpdated::dispatch($item);
 
             return;
         }

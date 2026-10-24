@@ -98,6 +98,7 @@ Cada fase termina con algo que se puede probar hablando.
 
 ## Épicas siguientes
 - **Wingman:** un agente que escucha tus llamadas de Meet sin que se note, toma notas y propone acciones. Ver [`docs/epica-wingman.md`](epica-wingman.md).
+- **Escenas:** un encargo de varios pasos se ve en pantalla mientras ocurre. Gemini solo habla. DeepSeek redacta y responde a los agentes. Ver [`docs/epica-escenas.md`](epica-escenas.md).
 
 ---
 

@@ -82,6 +82,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Compound requests opened for this person.
+     *
+     * @return HasMany<Scene, $this>
+     */
+    public function scenes(): HasMany
+    {
+        return $this->hasMany(Scene::class);
+    }
+
+    /**
      * @return HasMany<AlertSetting, $this>
      */
     public function alertSettings(): HasMany

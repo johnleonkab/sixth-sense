@@ -18,7 +18,7 @@ function placeholderReply(voice: VoiceSession): string {
         case 'connecting':
             return voice.reconnecting ? 'Se ha cortado la conexión. Reconectando…' : 'Conectando…';
         case 'thinking':
-            return 'Un momento…';
+            return voice.activity ?? 'Pensando…';
         case 'listening':
         case 'speaking':
             return 'Te escucho.';
@@ -135,7 +135,7 @@ function useKeyboardLift(): number {
  * the control to start or end the conversation.
  */
 export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent?: string | null }) {
-    const showsReply = voice.status !== 'error' && voice.reply !== '';
+    const showsReply = voice.status !== 'error' && voice.status !== 'thinking' && voice.reply !== '';
     const typedReply = useTypewriter(showsReply ? voice.reply : '');
     const lift = useKeyboardLift();
     const dock = useRef<HTMLElement>(null);

@@ -18,6 +18,7 @@ use App\Voice\Tools\Calendar\ProposeEventSummary;
 use App\Voice\Tools\Calendar\ProposeEventUpdate;
 use App\Voice\Tools\Calendar\ProposeNewEvent;
 use App\Voice\Tools\Calendar\ShowCalendar;
+use App\Voice\Tools\Docs\FindFiles;
 use App\Voice\Tools\Docs\OpenDocument;
 use App\Voice\Tools\Docs\ProposeCommentReply;
 use App\Voice\Tools\Docs\ProposeDocumentComment;
@@ -42,6 +43,7 @@ use App\Voice\Tools\Notion\ProposeNotionComment;
 use App\Voice\Tools\Notion\ProposeNotionEdit;
 use App\Voice\Tools\Notion\ProposeNotionPage;
 use App\Voice\Tools\Notion\SearchNotion;
+use App\Voice\Tools\Scenes\OpenSceneTool;
 use App\Voice\Tools\Screen\ControlViewer;
 use App\Voice\Tools\Sense\FocusSenseAgent;
 use App\Voice\Tools\Sense\ListSenseFiles;
@@ -90,6 +92,7 @@ class Toolbox
         ProposeEmailForward::class,
         SearchDocuments::class,
         ShowDocumentResults::class,
+        FindFiles::class,
         OpenDocument::class,
         ProposeDocumentEdit::class,
         ProposeDocumentComment::class,
@@ -127,6 +130,7 @@ class Toolbox
         ProposeSenseDelete::class,
         SyncSenseAgents::class,
         FocusSenseAgent::class,
+        OpenSceneTool::class,
     ];
 
     public function __construct(private Container $container) {}

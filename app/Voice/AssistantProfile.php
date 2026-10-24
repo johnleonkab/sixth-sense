@@ -45,6 +45,8 @@ final readonly class AssistantProfile
                 $chats ? self::familiarChats($chats->familiar($user)) : '',
                 self::workContext($user),
                 self::sense($user),
+                'Si el encargo necesita más de una herramienta (buscar hueco y contestar, dejar varias historias, preguntar a un agente), la única llamada es open_scene. No encadenes las herramientas de ese encargo.',
+                'Para encontrar un documento, una hoja, unas diapositivas o una página, la única llamada es find_files, con uno o varios términos. No busques primero en Docs y luego en Notion.',
                 $issues ? self::jiraRules($issues->rules($user)) : '',
             ]))),
             tools: $toolbox?->declarations() ?? [],

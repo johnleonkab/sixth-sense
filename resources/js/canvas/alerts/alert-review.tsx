@@ -57,7 +57,7 @@ function stateLine(alert: Alert): string {
         case 'routine':
             return 'No parece esperar tu respuesta. Si sí la espera, déjala pendiente.';
         case 'planning':
-            return 'Esperando tu respuesta. Preparando una propuesta…';
+            return 'Preparando una propuesta…';
         case 'ready':
         case 'important':
             return 'Esperando tu respuesta.';

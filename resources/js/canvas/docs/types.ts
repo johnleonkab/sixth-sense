@@ -33,7 +33,7 @@ export type Block =
     | { type: 'code'; text: string }
     | { type: 'table'; rows: Block[][][] }
     | { type: 'rule' }
-    | { type: 'image' }
+    | { type: 'image'; src?: string }
     | { type: 'truncated' };
 
 export type DocumentCommentReply = { id: string; author: string; mine: boolean; content: string; created_at: string };

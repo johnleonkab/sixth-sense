@@ -38,6 +38,8 @@ use App\Connectors\Notion\NotionWiki;
 use App\Connectors\Slack\SlackChats;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
+use App\Scenes\DeepSeekSceneText;
+use App\Scenes\SceneText;
 use App\Scheduling\Assessors\FakeTaskAssessor;
 use App\Scheduling\Assessors\LlmTaskAssessor;
 use App\Scheduling\TaskAssessor;
@@ -102,6 +104,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Documents::class, fn (): Documents => config('connectors.demo')
             ? new FakeDocuments
             : $this->app->make(GoogleDocs::class));
+
+        $this->app->singleton(SceneText::class, DeepSeekSceneText::class);
 
         $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (true) {
             $this->usesTextModel(config('alerts.judge')) => new LlmRelevanceJudge($this->textModel('light')),

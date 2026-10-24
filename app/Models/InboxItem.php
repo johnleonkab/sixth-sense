@@ -67,6 +67,16 @@ class InboxItem extends Model
     }
 
     /**
+     * The scene this alert opened, when the alert matched a scene kind.
+     *
+     * @return HasOne<Scene, $this>
+     */
+    public function scene(): HasOne
+    {
+        return $this->hasOne(Scene::class);
+    }
+
+    /**
      * Alerts still waiting for the person's answer.
      *
      * @param  Builder<InboxItem>  $query

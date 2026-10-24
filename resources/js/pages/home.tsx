@@ -15,6 +15,9 @@ import type { CanvasDirective } from '@/canvas/types';
 import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
+import { echoConnection } from '@/lib/echo';
+import { postJson } from '@/lib/http';
+import { activityFor } from '@/voice/activity';
 import { runTool } from '@/voice/run-tool';
 import { useVoiceSession } from '@/voice/use-voice-session';
 
@@ -27,13 +30,6 @@ const timeFormat = new Intl.DateTimeFormat('es-ES', {
     hour: '2-digit',
     minute: '2-digit',
 });
-
-/** What the screen says while a tool it asked for is on its way. */
-const OPENING_LABELS: Record<string, string> = {
-    review_alert: 'Abriendo la alerta…',
-    show_alert_history: 'Abriendo el historial…',
-    show_calendar: 'Abriendo el calendario…',
-};
 
 function Opening({ label }: { label: string }) {
     return (
@@ -150,6 +146,25 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
             return;
         }
 
+        if (reply === 'yes') {
+            const scene = canvases.find((canvas) => canvas.directive.view === 'scene.board');
+            const sceneId = scene?.directive.props.scene_id;
+
+            if (typeof sceneId === 'number') {
+                try {
+                    const confirmed = await postJson<{ actions: ActionState[] }>(`/scenes/${sceneId}/confirm`, {});
+
+                    for (const state of confirmed.actions) {
+                        await actions.confirm(state.id);
+                    }
+                } catch {
+                    // The cards stay pending; the person can say sí again.
+                }
+
+                return;
+            }
+        }
+
         const action = reply ? actions.awaitingAnswer() : null;
 
         if (action) {
@@ -172,6 +187,29 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
         }
     }, [voice.active]);
 
+    useEffect(() => {
+        const userId = auth.user?.id;
+
+        if (!userId) {
+            return;
+        }
+
+        const offered = new Set<number>();
+        const channel = echoConnection().private(`App.Models.User.${userId}`);
+        const onScene = (event: { scene_id: number; offer: string | null }) => {
+            if (event.offer && voice.active && !offered.has(event.scene_id)) {
+                offered.add(event.scene_id);
+                void voice.tell(event.offer, true);
+            }
+        };
+
+        channel.listen('.scene.updated', onScene);
+
+        return () => {
+            channel.stopListening('.scene.updated', onScene);
+        };
+    }, [auth.user?.id, voice.active, voice.tell]);
+
     // One thing opens at a time from the screen: further clicks wait for it, and it shows.
     const [opening, setOpening] = useState<string | null>(null);
     const openingNow = useRef(false);
@@ -182,7 +220,7 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
         }
 
         openingNow.current = true;
-        setOpening(OPENING_LABELS[name] ?? 'Abriendo…');
+        setOpening(activityFor([name]));
 
         void runTool({ id: `screen-${Date.now()}`, name, args })
             .then((outcome) => outcome.canvas && show(outcome.canvas))

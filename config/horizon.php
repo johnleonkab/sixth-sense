@@ -241,6 +241,22 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+
+        // Scene fan-out. More than one process, and never the default queue:
+        // a story must not wait behind another story or behind judging.
+        'supervisor-scenes' => [
+            'connection' => 'redis',
+            'queue' => ['scenes'],
+            'balance' => 'simple',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => 120,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [

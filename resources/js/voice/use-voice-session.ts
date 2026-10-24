@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
 import type { CanvasDirective } from '@/canvas/types';
+import { activityFor } from '@/voice/activity';
 import { playHalo } from '@/voice/audio/chimes';
 import { Microphone } from '@/voice/audio/microphone';
 import { AudioPlayer } from '@/voice/audio/player';
@@ -46,6 +47,8 @@ export type VoiceSession = {
     error: string | null;
     /** A spoken conversation is open. */
     active: boolean;
+    /** What a running tool is doing, shown instead of a generic wait. */
+    activity: string | null;
     /** The spoken conversation dropped and is being opened again. */
     reconnecting: boolean;
     /** Resolves to whether the conversation is open. A typed one has no microphone and no audio. */
@@ -67,6 +70,7 @@ export type VoiceSession = {
  */
 export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionOptions = {}): VoiceSession {
     const [status, setStatus] = useState<VoiceStatus>('idle');
+    const [activity, setActivity] = useState<string | null>(null);
     const [mode, setMode] = useState<VoiceMode | null>(null);
     const [reconnecting, setReconnecting] = useState(false);
     const idleTimer = useRef<number | undefined>(undefined);
@@ -119,6 +123,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
         reconnects.current = 0;
         setReconnecting(false);
         release();
+        setActivity(null);
         setStatus('idle');
     }, [release]);
 
@@ -128,6 +133,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
             reconnects.current = 0;
             setReconnecting(false);
             release();
+            setActivity(null);
             setError(message);
             setStatus('error');
         },
@@ -222,6 +228,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
                 transport.sendToolResponses(
                     pending.map(({ call, outcome }) => ({ id: call.id, name: call.name, output: outcome.output })),
                 );
+                setActivity(null);
                 setStatus(typed ? 'thinking' : settled());
             };
 
@@ -250,6 +257,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
                 onInterrupted: () => {
                     player.interrupt();
                     finishAnswer();
+                    setActivity(null);
                     dispatch({ type: 'turn-ended' });
                 },
                 onTurnComplete: () => {
@@ -264,6 +272,9 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
                     }
                 },
                 onToolCalls: (calls) => {
+                    // open_scene answers with the empty board and returns. Later cards
+                    // arrive on the user's channel. Every other tool still waits here.
+                    setActivity(activityFor(calls.map((call) => call.name)));
                     setStatus('thinking');
                     void runToolCalls(calls, finishUtterance());
                 },
@@ -396,6 +407,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
         reply: transcript.reply,
         error,
         active: mode === 'voice' && status !== 'idle' && status !== 'error',
+        activity,
         reconnecting,
         start,
         stop,
