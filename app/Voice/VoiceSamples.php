@@ -2,6 +2,7 @@
 
 namespace App\Voice;
 
+use App\Ai\ProviderKeys;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -33,12 +34,14 @@ class VoiceSamples
 
     private function make(string $voice): string
     {
-        if (blank($this->config['api_key'])) {
+        $key = app(ProviderKeys::class)->own('gemini') ?? $this->config['api_key'];
+
+        if (blank($key)) {
             throw new RuntimeException('GEMINI_API_KEY is not set.');
         }
 
         $response = Http::baseUrl($this->config['base_url'])
-            ->withHeaders(['x-goog-api-key' => $this->config['api_key']])
+            ->withHeaders(['x-goog-api-key' => $key])
             ->timeout(max($this->config['timeout'], 30))
             ->acceptJson()
             ->post("/v1beta/models/{$this->config['sample_model']}:generateContent", [

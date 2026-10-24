@@ -3,6 +3,7 @@
 namespace App\Scenes;
 
 use App\Ai\DeepSeekTextModel;
+use App\Ai\ProviderKeys;
 use InvalidArgumentException;
 
 /**
@@ -11,11 +12,20 @@ use InvalidArgumentException;
  */
 class DeepSeekSceneText implements SceneText
 {
-    private DeepSeekTextModel $capableModel;
+    public function capable(string $system, string $user, array $schema): array
+    {
+        return $this->model(true)->json($system, $user, $schema);
+    }
 
-    private DeepSeekTextModel $lightModel;
+    public function light(string $system, string $user, array $schema): array
+    {
+        return $this->model(false)->json($system, $user, $schema);
+    }
 
-    public function __construct()
+    /**
+     * Built per call so a long-lived worker does not keep another person's key.
+     */
+    private function model(bool $capable): DeepSeekTextModel
     {
         $config = config('ai.providers.deepseek');
 
@@ -23,34 +33,14 @@ class DeepSeekSceneText implements SceneText
             throw new InvalidArgumentException('DeepSeek is not configured.');
         }
 
-        $this->capableModel = new DeepSeekTextModel([
-            'api_key' => $config['api_key'],
+        return new DeepSeekTextModel([
+            'api_key' => app(ProviderKeys::class)->own('deepseek') ?? $config['api_key'],
             'base_url' => $config['base_url'],
-            'model' => $config['model'],
+            'model' => $capable ? $config['model'] : $config['light_model'],
             'fallback_model' => $config['fallback_model'],
             'timeout' => $config['timeout'],
-            'max_tokens' => $config['max_tokens'],
-            'thinking' => $config['thinking'],
+            'max_tokens' => $capable ? $config['max_tokens'] : $config['light_max_tokens'],
+            'thinking' => $capable ? $config['thinking'] : 'disabled',
         ]);
-
-        $this->lightModel = new DeepSeekTextModel([
-            'api_key' => $config['api_key'],
-            'base_url' => $config['base_url'],
-            'model' => $config['light_model'],
-            'fallback_model' => $config['fallback_model'],
-            'timeout' => $config['timeout'],
-            'max_tokens' => $config['light_max_tokens'],
-            'thinking' => 'disabled',
-        ]);
-    }
-
-    public function capable(string $system, string $user, array $schema): array
-    {
-        return $this->capableModel->json($system, $user, $schema);
-    }
-
-    public function light(string $system, string $user, array $schema): array
-    {
-        return $this->lightModel->json($system, $user, $schema);
     }
 }

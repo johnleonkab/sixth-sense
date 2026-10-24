@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Ai\DeepSeekTextModel;
 use App\Ai\GeminiTextModel;
+use App\Ai\JobOwner;
+use App\Ai\ProviderKeys;
 use App\Ai\TextModel;
 use App\Alerts\Judges\FakeMeetingAdvisor;
 use App\Alerts\Judges\FakeRelevanceJudge;
@@ -61,6 +63,10 @@ use App\WorkContext\ContextSummarizer;
 use App\WorkContext\Summarizers\FakeContextSummarizer;
 use App\WorkContext\Summarizers\LlmContextSummarizer;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -71,6 +77,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(ProviderKeys::class);
+
         $this->app->bind(CalendarReader::class, fn (): CalendarReader => config('connectors.demo')
             ? new FakeCalendarReader
             : $this->app->make(GoogleCalendarReader::class));
@@ -193,7 +201,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         $options = [
-            'api_key' => $config['api_key'],
+            'api_key' => app(ProviderKeys::class)->own($provider) ?? $config['api_key'],
             'base_url' => $config['base_url'],
             'model' => filled($model) ? $model : ($tier === 'light' ? $config['light_model'] : $config['model']),
             'fallback_model' => $config['fallback_model'],
@@ -224,6 +232,20 @@ class AppServiceProvider extends ServiceProvider
 
         // Reverb may already run inside Docker, which publishes its port: then `composer dev` does not start another.
         DevCommands::except('queue', 'server', ...($this->reverbAlreadyListening() ? ['reverb'] : []));
+
+        // The key belongs to the job's person only while that job runs.
+        Event::listen(JobProcessing::class, function (JobProcessing $event): void {
+            $job = $event->job;
+
+            app(ProviderKeys::class)->push($job->uuid(), app(JobOwner::class)->idFor($job));
+        });
+
+        $forget = function (JobProcessed|JobExceptionOccurred $event): void {
+            app(ProviderKeys::class)->pop($event->job->uuid());
+        };
+
+        Event::listen(JobProcessed::class, $forget);
+        Event::listen(JobExceptionOccurred::class, $forget);
     }
 
     /**

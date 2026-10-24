@@ -1,5 +1,5 @@
-import { router } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { router, useForm } from '@inertiajs/react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import SettingsLayout from '@/layouts/settings-layout';
 
@@ -107,15 +107,146 @@ type SystemProps = {
     voices: Voice[];
     voice: string;
     default_voice: string;
+    keys: {
+        gemini: KeyChoice;
+        deepseek: KeyChoice;
+    };
 };
 
-export default function System({ sizes, current, voices, voice, default_voice: defaultVoice }: SystemProps) {
+type KeyChoice = { using: 'system' | 'own'; system_ready: boolean };
+
+const fieldClass = 'w-full rounded-xl border border-line bg-surface px-3 py-2 font-mono text-[13px] text-ink outline-none focus:border-accent';
+
+/**
+ * Gemini and DeepSeek keys. The stored secret never comes back to the browser.
+ */
+function Keys({ keys }: { keys: SystemProps['keys'] }) {
+    const form = useForm({
+        gemini: keys.gemini.using,
+        deepseek: keys.deepseek.using,
+        gemini_api_key: '',
+        deepseek_api_key: '',
+    });
+
+    useEffect(() => {
+        form.setData('gemini', keys.gemini.using);
+        form.setData('deepseek', keys.deepseek.using);
+        // The stored key is not in props, so the fields stay empty after a save.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keys.gemini.using, keys.deepseek.using]);
+
+    const save = (event: FormEvent) => {
+        event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            gemini_api_key: data.gemini === 'own' ? data.gemini_api_key : '',
+            deepseek_api_key: data.deepseek === 'own' ? data.deepseek_api_key : '',
+        }));
+        form.put('/settings/system/keys', {
+            preserveScroll: true,
+            onSuccess: () => form.setData({ ...form.data, gemini_api_key: '', deepseek_api_key: '' }),
+        });
+    };
+
+    return (
+        <form onSubmit={save} className="mt-10">
+            <fieldset>
+                <legend className="mb-1 text-[13px] text-muted">Claves</legend>
+                <p className="mb-4 max-w-xl text-[12.5px] text-faint">
+                    Gemini es la voz. DeepSeek escribe. La tuya se guarda cifrada y no vuelve a mostrarse. Si vuelves a la del sistema, se borra de este servidor.
+                </p>
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <KeyField
+                        title="Gemini"
+                        choice={keys.gemini}
+                        mode={form.data.gemini}
+                        value={form.data.gemini_api_key}
+                        error={form.errors.gemini_api_key}
+                        onMode={(mode) => form.setData('gemini', mode)}
+                        onValue={(value) => form.setData('gemini_api_key', value)}
+                    />
+                    <KeyField
+                        title="DeepSeek"
+                        choice={keys.deepseek}
+                        mode={form.data.deepseek}
+                        value={form.data.deepseek_api_key}
+                        error={form.errors.deepseek_api_key}
+                        onMode={(mode) => form.setData('deepseek', mode)}
+                        onValue={(value) => form.setData('deepseek_api_key', value)}
+                    />
+                </div>
+                <button type="submit" disabled={form.processing} className="mt-4 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40">
+                    Guardar claves
+                </button>
+            </fieldset>
+        </form>
+    );
+}
+
+function KeyField({
+    title,
+    choice,
+    mode,
+    value,
+    error,
+    onMode,
+    onValue,
+}: {
+    title: string;
+    choice: KeyChoice;
+    mode: 'system' | 'own';
+    value: string;
+    error?: string;
+    onMode: (mode: 'system' | 'own') => void;
+    onValue: (value: string) => void;
+}) {
+    return (
+        <div className="rounded-2xl border border-line bg-surface p-4">
+            <p className="text-[14px] font-medium">{title}</p>
+            <div className="mt-3 grid gap-2">
+                {(['system', 'own'] as const).map((option) => (
+                    <label key={option} className="flex cursor-pointer items-start gap-2 text-[13px]">
+                        <input type="radio" name={title} value={option} checked={mode === option} onChange={() => onMode(option)} className="mt-0.5 accent-[var(--accent)]" />
+                        <span>
+                            <span className="font-medium">{option === 'system' ? 'La del sistema' : 'La mía'}</span>
+                            <span className="mt-0.5 block text-[12.5px] text-muted">
+                                {option === 'system'
+                                    ? choice.system_ready
+                                        ? 'La que está configurada en el servidor.'
+                                        : 'En el servidor no hay clave.'
+                                    : choice.using === 'own'
+                                      ? 'Hay una guardada. Pega otra solo si quieres cambiarla.'
+                                      : 'Pégala aquí. El navegador no la envía al proveedor: la usa el servidor.'}
+                            </span>
+                        </span>
+                    </label>
+                ))}
+            </div>
+            {mode === 'own' && (
+                <input
+                    type="password"
+                    name={`${title.toLowerCase()}_api_key`}
+                    value={value}
+                    onChange={(event) => onValue(event.target.value)}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    placeholder={choice.using === 'own' ? 'En blanco se conserva la actual' : 'Pega la clave'}
+                    className={`${fieldClass} mt-3`}
+                />
+            )}
+            {error && <p className="mt-2 text-[12.5px] text-crit">{error}</p>}
+        </div>
+    );
+}
+
+export default function System({ sizes, current, voices, voice, default_voice: defaultVoice, keys }: SystemProps) {
     const choose = (key: DisplaySize['key']) => router.put('/settings/system/display', { display_size: key }, { preserveScroll: true });
     const chooseVoice = (name: string) => router.put('/settings/system/voice', { voice: name }, { preserveScroll: true });
     const { playback, toggle } = useSamplePlayer();
 
     return (
-        <SettingsLayout title="Sistema" description="Cómo ves y cómo oyes a la IA.">
+        <SettingsLayout title="Sistema" description="Cómo ves, cómo oyes y con qué claves.">
             <fieldset>
                 <legend className="mb-3 text-[13px] text-muted">Tamaño de visualización</legend>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -160,6 +291,8 @@ export default function System({ sizes, current, voices, voice, default_voice: d
                     ))}
                 </div>
             </fieldset>
+
+            <Keys keys={keys} />
         </SettingsLayout>
     );
 }

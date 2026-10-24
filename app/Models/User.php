@@ -17,7 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled', 'wingman_settings', 'wingman_token_hash', 'wingman_token_used_at'])]
-#[Hidden(['password', 'remember_token', 'wingman_token_hash'])]
+#[Hidden(['password', 'remember_token', 'wingman_token_hash', 'gemini_api_key', 'deepseek_api_key'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -47,6 +47,8 @@ class User extends Authenticatable
             'wingman_enabled' => 'boolean',
             'wingman_settings' => 'array',
             'wingman_token_used_at' => 'immutable_datetime',
+            'gemini_api_key' => 'encrypted',
+            'deepseek_api_key' => 'encrypted',
         ];
     }
 

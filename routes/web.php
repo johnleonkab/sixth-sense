@@ -96,6 +96,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('wingman/token', [WingmanController::class, 'revokeToken'])->name('wingman.token.revoke');
         Route::put('system/display', [SystemController::class, 'updateDisplay'])->name('system.display');
         Route::put('system/voice', [SystemController::class, 'updateVoice'])->name('system.voice');
+        Route::put('system/keys', [SystemController::class, 'updateKeys'])->middleware('throttle:6,1')->name('system.keys');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
         Route::put('alerts/{source}', [AlertController::class, 'update'])->name('alerts.update');

@@ -2,6 +2,7 @@
 
 namespace App\Voice\Providers;
 
+use App\Ai\ProviderKeys;
 use App\Models\User;
 use App\Voice\AssistantProfile;
 use App\Voice\VoiceProvider;
@@ -30,7 +31,9 @@ class GeminiVoiceProvider implements VoiceProvider
 
     public function startSession(User $user, AssistantProfile $assistant): VoiceSession
     {
-        if (blank($this->config['api_key'])) {
+        $key = app(ProviderKeys::class)->own('gemini', $user) ?? $this->config['api_key'];
+
+        if (blank($key)) {
             throw VoiceProviderUnavailable::misconfigured('gemini', 'GEMINI_API_KEY is not set.');
         }
 
@@ -42,7 +45,7 @@ class GeminiVoiceProvider implements VoiceProvider
 
         try {
             $response = Http::baseUrl($this->config['base_url'])
-                ->withHeaders(['x-goog-api-key' => $this->config['api_key']])
+                ->withHeaders(['x-goog-api-key' => $key])
                 ->timeout($this->config['timeout'])
                 ->acceptJson()
                 ->post("/{$this->config['api_version']}/auth_tokens", [
