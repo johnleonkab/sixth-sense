@@ -25,6 +25,7 @@
     "dependencies": {
         "@google/genai": "^2.27.0",
         "@inertiajs/react": "^3.8.0",
+        "@mdxeditor/editor": "^4.3.3",
         "laravel-echo": "^2.6.1",
         "pdfjs-dist": "^6.3.289",
         "pusher-js": "^8.6.0",
