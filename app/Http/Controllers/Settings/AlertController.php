@@ -33,6 +33,7 @@ class AlertController extends Controller
                         'watched' => $account->can($source->capability()),
                     ])->all(),
             ], AlertSource::cases()),
+            'vapidPublicKey' => filled(config('services.vapid.public_key')) ? config('services.vapid.public_key') : null,
         ]);
     }
 

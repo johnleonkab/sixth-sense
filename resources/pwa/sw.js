@@ -1,4 +1,4 @@
-const CACHE = 'sixth-sense-v1';
+const CACHE = 'sixth-sense-v2';
 
 const OFFLINE = `<!DOCTYPE html>
 <html lang="es">
@@ -85,3 +85,68 @@ self.addEventListener('fetch', (event) => {
         }),
     );
 });
+
+// Safari shows a declarative push itself. Chrome, Edge and Firefox reach this
+// handler and show the same JSON.
+self.addEventListener('push', (event) => {
+    let payload = {};
+
+    try {
+        payload = event.data ? event.data.json() : {};
+    } catch {
+        return;
+    }
+
+    const notification = payload.notification;
+
+    if (!notification || typeof notification.title !== 'string') {
+        return;
+    }
+
+    const url = typeof notification.navigate === 'string' ? notification.navigate : '/';
+
+    event.waitUntil(
+        self.registration.showNotification(notification.title, {
+            body: typeof notification.body === 'string' ? notification.body : '',
+            lang: typeof notification.lang === 'string' ? notification.lang : 'es',
+            tag: typeof notification.tag === 'string' ? notification.tag : undefined,
+            data: { url },
+        }),
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const target = notificationUrl(event.notification.data?.url);
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            const open = clients.find((client) => {
+                try {
+                    return new URL(client.url).origin === self.location.origin;
+                } catch {
+                    return false;
+                }
+            });
+
+            if (open) {
+                open.postMessage({ type: 'open-alert', url: target });
+
+                return open.focus();
+            }
+
+            return self.clients.openWindow(target);
+        }),
+    );
+});
+
+function notificationUrl(value) {
+    try {
+        const url = new URL(typeof value === 'string' ? value : '/', self.location.origin);
+
+        return url.origin === self.location.origin ? url.href : self.location.origin + '/';
+    } catch {
+        return self.location.origin + '/';
+    }
+}

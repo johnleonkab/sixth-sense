@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * Something that deserved an alert, with why: a message waiting for the
  * person's answer (with how an AI proposes to answer it), or a reminder.
  */
-#[Fillable(['source', 'external_id', 'thread_key', 'external_url', 'actor_name', 'title', 'body', 'why', 'relevance', 'status', 'triage', 'planning', 'resolution', 'payload', 'proposal', 'read_at', 'resolved_at', 'received_at'])]
+#[Fillable(['source', 'external_id', 'thread_key', 'external_url', 'actor_name', 'title', 'body', 'why', 'relevance', 'status', 'triage', 'planning', 'resolution', 'payload', 'proposal', 'read_at', 'resolved_at', 'received_at', 'last_push_key'])]
 class InboxItem extends Model
 {
     /** @use HasFactory<InboxItemFactory> */
@@ -131,6 +131,22 @@ class InboxItem extends Model
     public function messageRef(): string
     {
         return $this->external_id;
+    }
+
+    /**
+     * Waiting for the person: the states that already ring inside the app.
+     */
+    public function awaitsPush(): bool
+    {
+        return in_array($this->state(), ['important', 'planning', 'ready'], true);
+    }
+
+    /**
+     * One notification per message. A proposal becoming ready does not change it.
+     */
+    public function pushKey(): string
+    {
+        return $this->id.':'.count($this->messages()).':'.$this->external_id;
     }
 
     /**

@@ -1,5 +1,7 @@
 import { Link, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 
+import { deviceSubscribed, disableDevicePush, enableDevicePush } from '@/alerts/push';
 import { ServiceIconFor } from '@/components/service-icon';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
@@ -75,13 +77,77 @@ function SourceCard({ source }: { source: AlertSource }) {
     );
 }
 
-export default function Alerts({ sources }: { sources: AlertSource[] }) {
+function DeviceAlerts({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+    const [on, setOn] = useState(false);
+    const [ready, setReady] = useState(vapidPublicKey === null);
+    const [note, setNote] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (vapidPublicKey === null) {
+            return;
+        }
+
+        let active = true;
+
+        void deviceSubscribed().then((subscribed) => {
+            if (!active) {
+                return;
+            }
+
+            setOn(subscribed);
+            setReady(true);
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [vapidPublicKey]);
+
+    const toggle = async (checked: boolean) => {
+        if (vapidPublicKey === null) {
+            return;
+        }
+
+        setNote(null);
+
+        try {
+            if (checked) {
+                await enableDevicePush(vapidPublicKey);
+            } else {
+                await disableDevicePush();
+            }
+
+            setOn(checked);
+        } catch {
+            setOn(false);
+            setNote(checked ? 'Este navegador no ha dado permiso para avisarte.' : 'No he podido quitar el aviso de este dispositivo.');
+        }
+    };
+
+    return (
+        <section aria-labelledby="alerts-device" className="rounded-2xl border border-line bg-surface px-[22px] py-[18px]">
+            <Switch checked={on} disabled={vapidPublicKey === null || !ready} onChange={(checked) => void toggle(checked)}>
+                <span id="alerts-device" className="text-[15px] font-medium tracking-[-0.01em]">
+                    Avisar en este dispositivo
+                </span>
+            </Switch>
+            <p className="mt-1 max-w-[480px] pl-10 text-[13px] text-muted">
+                Los avisos importantes llegan también como notificación del sistema, con el motivo. En el iPhone solo funciona con la app en la pantalla de inicio.
+            </p>
+            {vapidPublicKey === null && <p className="mt-2 pl-10 text-[13px] text-warn">Los avisos del sistema no están configurados.</p>}
+            {note && <p className="mt-2 pl-10 text-[13px] text-warn">{note}</p>}
+        </section>
+    );
+}
+
+export default function Alerts({ sources, vapidPublicKey }: { sources: AlertSource[]; vapidPublicKey: string | null }) {
     return (
         <SettingsLayout
             title="Avisos"
             description="Lo que sixth-sense te cuenta sin que preguntes. Solo avisa de lo importante, con un sonido, y siempre te dice por qué."
         >
             <div className="flex flex-col gap-4">
+                <DeviceAlerts vapidPublicKey={vapidPublicKey} />
                 {sources.map((source) => (
                     <SourceCard key={source.key} source={source} />
                 ))}

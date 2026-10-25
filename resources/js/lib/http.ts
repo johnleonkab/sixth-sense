@@ -38,6 +38,31 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
     return (await response.json()) as T;
 }
 
+/**
+ * JSON DELETE to the Laravel app with the session's CSRF token.
+ */
+export async function deleteJson<T>(url: string, body: unknown): Promise<T> {
+    const response = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': xsrfToken(),
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { message?: string };
+
+        throw new HttpError(response.status, data.message ?? `HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+}
+
 export const browserTimezone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /**

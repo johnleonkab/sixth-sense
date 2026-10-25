@@ -161,6 +161,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Browsers registered for system notifications.
+     *
+     * @return HasMany<PushSubscription, $this>
+     */
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
+    /**
      * @return HasMany<MeetingReminder, $this>
      */
     public function meetingReminders(): HasMany

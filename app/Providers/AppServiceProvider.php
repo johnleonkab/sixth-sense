@@ -12,6 +12,8 @@ use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\Judges\LlmMeetingAdvisor;
 use App\Alerts\Judges\LlmRelevanceJudge;
 use App\Alerts\MeetingAdvisor;
+use App\Alerts\Push\PushSender;
+use App\Alerts\Push\WebPushSender;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\LlmReplyPlanner;
@@ -40,6 +42,9 @@ use App\Connectors\Notion\NotionWiki;
 use App\Connectors\Slack\SlackChats;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
+use App\Events\InboxItemCreated;
+use App\Events\InboxItemUpdated;
+use App\Jobs\SendAlertPush;
 use App\Scenes\DeepSeekSceneText;
 use App\Scenes\SceneText;
 use App\Scheduling\Assessors\FakeTaskAssessor;
@@ -78,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ProviderKeys::class);
+        $this->app->bind(PushSender::class, WebPushSender::class);
 
         $this->app->bind(CalendarReader::class, fn (): CalendarReader => config('connectors.demo')
             ? new FakeCalendarReader
@@ -246,6 +252,13 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(JobProcessed::class, $forget);
         Event::listen(JobExceptionOccurred::class, $forget);
+
+        $notify = function (InboxItemCreated|InboxItemUpdated $event): void {
+            SendAlertPush::dispatch($event->item);
+        };
+
+        Event::listen(InboxItemCreated::class, $notify);
+        Event::listen(InboxItemUpdated::class, $notify);
     }
 
     /**

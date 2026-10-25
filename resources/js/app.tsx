@@ -1,6 +1,6 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 
 const appName = import.meta.env.VITE_APP_NAME || 'sixth-sense';
@@ -11,6 +11,20 @@ const appName = import.meta.env.VITE_APP_NAME || 'sixth-sense';
  */
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+
+    navigator.serviceWorker.addEventListener('message', (event: MessageEvent<{ type?: string; url?: string }>) => {
+        if (event.data?.type !== 'open-alert' || typeof event.data.url !== 'string') {
+            return;
+        }
+
+        const target = new URL(event.data.url, window.location.origin);
+
+        if (target.origin !== window.location.origin) {
+            return;
+        }
+
+        router.visit(`${target.pathname}${target.search}${target.hash}`);
+    });
 }
 
 window.addEventListener('vite:preloadError', () => {

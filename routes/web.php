@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\PendingActionController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\SceneController;
 use App\Http\Controllers\Settings\AccountAuthorizationController;
@@ -55,6 +56,8 @@ Route::middleware('auth')->group(function () {
     Route::get('alerts/feed', AlertFeedController::class)->middleware('throttle:120,1')->name('alerts.feed');
     Route::get('alerts/history', [AlertFeedController::class, 'history'])->middleware('throttle:120,1')->name('alerts.history');
     Route::post('alerts/{item}/dismiss', [AlertFeedController::class, 'dismiss'])->whereNumber('item')->name('alerts.dismiss');
+    Route::post('push-subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:10,1')->name('push-subscriptions.store');
+    Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
     Route::get('media/chat/{file}', [MediaController::class, 'chatFile'])->name('media.chat');
     Route::get('media/mail/{message}/{index}', [MediaController::class, 'mailAttachment'])->whereNumber('index')->name('media.mail');
 

@@ -84,7 +84,13 @@ function useNow(): Date {
     return now;
 }
 
-export default function Home({ alerts }: { alerts: Alert[] }) {
+type OpenAlert = {
+    id: number;
+    source: string;
+    starts_at: string | null;
+};
+
+export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; openAlert?: OpenAlert | null }) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
     const nextCanvasId = useRef(1);
@@ -247,6 +253,37 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                 setOpening(null);
             });
     };
+    const openedFromNotification = useRef(false);
+
+    useEffect(() => {
+        const url = new URL(window.location.href);
+
+        if (!url.searchParams.has('alert')) {
+            return;
+        }
+
+        url.searchParams.delete('alert');
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+
+        if (!openAlert || openedFromNotification.current) {
+            return;
+        }
+
+        openedFromNotification.current = true;
+
+        if (openAlert.source === 'calendar') {
+            const date = (openAlert.starts_at ?? '').slice(0, 10);
+
+            if (date !== '') {
+                runFromScreen('show_calendar', { start_date: date });
+            }
+
+            return;
+        }
+
+        runFromScreen('review_alert', { alert_id: openAlert.id });
+    }, [openAlert]);
+
     const now = useNow();
 
     return (

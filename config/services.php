@@ -68,4 +68,10 @@ return [
         'redirect' => env('NOTION_REDIRECT_URI', env('APP_URL').'/settings/connections/notion/callback'),
     ],
 
+    'vapid' => [
+        'subject' => env('VAPID_SUBJECT', 'mailto:sixth-sense@localhost'),
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+    ],
+
 ];
