@@ -506,3 +506,46 @@
     min-height: 0;
     flex: none;
 }
+
+/* Phone navigation between the assistant and settings: the page slides, like going back in an app. */
+@media (max-width: 767px) {
+    html[data-nav='forward']::view-transition-old(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-forward-out;
+    }
+
+    html[data-nav='forward']::view-transition-new(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-forward-in;
+    }
+
+    html[data-nav='back']::view-transition-old(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-back-out;
+    }
+
+    html[data-nav='back']::view-transition-new(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-back-in;
+    }
+}
+
+@keyframes nav-forward-out {
+    to {
+        transform: translateX(-22%);
+    }
+}
+
+@keyframes nav-forward-in {
+    from {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes nav-back-out {
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes nav-back-in {
+    from {
+        transform: translateX(-22%);
+    }
+}

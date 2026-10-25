@@ -228,7 +228,7 @@ function AccountRow({ provider, account }: { provider: ProviderConnections; acco
 
     return (
         <li className="py-3 first:pt-0 last:pb-0">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3 max-md:flex-wrap">
                 <AccountAvatar account={account} />
 
                 <div className="min-w-0 flex-1">
@@ -240,7 +240,7 @@ function AccountRow({ provider, account }: { provider: ProviderConnections; acco
                     </p>
                 </div>
 
-                <div className="flex flex-none items-center gap-1 text-[13px]">
+                <div className="flex flex-none items-center gap-1 text-[13px] max-md:w-full max-md:flex-wrap">
                     {provider.key === 'atlassian' && (
                         <Link
                             href={`/settings/connections/${account.id}/rules`}
@@ -283,7 +283,7 @@ function ProviderCard({ provider }: { provider: ProviderConnections }) {
 
     return (
         <section aria-labelledby={`provider-${provider.key}`} className="rounded-2xl border border-line bg-surface">
-            <header className="flex items-center gap-3 px-[22px] pt-[18px]">
+            <header className="flex items-center gap-3 px-[22px] pt-[18px] max-md:flex-wrap">
                 <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[9px] border border-line bg-surface">
                     <ServiceIconFor reference={provider.key} size={20} label={false} />
                 </span>

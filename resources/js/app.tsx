@@ -51,3 +51,6 @@ createInertiaApp({
         color: 'var(--accent)',
     },
 });
+
+router.on('finish', () => document.documentElement.removeAttribute('data-nav'));
+router.on('httpException', () => document.documentElement.removeAttribute('data-nav'));

@@ -58,7 +58,11 @@ function SettingsIcon() {
     return (
         <svg viewBox="0 0 24 24" className="size-5 md:hidden" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden>
             <circle cx="12" cy="12" r="3" />
-            <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18" strokeLinecap="round" />
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"
+            />
         </svg>
     );
 }
@@ -291,7 +295,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
             <Head title="Inicio" />
 
             <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
-                <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[1fr_auto_1fr] items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1.5 text-[13px] text-muted">
+                <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1.5 text-[13px] text-muted md:grid-cols-[1fr_auto_1fr]">
                     <div className="flex min-w-0 items-center gap-3">
                         <Wordmark />
                         <span className="hidden sm:inline">
@@ -317,7 +321,15 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                             onArrive={(alert) => void voice.tell(alertArrivedNote(alert), false)}
                             onTellMe={(alert) => void voice.tell(tellMeNote(alert), true)}
                         />
-                        <Link href="/settings" aria-label="Configuración" className="grid size-11 place-items-center rounded-lg hover:bg-soft hover:text-ink md:size-auto md:px-2.5 md:py-1">
+                        <Link
+                            href="/settings"
+                            viewTransition={!wide}
+                            onClick={() => {
+                                document.documentElement.dataset.nav = 'forward';
+                            }}
+                            aria-label="Configuración"
+                            className="grid size-11 place-items-center rounded-lg hover:bg-soft hover:text-ink md:size-auto md:px-2.5 md:py-1"
+                        >
                             <SettingsIcon />
                             <span className="max-md:sr-only">Configuración</span>
                         </Link>
@@ -326,7 +338,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                             method="post"
                             as="button"
                             aria-label="Salir"
-                            className="grid size-11 place-items-center rounded-lg hover:bg-soft hover:text-ink md:size-auto md:px-2.5 md:py-1"
+                            className="hidden place-items-center rounded-lg hover:bg-soft hover:text-ink md:grid md:px-2.5 md:py-1"
                         >
                             <LeaveIcon />
                             <span className="max-md:sr-only">Salir</span>

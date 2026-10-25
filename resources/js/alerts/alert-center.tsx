@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
@@ -355,14 +356,67 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
         </div>
     ));
 
+    const pull = useRef(0);
+    const [reveal, setReveal] = useState(0);
+    const gesture = useRef<{ y: number; dragging: boolean } | null>(null);
+    const suppressClick = useRef(false);
+
+    const onChipPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (open || window.matchMedia('(min-width: 768px)').matches) {
+            return;
+        }
+
+        gesture.current = { y: event.clientY, dragging: false };
+    };
+
+    const onChipPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        const start = gesture.current;
+
+        if (!start) {
+            return;
+        }
+
+        const distance = Math.max(0, event.clientY - start.y);
+
+        if (!start.dragging) {
+            if (distance < 8) {
+                return;
+            }
+
+            start.dragging = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+        }
+
+        pull.current = distance;
+        setReveal(distance);
+    };
+
+    const endChipGesture = () => {
+        const start = gesture.current;
+        gesture.current = null;
+
+        if (!start?.dragging) {
+            return;
+        }
+
+        suppressClick.current = true;
+
+        if (pull.current > 72) {
+            setOpen(true);
+        }
+
+        pull.current = 0;
+        setReveal(0);
+    };
+
     const cluster = embedInHeader
-        ? 'max-md:contents md:fixed md:top-[60px] md:right-4 md:z-50 md:flex md:w-[min(380px,calc(100vw-32px))] md:flex-col md:items-end md:gap-2'
-        : 'fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2';
+        ? 'relative md:fixed md:top-[60px] md:right-4 md:z-50 md:flex md:w-[min(380px,calc(100vw-32px))] md:flex-col md:items-end md:gap-2'
+        : 'fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2 max-md:top-[calc(env(safe-area-inset-top)+4.75rem)]';
 
     return (
         <div className={cluster}>
-            <div className={`flex items-start gap-2 ${embedInHeader ? 'max-md:contents' : ''}`}>
-                <div className={embedInHeader ? 'max-md:fixed max-md:top-[calc(env(safe-area-inset-top)+3.25rem)] max-md:right-4 max-md:z-40' : ''}>
+            <div className="flex items-center gap-2 md:items-start">
+                <div className="max-md:fixed max-md:top-[calc(env(safe-area-inset-top)+4.75rem)] max-md:right-4 max-md:z-30">
                     <WingmanBubble />
                 </div>
 
@@ -370,13 +424,26 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                     type="button"
                     aria-expanded={open}
                     aria-label={`Avisos: ${waiting.length} pendientes`}
-                    onClick={() => setOpen(!open)}
-                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${embedInHeader ? 'max-md:size-11 max-md:justify-center max-md:px-0 max-md:py-0' : ''} ${open ? 'border-accent/50' : 'border-line'}`}
+                    onPointerDown={onChipPointerDown}
+                    onPointerMove={onChipPointerMove}
+                    onPointerUp={endChipGesture}
+                    onPointerCancel={endChipGesture}
+                    onClick={() => {
+                        if (suppressClick.current) {
+                            suppressClick.current = false;
+
+                            return;
+                        }
+
+                        setOpen(!open);
+                    }}
+                    className={`flex h-11 touch-none items-center gap-1.5 rounded-full border bg-surface px-2.5 text-[12.5px] shadow-card transition-all hover:bg-soft md:h-auto md:touch-auto md:gap-2 md:px-3 md:py-1.5 ${open ? 'border-accent/50' : 'border-line'}`}
                 >
                     <span
                         title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
                         className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
                     />
+                    {embedInHeader && waiting.length > 0 && <span className="font-medium tabular-nums md:hidden">{waiting.length}</span>}
                     <span className={embedInHeader ? 'max-md:sr-only' : ''}>
                         {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
                         {working && <span className="text-muted"> · analizando</span>}
@@ -390,7 +457,9 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                 </div>
             )}
 
-            {open && <AlertSheet onClose={() => setOpen(false)}>{inbox}</AlertSheet>}
+            <AlertSheet open={open} reveal={reveal} onClose={() => setOpen(false)}>
+                {inbox}
+            </AlertSheet>
 
             {!open && (
                 <div
@@ -407,48 +476,146 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
     );
 }
 
-/** The alert list on a phone: a sheet from the bottom, closed by the backdrop or a downward drag. */
-function AlertSheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+/**
+ * The alert list on a phone. It rises from the bottom, follows a finger
+ * dragged down from the chip or the sheet, and closes when that drag is let go.
+ */
+function AlertSheet({ open, reveal, onClose, children }: { open: boolean; reveal: number; onClose: () => void; children: ReactNode }) {
+    const sheet = useRef<HTMLDivElement>(null);
+    const scroller = useRef<HTMLDivElement>(null);
+    const offset = useRef(0);
     const startY = useRef<number | null>(null);
-    const [drag, setDrag] = useState(0);
+    const shown = useRef(false);
+    const [y, setY] = useState(() => (typeof window === 'undefined' ? 480 : Math.round(window.innerHeight * 0.8)));
+    const [dragging, setDragging] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-    return (
+    const place = (value: number) => {
+        offset.current = value;
+        setY(value);
+    };
+
+    const height = () => sheet.current?.offsetHeight || Math.round(window.innerHeight * 0.8);
+
+    useLayoutEffect(() => {
+        if (reveal > 0 && !open) {
+            shown.current = true;
+            setMounted(true);
+            setDragging(true);
+            place(Math.max(0, height() - reveal));
+
+            return;
+        }
+
+        if (open) {
+            shown.current = true;
+            setMounted(true);
+
+            return;
+        }
+
+        if (!shown.current) {
+            return;
+        }
+
+        setDragging(false);
+        place(height());
+        const timer = window.setTimeout(() => {
+            shown.current = false;
+            setMounted(false);
+        }, 280);
+
+        return () => window.clearTimeout(timer);
+    }, [open, reveal]);
+
+    useEffect(() => {
+        if (!open || reveal > 0 || offset.current < 8) {
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() => place(0));
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [open, reveal]);
+
+    if (!mounted || typeof document === 'undefined') {
+        return null;
+    }
+
+    const travel = height();
+    const fade = travel === 0 ? 1 : Math.max(0, 1 - y / travel);
+
+    const beginDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+        const fromHandle = (event.target as HTMLElement).dataset.handle === 'true';
+
+        if (!fromHandle && (scroller.current?.scrollTop ?? 0) > 0) {
+            return;
+        }
+
+        startY.current = event.clientY;
+    };
+
+    const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (startY.current === null) {
+            return;
+        }
+
+        const next = event.clientY - startY.current;
+
+        if (next < 8) {
+            return;
+        }
+
+        setDragging(true);
+        sheet.current?.setPointerCapture(event.pointerId);
+        place(next);
+    };
+
+    const endDrag = () => {
+        if (startY.current === null) {
+            return;
+        }
+
+        startY.current = null;
+        setDragging(false);
+
+        if (offset.current > 72) {
+            onClose();
+
+            return;
+        }
+
+        place(0);
+    };
+
+    return createPortal(
         <div className="fixed inset-0 z-50 md:hidden">
-            <button type="button" aria-label="Cerrar avisos" className="absolute inset-0 bg-ink/40" onClick={onClose} />
+            <button
+                type="button"
+                aria-label="Cerrar avisos"
+                className="absolute inset-0 bg-black/55 transition-opacity duration-300 data-[dragging=true]:transition-none"
+                data-dragging={dragging ? 'true' : undefined}
+                style={{ opacity: fade }}
+                onClick={onClose}
+            />
             <div
-                className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card"
-                style={{ transform: drag > 0 ? `translateY(${drag}px)` : undefined }}
+                ref={sheet}
+                data-dragging={dragging ? 'true' : undefined}
+                className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card transition-transform duration-300 ease-out data-[dragging=true]:transition-none"
+                style={{ transform: `translateY(${y}px)` }}
+                onPointerDown={beginDrag}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
             >
-                <div
-                    className="flex shrink-0 justify-center py-3"
-                    onPointerDown={(event) => {
-                        startY.current = event.clientY;
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                    }}
-                    onPointerMove={(event) => {
-                        if (startY.current === null) {
-                            return;
-                        }
-
-                        setDrag(Math.max(0, event.clientY - startY.current));
-                    }}
-                    onPointerUp={() => {
-                        if (drag > 72) {
-                            onClose();
-                        }
-
-                        startY.current = null;
-                        setDrag(0);
-                    }}
-                    onPointerCancel={() => {
-                        startY.current = null;
-                        setDrag(0);
-                    }}
-                >
-                    <span aria-hidden className="h-1 w-10 rounded-full bg-line" />
+                <div data-handle="true" className="flex shrink-0 cursor-grab justify-center py-3 touch-none">
+                    <span aria-hidden data-handle="true" className="h-1 w-10 rounded-full bg-line" />
                 </div>
-                <div className="min-h-0 overflow-auto p-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{children}</div>
+                <div ref={scroller} className="min-h-0 overflow-auto p-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    {children}
+                </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }

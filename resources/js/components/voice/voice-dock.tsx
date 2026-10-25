@@ -203,7 +203,7 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
                     <button
                         type="button"
                         onClick={voice.stop}
-                        className="min-h-11 rounded-full border border-line bg-surface px-6 text-[15px] text-ink hover:bg-soft md:min-h-0 md:px-4 md:py-1.5 md:text-[13px]"
+                        className="min-h-14 w-full rounded-2xl border border-line bg-surface text-[16px] font-medium text-ink shadow-card hover:bg-soft md:min-h-0 md:w-auto md:rounded-full md:px-4 md:py-1.5 md:text-[13px] md:font-normal md:shadow-none"
                     >
                         Terminar
                     </button>
@@ -211,7 +211,7 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
                     <button
                         type="button"
                         onClick={() => void voice.start('voice')}
-                        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-8 text-[16px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:px-5 md:py-2 md:text-[14px]"
+                        className="inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-accent text-[17px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:w-auto md:gap-2 md:rounded-full md:px-5 md:py-2 md:text-[14px]"
                     >
                         <MicrophoneIcon />
                         Hablar
