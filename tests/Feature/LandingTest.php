@@ -11,6 +11,8 @@ test('visitors see the landing, with the code and a way in', function () {
 
     $this->get(route('home'))
         ->assertOk()
+        ->assertSee('og:title', false)
+        ->assertSee('your workday, spoken', false)
         ->assertInertia(fn (Assert $page) => $page->component('landing')
             ->where('canRegister', false)
             ->where('repositoryUrl', 'https://github.com/acme/sixth-sense'));
