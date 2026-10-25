@@ -174,9 +174,17 @@ test('by voice: it says when, and why that urgency, and it can be undone', funct
         ->assertJsonPath('canvas.props.task.status', 'scheduled')
         ->assertJsonPath('output.when', 'miércoles 14 de octubre, 10:00')
         ->assertJsonPath('output.urgency', 'Esta semana')
-        ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.');
+        ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.')
+        ->assertJsonPath('beside', null);
 
     runAgendaTool('cancel_scheduled_task', ['task_id' => $booked->json('output.task_id')])
         ->assertJsonPath('canvas.props.task.status', 'cancelled')
         ->assertJsonPath('output.say', 'Quitado: «Revisar el PRD del prepago» ya no está en tu calendario.');
+});
+
+test('when nothing fits, the day stays beside the task so the person can decide', function () {
+    runAgendaTool('schedule_task', ['what' => 'Contestar a riesgos', 'effort_minutes' => 120, 'urgency' => 'today'])
+        ->assertJsonPath('canvas.props.task.status', 'conflict')
+        ->assertJsonPath('beside.view', 'calendar.day')
+        ->assertJsonPath('beside.props.from', '2026-10-14');
 });

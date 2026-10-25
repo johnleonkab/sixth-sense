@@ -98,7 +98,8 @@ test('slot_then_reply does not call DeepSeek when the calendar has no slot', fun
 
     expect($text->capableCalls)->toBe([])
         ->and(PendingAction::query()->count())->toBe(0)
-        ->and($scene->fresh()->canvas['cards'][1]['state'])->toBe('failed');
+        ->and($scene->fresh()->canvas['cards'][1]['state'])->toBe('failed')
+        ->and($scene->fresh()->canvas['beside']['view'])->toBe('calendar.agenda');
 });
 
 test('slot_then_reply drafts the reply with the free time', function () {

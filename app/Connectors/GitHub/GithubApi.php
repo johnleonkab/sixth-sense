@@ -3,6 +3,8 @@
 namespace App\Connectors\GitHub;
 
 use App\Connections\AccessTokens;
+use App\Connections\AccountNeedsReconnection;
+use App\Connections\AccountStatus;
 use App\Models\ConnectedAccount;
 use App\Models\GithubRepository;
 use Illuminate\Http\Client\Response;
@@ -150,7 +152,31 @@ class GithubApi
      */
     private function send(ConnectedAccount $account, string $verb, string $path, array $data): Response
     {
-        $pending = Http::withToken($this->tokens->for($account))
+        $token = $this->tokens->for($account);
+        $response = $this->request($token, $verb, $path, $data);
+
+        if ($response->status() !== 401) {
+            return $response;
+        }
+
+        $token = $this->tokens->renew($account, $token);
+        $response = $this->request($token, $verb, $path, $data);
+
+        if ($response->status() === 401) {
+            $account->update(['status' => AccountStatus::NeedsReconnection]);
+
+            throw new AccountNeedsReconnection($account);
+        }
+
+        return $response;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function request(string $token, string $verb, string $path, array $data): Response
+    {
+        $pending = Http::withToken($token)
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'User-Agent' => 'sixth-sense',

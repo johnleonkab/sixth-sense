@@ -18,6 +18,7 @@ class SceneUpdated implements ShouldBroadcastNow
 
     /**
      * @param  list<array<string, mixed>>  $cards
+     * @param  ?array{view: string, props: array<string, mixed>, layout: string}  $beside
      */
     public function __construct(
         public int $userId,
@@ -25,6 +26,7 @@ class SceneUpdated implements ShouldBroadcastNow
         public string $status,
         public array $cards,
         public ?string $offer,
+        public ?array $beside = null,
     ) {}
 
     /**
@@ -50,6 +52,7 @@ class SceneUpdated implements ShouldBroadcastNow
             'status' => $this->status,
             'cards' => $this->cards,
             'offer' => $this->offer,
+            'beside' => $this->beside,
         ];
     }
 
@@ -59,6 +62,7 @@ class SceneUpdated implements ShouldBroadcastNow
     public static function forScene(Scene $scene, ?string $offer): void
     {
         $cards = $scene->canvas['cards'] ?? [];
+        $beside = $scene->canvas['beside'] ?? null;
 
         self::dispatch(
             $scene->user_id,
@@ -66,6 +70,7 @@ class SceneUpdated implements ShouldBroadcastNow
             $scene->status,
             is_array($cards) ? array_values($cards) : [],
             $offer,
+            is_array($beside) ? $beside : null,
         );
     }
 }

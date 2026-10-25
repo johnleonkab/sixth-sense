@@ -93,10 +93,19 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
     // A confirmed change is acknowledged with a sound once the service really did it.
     const actions = useActions({ onExecuted: (action) => ring(['mail.send', 'chat.send'].includes(action.type) ? 'sent' : 'done') });
 
-    // For now each canvas replaces what was on screen; layouts with two come with the agent protocol.
+    // One canvas, or two when the decision needs both. The second sits on the right.
     const [agent, setAgent] = useState<string | null>(null);
 
-    const show = (directive: CanvasDirective) => {
+    const place = (next: CanvasDirective[]) => {
+        setCanvases(next.map((directive) => ({ id: nextCanvasId.current++, directive })));
+
+        if (window.matchMedia('(max-width: 767px)').matches && !canvasInHistory.current) {
+            history.pushState({ sixthSenseCanvas: true }, '');
+            canvasInHistory.current = true;
+        }
+    };
+
+    const show = (directive: CanvasDirective, beside?: CanvasDirective | null) => {
         if (directive.view === 'sense.agent') {
             const name = directive.props.name;
 
@@ -105,16 +114,13 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
             return;
         }
 
-        if (directive.props.action) {
-            actions.track(directive.props.action as ActionState);
+        for (const canvas of [directive, beside]) {
+            if (canvas?.props.action) {
+                actions.track(canvas.props.action as ActionState);
+            }
         }
 
-        setCanvases([{ id: nextCanvasId.current++, directive }]);
-
-        if (window.matchMedia('(max-width: 767px)').matches && !canvasInHistory.current) {
-            history.pushState({ sixthSenseCanvas: true }, '');
-            canvasInHistory.current = true;
-        }
+        place(beside ? [directive, beside] : [directive]);
     };
 
     useEffect(() => {
@@ -196,7 +202,19 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
 
         const offered = new Set<number>();
         const channel = echoConnection().private(`App.Models.User.${userId}`);
-        const onScene = (event: { scene_id: number; offer: string | null }) => {
+        const onScene = (event: { scene_id: number; offer: string | null; beside: CanvasDirective | null }) => {
+            if (event.beside?.view) {
+                setCanvases((current) => {
+                    const scene = current.find((canvas) => canvas.directive.view === 'scene.board' && canvas.directive.props.scene_id === event.scene_id);
+
+                    if (!scene) {
+                        return current;
+                    }
+
+                    return [scene, { id: nextCanvasId.current++, directive: event.beside as CanvasDirective }];
+                });
+            }
+
             if (event.offer && voice.active && !offered.has(event.scene_id)) {
                 offered.add(event.scene_id);
                 void voice.tell(event.offer, true);
@@ -223,7 +241,7 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
         setOpening(activityFor([name]));
 
         void runTool({ id: `screen-${Date.now()}`, name, args })
-            .then((outcome) => outcome.canvas && show(outcome.canvas))
+            .then((outcome) => outcome.canvas && show(outcome.canvas, outcome.beside))
             .finally(() => {
                 openingNow.current = false;
                 setOpening(null);
@@ -279,7 +297,7 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                     </div>
                 </header>
 
-                <main aria-live="polite" aria-busy={opening !== null} className="min-h-0 overflow-auto py-4">
+                <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 py-4 ${canvases.length > 1 ? 'overflow-auto md:flex md:flex-col md:overflow-hidden' : 'overflow-auto'}`}>
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
                         !opening && (
@@ -292,16 +310,18 @@ export default function Home({ alerts }: { alerts: Alert[] }) {
                             <div
                                 // The chosen display size scales the canvases, not the voice zone.
                                 style={wide ? { zoom: auth.user?.display_scale ?? 1 } : undefined}
-                                className={`mx-auto grid items-start gap-5 transition-opacity ${opening ? 'pointer-events-none opacity-50' : ''} ${
+                                className={`mx-auto grid w-full items-start gap-5 transition-opacity ${opening ? 'pointer-events-none opacity-50' : ''} ${
                                     canvases.length > 1
-                                        ? 'max-w-[1120px] md:grid-cols-2'
+                                        ? 'max-w-[1120px] md:min-h-0 md:flex-1 md:grid-cols-2 md:items-stretch'
                                         : canvases[0].directive.layout === 'wide'
                                           ? 'max-w-[1120px]'
                                           : 'max-w-[760px]'
                                 }`}
                             >
                                 {canvases.map((canvas, index) => (
-                                    <Canvas key={canvas.id} directive={canvas.directive} index={index + 1} />
+                                    <div key={canvas.id} className={canvases.length > 1 ? 'min-w-0 md:min-h-0 md:overflow-y-auto' : 'min-w-0'}>
+                                        <Canvas directive={canvas.directive} index={index + 1} />
+                                    </div>
                                 ))}
                             </div>
                         </CanvasContext>

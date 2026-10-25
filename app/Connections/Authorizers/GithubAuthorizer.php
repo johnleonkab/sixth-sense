@@ -85,8 +85,8 @@ class GithubAuthorizer implements AccountAuthorizer
             name: $profile->json('name') ?: $profile->json('login'),
             avatarUrl: $profile->json('avatar_url'),
             accessToken: $accessToken,
-            refreshToken: null,
-            expiresIn: null,
+            refreshToken: $token->json('refresh_token'),
+            expiresIn: filled($token->json('expires_in')) ? (int) $token->json('expires_in') : null,
             scopes: array_values(array_filter(preg_split('/[\s,]+/', (string) $token->json('scope')) ?: [])),
             metadata: [
                 'login' => $profile->json('login'),

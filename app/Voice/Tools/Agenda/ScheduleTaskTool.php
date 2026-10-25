@@ -2,15 +2,19 @@
 
 namespace App\Voice\Tools\Agenda;
 
+use App\Models\AgendaTask;
 use App\Models\User;
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Scheduler;
 use App\Scheduling\SchedulingRequest;
 use App\Scheduling\Urgency;
+use App\Voice\Tools\Calendar\CalendarCanvas;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
+use Carbon\CarbonImmutable;
+use Throwable;
 
 /**
  * "Agéndame revisar el PRD esta semana": the scheduler decides how urgent it
@@ -18,7 +22,7 @@ use App\Voice\Tools\VoiceTool;
  */
 class ScheduleTaskTool implements VoiceTool
 {
-    public function __construct(private Scheduler $scheduler) {}
+    public function __construct(private Scheduler $scheduler, private CalendarCanvas $calendar) {}
 
     public function name(): string
     {
@@ -99,6 +103,23 @@ class ScheduleTaskTool implements VoiceTool
                 'task' => $task->toCard($context->timezone()),
                 'action' => $task->pendingAction?->toState(),
             ]),
+            beside: $task->status === AgendaTaskStatus::Conflict ? $this->calendarBeside($user, $task, $context) : null,
         );
+    }
+
+    /**
+     * The days that were searched, when none of them had room.
+     */
+    private function calendarBeside(User $user, AgendaTask $task, ToolContext $context): ?Canvas
+    {
+        try {
+            $until = $task->deadline !== null
+                ? CarbonImmutable::parse($task->deadline->toDateString(), $context->timezone())->endOfDay()
+                : ($task->urgency?->latestEnd($context->now) ?? $context->now->endOfWeek());
+
+            return $this->calendar->covering($user, $context->now, $until, $context->now);
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

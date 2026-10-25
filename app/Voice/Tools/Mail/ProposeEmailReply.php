@@ -85,6 +85,6 @@ class ProposeEmailReply implements VoiceTool
             return ToolResult::error('No hay a quién responder en ese email.');
         }
 
-        return $this->propose($this->actions, $user, $email, $arguments['body']);
+        return $this->propose($this->actions, $user, $email, $arguments['body'], $original, $context->timezone());
     }
 }

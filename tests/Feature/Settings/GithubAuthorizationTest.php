@@ -6,6 +6,7 @@ use App\Models\ConnectedAccount;
 use App\Models\GithubRepository;
 use App\Models\User;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -62,6 +63,8 @@ test('the callback stores the account and the repositories it can see', function
         ->and($account->external_account_id)->toBe('42')
         ->and($account->email)->toBe('jhon@covermanager.com')
         ->and($account->access_token)->toBe('gho_1')
+        ->and($account->refresh_token)->toBeNull()
+        ->and($account->expires_at)->toBeNull()
         ->and($account->metadata)->toBe(['login' => 'jhon'])
         ->and($account->can(Capability::GithubRead))->toBeTrue()
         ->and($account->can(Capability::GithubWrite))->toBeTrue()
@@ -70,6 +73,30 @@ test('the callback stores the account and the repositories it can see', function
         ->and($account->githubRepositories()->where('included', true)->exists())->toBeFalse();
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'access_token') && $request['code'] === 'abc' && $request['client_secret'] === 'github-secret');
+});
+
+test('an expiring grant keeps the refresh token, encrypted, and when it runs out', function () {
+    [, $query] = githubRedirect();
+    Http::fake([
+        'github.com/login/oauth/access_token' => Http::response([
+            'access_token' => 'gho_1',
+            'refresh_token' => 'ghr_1',
+            'expires_in' => 28800,
+            'scope' => 'repo,read:user,user:email',
+            'token_type' => 'bearer',
+        ]),
+        'api.github.com/user/repos*' => Http::response([]),
+        'api.github.com/user' => Http::response(['id' => 42, 'login' => 'jhon', 'name' => 'John León', 'email' => 'jhon@covermanager.com']),
+    ]);
+
+    $this->get(route('settings.connections.callback', ['provider' => 'github', 'code' => 'abc', 'state' => $query['state']]));
+
+    $account = ConnectedAccount::sole();
+    $stored = DB::table('connected_accounts')->where('id', $account->id)->value('refresh_token');
+
+    expect($account->refresh_token)->toBe('ghr_1')
+        ->and($account->expires_at->diffInSeconds(now()->addSeconds(28799)))->toBeLessThan(5)
+        ->and($stored)->not->toContain('ghr_1');
 });
 
 test('connecting again keeps the repositories the person already chose', function () {

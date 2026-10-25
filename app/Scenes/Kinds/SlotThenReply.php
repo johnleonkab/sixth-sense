@@ -12,7 +12,9 @@ use App\Models\Scene;
 use App\Scenes\SceneBoard;
 use App\Scenes\SceneText;
 use App\Scheduling\SlotFinder;
+use App\Voice\Tools\Calendar\CalendarCanvas;
 use Carbon\CarbonImmutable;
+use Throwable;
 
 /**
  * Find a free slot, then draft the reply with that time already in it.
@@ -28,6 +30,7 @@ class SlotThenReply implements SceneKind
         private Outbox $outbox,
         private EmailComposer $composer,
         private Actions $actions,
+        private CalendarCanvas $calendar,
     ) {}
 
     public function type(): string
@@ -66,6 +69,8 @@ class SlotThenReply implements SceneKind
                 'state' => 'failed',
                 'error' => 'Sin hueco no preparo la respuesta.',
             ], error: 'Sin hueco no preparo la respuesta.');
+
+            $this->showCalendar($scene->refresh(), $from, $until);
 
             return;
         }
@@ -134,5 +139,17 @@ class SlotThenReply implements SceneKind
             'text' => $body,
             'action' => $action->toState(),
         ], $action->id);
+    }
+
+    /**
+     * The days that had no room, beside the failed scene, so the person can decide what to move.
+     */
+    private function showCalendar(Scene $scene, CarbonImmutable $from, CarbonImmutable $until): void
+    {
+        try {
+            $this->board->accompany($scene, $this->calendar->covering($scene->user, $from, $until, $from)->toArray());
+        } catch (Throwable) {
+            // The failed cards are already on screen.
+        }
     }
 }

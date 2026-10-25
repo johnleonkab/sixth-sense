@@ -81,6 +81,6 @@ class ProposeEmailForward implements VoiceTool
 
         $note = $arguments['note'] ?? '';
 
-        return $this->propose($this->actions, $user, $this->composer->forward($original, $sender, $to, $note), $note);
+        return $this->propose($this->actions, $user, $this->composer->forward($original, $sender, $to, $note), $note, $original, $context->timezone());
     }
 }

@@ -89,6 +89,21 @@ class SceneBoard
     }
 
     /**
+     * A second canvas the decision needs, kept with the cards already on screen.
+     *
+     * @param  array{view: string, props: array<string, mixed>, layout: string}  $beside
+     */
+    public function accompany(Scene $scene, array $beside): void
+    {
+        $scene->refresh();
+        $canvas = $scene->canvas;
+        $canvas['beside'] = $beside;
+        $scene->update(['canvas' => $canvas]);
+
+        SceneUpdated::forScene($scene->fresh() ?? $scene, null);
+    }
+
+    /**
      * @param  array<string, mixed>  $action
      * @return array{key: string, title: string, state: string, text: string, error: ?string, action: ?array<string, mixed>}
      */

@@ -80,6 +80,7 @@ class ProposeSlackMessage implements VoiceTool
 
         $message = new OutgoingChatMessage($to, $label, $arguments['text'], $mentions, $threadRef);
         $action = $this->actions->propose($user, 'chat.send', ($threadRef ? 'Responder en el hilo de ' : 'Mensaje a ').$label, ['message' => $message->toArray()]);
+        $history = $this->history($user, $to, $label, filled($arguments['reply_to'] ?? null) ? (string) $arguments['reply_to'] : null, $threadRef, $context);
 
         return new ToolResult(
             output: $this->proposalOutput($action, ['to' => $label, 'in_thread' => $threadRef !== null, 'mentions' => implode(', ', array_column($mentions, 'name')) ?: null]),
@@ -90,6 +91,7 @@ class ProposeSlackMessage implements VoiceTool
                 'mentions' => array_column($mentions, 'name'),
                 'thread' => $threadPreview,
             ]),
+            beside: $history,
         );
     }
 
@@ -133,5 +135,23 @@ class ProposeSlackMessage implements VoiceTool
 
             return [$person->ref, $person->name, null, null];
         }
+    }
+
+    /**
+     * The conversation the draft answers, when there is one to read.
+     */
+    private function history(User $user, string $to, string $label, ?string $around, ?string $thread, ToolContext $context): ?Canvas
+    {
+        $view = $this->chats->view($user, $to, $around, $thread);
+
+        if ($view === null) {
+            try {
+                $view = $this->chats->view($user, $this->conversationNamed($user, $label)->ref, $around, $thread);
+            } catch (RuntimeException) {
+                $view = null;
+            }
+        }
+
+        return $view !== null && $view->messages !== [] ? $this->conversationCanvas($view, $context) : null;
     }
 }

@@ -4,6 +4,7 @@ namespace App\Voice\Tools\Mail;
 
 use App\Actions\Actions;
 use App\Connectors\Mail\MailAddress;
+use App\Connectors\Mail\MailMessage;
 use App\Connectors\Mail\OutgoingEmail;
 use App\Models\User;
 use App\Voice\Tools\Canvas;
@@ -18,7 +19,7 @@ trait ProposesEmails
 {
     use ProposesChanges;
 
-    private function propose(Actions $actions, User $user, OutgoingEmail $email, string $message): ToolResult
+    private function propose(Actions $actions, User $user, OutgoingEmail $email, string $message, ?MailMessage $original = null, ?string $timezone = null): ToolResult
     {
         $label = match ($email->mode) {
             'reply' => 'Responder a '.MailAddress::names($email->to),
@@ -50,6 +51,7 @@ trait ProposesEmails
                 'trail' => trim(mb_substr($email->body, mb_strlen(rtrim($message)))),
                 'attachments' => array_map(fn (array $attachment): array => ['name' => $attachment['name'], 'size' => $attachment['size']], $email->attachments),
             ]),
+            beside: $original !== null && $timezone !== null ? (new EmailCanvas)->open($original, $timezone) : null,
         );
     }
 }

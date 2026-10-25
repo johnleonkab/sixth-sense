@@ -7,6 +7,7 @@ import { Microphone } from '@/voice/audio/microphone';
 import { AudioPlayer } from '@/voice/audio/player';
 import { requestGrant, VoiceGrantError } from '@/voice/request-grant';
 import { runTool } from '@/voice/run-tool';
+import { canvasesToShow } from '@/voice/pair-canvases';
 import { ConversationMemory, resumeNote } from '@/voice/memory';
 import { emptyTranscript, transcriptReducer } from '@/voice/transcript';
 import { createTransport } from '@/voice/transports';
@@ -28,8 +29,8 @@ const TEXT_IDLE_CLOSE = 5 * 60_000;
 const MAX_RECONNECTS = 3;
 
 type VoiceSessionOptions = {
-    /** The assistant asked to put something on screen. */
-    onCanvas?: (canvas: CanvasDirective) => void;
+    /** The assistant asked to put something on screen, and maybe a second canvas beside it. */
+    onCanvas?: (canvas: CanvasDirective, beside?: CanvasDirective | null) => void;
     /** The person finished saying something (used to recognise "sí", "cancela", "deshaz"). */
     onUtterance?: (text: string) => Promise<void> | void;
     /** What is on screen now, for a conversation that starts or picks up again. */
@@ -224,7 +225,11 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
                     return;
                 }
 
-                pending.forEach(({ outcome }) => outcome.canvas && onCanvasRef.current?.(outcome.canvas));
+                const shown = canvasesToShow(pending.map(({ outcome }) => outcome));
+
+                if (shown.length > 0) {
+                    onCanvasRef.current?.(shown[0], shown[1] ?? null);
+                }
                 transport.sendToolResponses(
                     pending.map(({ call, outcome }) => ({ id: call.id, name: call.name, output: outcome.output })),
                 );
