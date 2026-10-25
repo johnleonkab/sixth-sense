@@ -30,9 +30,10 @@ class PushSubscriptionController extends Controller
         }
 
         PushSubscription::query()->updateOrCreate(
-            ['endpoint' => $data['endpoint']],
+            ['endpoint_hash' => PushSubscription::hashOf($data['endpoint'])],
             [
                 'user_id' => $request->user()->id,
+                'endpoint' => $data['endpoint'],
                 'p256dh' => $data['keys']['p256dh'],
                 'auth' => $data['keys']['auth'],
                 'content_encoding' => $data['contentEncoding'] ?? 'aes128gcm',
@@ -48,7 +49,7 @@ class PushSubscriptionController extends Controller
             'endpoint' => ['required', 'string', 'max:2000'],
         ]);
 
-        $request->user()->pushSubscriptions()->where('endpoint', $data['endpoint'])->delete();
+        $request->user()->pushSubscriptions()->where('endpoint_hash', PushSubscription::hashOf($data['endpoint']))->delete();
 
         return response()->json(['ok' => true]);
     }

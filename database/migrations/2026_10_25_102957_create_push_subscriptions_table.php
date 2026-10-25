@@ -11,10 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // MySQL creates the table and adds indexes afterwards. The first
+        // production deploy kept this table when the unique index on the text
+        // endpoint was rejected, and did not record the migration.
+        Schema::dropIfExists('push_subscriptions');
+
         Schema::create('push_subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->text('endpoint')->unique();
+            $table->string('endpoint_hash', 64)->unique();
+            $table->text('endpoint');
             $table->text('p256dh');
             $table->text('auth');
             $table->string('content_encoding')->default('aes128gcm');
