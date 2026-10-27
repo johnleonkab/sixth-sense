@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -272,9 +273,12 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
 
         if (onOpen) {
             onOpen(alert);
-        } else if (alert.external_url) {
-            window.open(alert.external_url, '_blank', 'noopener');
+
+            return;
         }
+
+        document.documentElement.dataset.nav = 'back';
+        router.visit(`/?alert=${alert.id}`);
     };
 
     // Escape closes the list.

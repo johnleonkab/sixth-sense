@@ -297,7 +297,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
             <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
                 <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1.5 text-[13px] text-muted md:grid-cols-[1fr_auto_1fr]">
                     <div className="flex min-w-0 items-center gap-3">
-                        <Wordmark />
+                        <Wordmark to="/" />
                         <span className="hidden sm:inline">
                             {dateFormat.format(now).replaceAll('.', '')} ·{' '}
                             <span className="font-mono tabular-nums">{timeFormat.format(now)}</span>

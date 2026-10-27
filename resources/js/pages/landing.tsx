@@ -251,7 +251,7 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
 
             <div lang="en" className="min-h-full px-4 md:px-6">
                 <header className="mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 py-5">
-                    <Wordmark className="h-5 sm:h-6" />
+                    <Wordmark to="/" className="h-5 sm:h-6" />
                     <nav className="flex min-w-0 items-center gap-1 text-[13.5px]">
                         <a
                             href={repositoryUrl}

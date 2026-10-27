@@ -63,7 +63,7 @@ export default function SettingsLayout({ title, description, wide = false, edito
             <div className="flex h-dvh max-w-full flex-col overflow-x-clip px-4">
                 <header className={`chrome sticky top-0 z-20 mx-auto flex w-full min-w-0 ${frame} items-center justify-between gap-3 border-b border-line bg-bg pt-[max(1rem,env(safe-area-inset-top))] pb-3.5 text-[13px] text-muted`}>
                     <div className="hidden min-w-0 items-center gap-2 md:flex">
-                        <Wordmark />
+                        <Wordmark to="/" />
                         <span aria-hidden className="text-faint">
                             /
                         </span>

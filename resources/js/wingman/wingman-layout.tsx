@@ -23,7 +23,7 @@ export default function WingmanLayout({ title, back = { href: '/', label: 'Volve
             <div className="min-h-full overflow-x-clip px-4">
                 <header className="mx-auto flex w-full min-w-0 max-w-[1120px] items-center justify-between gap-3 border-b border-line pt-[max(1rem,env(safe-area-inset-top))] pb-3.5 text-[13px] text-muted">
                     <div className="flex min-w-0 items-center gap-2">
-                        <Wordmark />
+                        <Wordmark to="/" />
                         <span aria-hidden className="text-faint">
                             /
                         </span>
