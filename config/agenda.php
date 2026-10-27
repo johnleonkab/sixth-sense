@@ -39,6 +39,20 @@ return [
     'buffer_minutes' => 10,
 
     /*
+    | How far past the working day a slot may sit when nothing fits inside it,
+    | and the earliest and latest that stretch may reach. A person's own task
+    | can be shortened, but never below the minimum.
+    */
+
+    'stretch_minutes' => (int) env('AGENDA_STRETCH_MINUTES', 45),
+
+    'stretch_earliest' => env('AGENDA_STRETCH_EARLIEST', '08:00'),
+
+    'stretch_latest' => env('AGENDA_STRETCH_LATEST', '20:00'),
+
+    'task_minimum_minutes' => 15,
+
+    /*
     |--------------------------------------------------------------------------
     | Task assessor
     |--------------------------------------------------------------------------

@@ -7,6 +7,9 @@ use App\Ai\GeminiTextModel;
 use App\Ai\JobOwner;
 use App\Ai\ProviderKeys;
 use App\Ai\TextModel;
+use App\Alerts\Intents\FakeIntentClassifier;
+use App\Alerts\Intents\IntentClassifier;
+use App\Alerts\Intents\LlmIntentClassifier;
 use App\Alerts\Judges\FakeMeetingAdvisor;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\Judges\LlmMeetingAdvisor;
@@ -124,6 +127,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (true) {
             $this->usesTextModel(config('alerts.judge')) => new LlmRelevanceJudge($this->textModel('light')),
             config('alerts.judge') === 'fake' => new FakeRelevanceJudge,
+            default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
+        });
+
+        $this->app->singleton(IntentClassifier::class, fn (): IntentClassifier => match (true) {
+            $this->usesTextModel(config('alerts.judge')) => new LlmIntentClassifier($this->textModel('light')),
+            config('alerts.judge') === 'fake' => new FakeIntentClassifier,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 

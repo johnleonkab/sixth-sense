@@ -14,9 +14,23 @@ class FakeCalendarReader implements CalendarReader
     /** @var list<EventQuery> */
     public array $queries = [];
 
+    /** @var list<CalendarEvent> A scripted day, instead of the sample, for tests. */
+    public array $scripted = [];
+
     public function read(User $user, EventQuery $query): CalendarReading
     {
         $this->queries[] = $query;
+
+        if ($this->scripted !== []) {
+            return new CalendarReading(
+                events: array_values(array_filter(
+                    $this->scripted,
+                    fn (CalendarEvent $event): bool => $query->matches($event) && $event->end->greaterThan($query->from) && $event->start->lessThan($query->to),
+                )),
+                accounts: ['demo@sixth-sense.test'],
+                calendars: [['account' => 'demo@sixth-sense.test', 'name' => 'demo@sixth-sense.test', 'color' => null]],
+            );
+        }
 
         $events = [];
 

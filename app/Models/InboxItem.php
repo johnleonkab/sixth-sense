@@ -111,9 +111,22 @@ class InboxItem extends Model
     }
 
     /**
+     * Conversations this intent already covers, across channels.
+     *
+     * @return list<string>
+     */
+    public function threads(): array
+    {
+        return array_values(array_unique(array_filter([
+            ...($this->payload['threads'] ?? []),
+            $this->thread_key,
+        ])));
+    }
+
+    /**
      * One message of a conversation, as an alert keeps it.
      *
-     * @return array{id: string, from: ?string, text: string, at: string}
+     * @return array{id: string, from: ?string, text: string, at: string, source: string}
      */
     public static function messageOf(InboxCandidate $candidate): array
     {
@@ -122,6 +135,7 @@ class InboxItem extends Model
             'from' => $candidate->from?->label(),
             'text' => mb_substr($candidate->excerpt, 0, 1000),
             'at' => $candidate->receivedAt->toIso8601String(),
+            'source' => $candidate->source->value,
         ];
     }
 

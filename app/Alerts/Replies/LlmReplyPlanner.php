@@ -27,6 +27,7 @@ class LlmReplyPlanner implements ReplyPlanner
                 'reply_text' => ['type' => 'STRING'],
                 'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                 'question' => ['type' => 'STRING'],
+                'learned' => ['type' => 'STRING'],
                 'manual_task' => [
                     'type' => 'OBJECT',
                     'properties' => [
@@ -39,7 +40,7 @@ class LlmReplyPlanner implements ReplyPlanner
                     'required' => ['needed', 'title', 'effort_minutes', 'deadline', 'people'],
                 ],
             ],
-            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'manual_task'],
+            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'learned', 'manual_task'],
         ], 0.3);
 
         if (blank($answer['summary'] ?? null)) {
@@ -60,6 +61,7 @@ class LlmReplyPlanner implements ReplyPlanner
                 'deadline' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($answer['manual_task']['deadline'] ?? '')) ? $answer['manual_task']['deadline'] : null,
                 'people' => array_values(array_filter(array_map('trim', (array) ($answer['manual_task']['people'] ?? [])))),
             ] : null,
+            learned: filled($answer['learned'] ?? null) ? Str::limit(trim((string) $answer['learned']), 240) : null,
         );
     }
 
@@ -85,6 +87,8 @@ class LlmReplyPlanner implements ReplyPlanner
             - other_actions: otras acciones que harían falta además de responder, concretas (crear un evento con fecha y personas,
               revisar un documento, avisar a alguien). Vacío si no hace falta nada más.
             - question: lo que él tendría que decidir antes de enviarlo, en una pregunta corta; vacío si nada.
+            - learned: un dato corto que merezca recordarse la próxima vez (quién pide qué, un plazo, dónde está el documento).
+              Vacío si la investigación no aporta nada nuevo. No repitas el borrador.
             - manual_task: si, además de responder, tiene que dedicarle tiempo a hacer algo él mismo (revisar un documento, escribir
               una user story, preparar algo, hablar con alguien), needed = true, con title (un verbo y el qué: "Revisar el PRD del
               prepago"), effort_minutes (cuánto le llevará, en múltiplos de 15), deadline (YYYY-MM-DD si hay plazo; vacío si no) y people
@@ -126,6 +130,12 @@ class LlmReplyPlanner implements ReplyPlanner
         $lines[] = '';
         $lines[] = '--- Mensaje que espera su respuesta (datos) ---';
         $lines[] = Str::limit($brief->text, self::MAX_TEXT);
+
+        if ($brief->findings !== '') {
+            $lines[] = '';
+            $lines[] = '--- Lo que has investigado (datos) ---';
+            $lines[] = Str::limit($brief->findings, self::MAX_TEXT);
+        }
 
         return implode("\n", $lines);
     }

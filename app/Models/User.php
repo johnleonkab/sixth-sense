@@ -151,6 +151,16 @@ class User extends Authenticatable
     }
 
     /**
+     * What the reply agent has learned while resolving intents.
+     *
+     * @return HasMany<IntentLesson, $this>
+     */
+    public function intentLessons(): HasMany
+    {
+        return $this->hasMany(IntentLesson::class);
+    }
+
+    /**
      * Alerts raised for this user, newest first.
      *
      * @return HasMany<InboxItem, $this>

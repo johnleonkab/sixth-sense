@@ -282,6 +282,7 @@ class GoogleCalendarReader implements CalendarReader
             description: $item['description'] ?? null,
             isOrganizer: (bool) ($item['organizer']['self'] ?? false),
             myResponse: $calendar['primary'] ? ($self['responseStatus'] ?? null) : null,
+            flexible: $this->flexible($item, $account),
         );
     }
 
@@ -306,5 +307,25 @@ class GoogleCalendarReader implements CalendarReader
         }
 
         return array_values($documents);
+    }
+
+    /**
+     * A block the person can shorten: one sixth-sense created, or a focus
+     * block they organised with nobody else and no call.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function flexible(array $item, string $account): bool
+    {
+        if (($item['extendedProperties']['private']['sixthSense'] ?? null) === 'task') {
+            return true;
+        }
+
+        $others = array_filter(
+            $item['attendees'] ?? [],
+            fn (array $attendee): bool => ! ($attendee['self'] ?? false) && ! ($attendee['resource'] ?? false) && strcasecmp((string) ($attendee['email'] ?? ''), $account) !== 0,
+        );
+
+        return (bool) ($item['organizer']['self'] ?? false) && empty($item['hangoutLink']) && $others === [];
     }
 }

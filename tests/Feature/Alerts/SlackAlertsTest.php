@@ -131,13 +131,10 @@ test('the user own messages, apps and what was already handled are left out', fu
 
     $listed = app(AlertInbox::class)->check($this->account, AlertSource::Slack);
 
-    expect($listed)->toHaveCount(1)
-        ->and($listed[0]->refresh()->state())->toBe('routine')
-        ->and($this->judge->judged)->toHaveCount(1);
+    expect($listed)->toHaveCount(0)
+        ->and($this->user->inboxItems()->count())->toBe(0);
 
-    // A minute later the same search answers the same: nothing is listed or judged twice.
-    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([])
-        ->and($this->judge->judged)->toHaveCount(1);
+    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([]);
 });
 
 test('messages of one conversation make one alert, ending on the latest', function () {
@@ -149,7 +146,7 @@ test('messages of one conversation make one alert, ending on the latest', functi
     $listed = app(AlertInbox::class)->check($this->account, AlertSource::Slack);
     $alert = $this->user->inboxItems()->sole();
 
-    expect($listed)->toHaveCount(2)
+    expect($listed)->toHaveCount(1)
         ->and($alert->external_id)->toBe("{$this->account->id}:D5:{$this->now}.000300")
         ->and(array_column($alert->messages(), 'text'))->toBe(['Hola', 'Es urgente, necesito la firma hoy'])
         ->and($alert->status)->toBe(AlertStatus::Pending)
@@ -168,30 +165,25 @@ test('a new message in a conversation already waiting for an answer updates its 
 
     expect($second->is($first))->toBeTrue()
         ->and($first->refresh()->status)->toBe(AlertStatus::Pending)
-        ->and($first->body)->toBe('Gracias!')
         ->and($first->messages())->toHaveCount(2)
         ->and($this->user->inboxItems()->count())->toBe(1)
-        ->and(count($this->planner->planned))->toBe($planned + 1);
+        ->and(count($this->planner->planned))->toBe($planned);
 
     Event::assertDispatchedTimes(InboxItemCreated::class, 1);
 });
 
-test('once dealt with, a new message opens the same alert again with only what came since', function () {
+test('a new message in a conversation already resolved, of the same intent, is dropped', function () {
     fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?')]);
     $alert = app(AlertInbox::class)->check($this->account, AlertSource::Slack)[0];
     $alert->refresh()->close(AlertStatus::Resolved, 'replied');
 
     fakeSlackInbox([slackMatch("{$this->now}.000500", 'U5', 'Ahora necesito la firma')]);
-    app(AlertInbox::class)->check($this->account, AlertSource::Slack);
+    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([]);
 
     expect($this->user->inboxItems()->count())->toBe(1)
-        ->and($alert->refresh()->status)->toBe(AlertStatus::Pending)
-        ->and($alert->resolution)->toBeNull()
-        ->and(array_column($alert->messages(), 'text'))->toBe(['Ahora necesito la firma']);
-
-    // The first message is still known: the same search a minute later lists nothing.
-    fakeSlackInbox([slackMatch("{$this->now}.000100", 'U5', '¿Puedes revisar el contrato?'), slackMatch("{$this->now}.000500", 'U5', 'Ahora necesito la firma')]);
-    expect(app(AlertInbox::class)->check($this->account, AlertSource::Slack))->toBe([]);
+        ->and($alert->refresh()->status)->toBe(AlertStatus::Resolved)
+        ->and($alert->resolution)->toBe('replied')
+        ->and(array_column($alert->messages(), 'text'))->toBe(['¿Puedes revisar el contrato?']);
 });
 
 test('every minute slack accounts of users who want its alerts are checked', function () {

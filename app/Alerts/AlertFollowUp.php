@@ -2,6 +2,7 @@
 
 namespace App\Alerts;
 
+use App\Alerts\Intents\IntentResearch;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Connectors\Chat\ChatMessage;
@@ -35,6 +36,7 @@ class AlertFollowUp
         private Chats $chats,
         private IssueTracker $issues,
         private SceneMatch $scenes,
+        private IntentResearch $research,
     ) {}
 
     /**
@@ -71,7 +73,17 @@ class AlertFollowUp
             return;
         }
 
+        $brief = $brief->withFindings($this->research->gather($item->user, $brief));
+
         $plan = $this->planner->plan($item->user, $brief);
+
+        if (filled($plan->learned)) {
+            $item->user->intentLessons()->create([
+                'inbox_item_id' => $item->id,
+                'body' => $plan->learned,
+            ]);
+        }
+
         $item->update(['proposal' => $plan->toArray(), 'planning' => false]);
         InboxItemUpdated::dispatch($item);
 
