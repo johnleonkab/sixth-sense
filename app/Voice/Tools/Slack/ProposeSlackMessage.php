@@ -79,7 +79,22 @@ class ProposeSlackMessage implements VoiceTool
         }
 
         $message = new OutgoingChatMessage($to, $label, $arguments['text'], $mentions, $threadRef);
-        $action = $this->actions->propose($user, 'chat.send', ($threadRef ? 'Responder en el hilo de ' : 'Mensaje a ').$label, ['message' => $message->toArray()]);
+        $payload = ['message' => $message->toArray()];
+        $decision = filled($arguments['reply_to'] ?? null)
+            ? $user->slackTriageDecisions()
+                ->where(fn ($query) => $query->where('external_id', $arguments['reply_to'])->orWhere('thread_key', $arguments['reply_to']))
+                ->whereNull('confirmed_at')
+                ->latest('id')
+                ->first()
+            : null;
+
+        if ($decision !== null) {
+            $payload['slack_decision_id'] = $decision->id;
+            $payload['proposed_text'] = $decision->draft_text ?? $arguments['text'];
+            $payload['autonomy'] = 'propose';
+        }
+
+        $action = $this->actions->propose($user, 'chat.send', ($threadRef ? 'Responder en el hilo de ' : 'Mensaje a ').$label, $payload);
         $history = $this->history($user, $to, $label, filled($arguments['reply_to'] ?? null) ? (string) $arguments['reply_to'] : null, $threadRef, $context);
 
         return new ToolResult(

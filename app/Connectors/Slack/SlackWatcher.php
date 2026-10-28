@@ -55,14 +55,34 @@ class SlackWatcher implements InboxWatcher
         $since = $cursor - self::LAG_SECONDS;
         $seen = Cache::get($this->seenKey($account), []);
         $after = CarbonImmutable::createFromTimestamp($since)->subDay()->toDateString();
+        $queries = ["to:<@{$me}> after:{$after}", "<@{$me}> after:{$after}"];
+        $ownedChannel = [];
+        $signals = $account->user->slackAttentionProfile?->signals;
+
+        foreach (array_slice(is_array($signals) ? ($signals['owned_channels'] ?? []) : [], 0, 5) as $channel) {
+            if (is_string($channel) && str_starts_with($channel, '#')) {
+                $query = "in:{$channel} after:{$after}";
+                $queries[] = $query;
+                $ownedChannel[$query] = true;
+            }
+        }
+
         $matches = [];
 
-        // To the user (direct and group messages), and mentioning them anywhere.
-        foreach (["to:<@{$me}> after:{$after}", "<@{$me}> after:{$after}"] as $query) {
+        // To the user (direct and group messages), mentioning them anywhere,
+        // and questions in channels the attention profile says they own.
+        foreach ($queries as $query) {
             $found = $this->slack->get($account, 'search.messages', ['query' => $query, 'sort' => 'timestamp', 'sort_dir' => 'desc', 'count' => 50]);
 
             foreach ($found['messages']['matches'] ?? [] as $match) {
-                $matches["{$match['channel']['id']}:{$match['ts']}"] ??= $match;
+                $key = "{$match['channel']['id']}:{$match['ts']}";
+
+                if (isset($matches[$key])) {
+                    continue;
+                }
+
+                $match['_owned_channel'] = isset($ownedChannel[$query]);
+                $matches[$key] = $match;
             }
         }
 
@@ -118,6 +138,8 @@ class SlackWatcher implements InboxWatcher
         $kind = match (true) {
             (bool) ($channel['is_im'] ?? false) => 'dm',
             (bool) ($channel['is_mpim'] ?? false) => 'group',
+            str_contains((string) ($match['text'] ?? ''), '<@'.$this->chats->me($account).'>') => 'mention',
+            (bool) ($match['_owned_channel'] ?? false) => 'channel',
             default => 'mention',
         };
 
@@ -134,6 +156,7 @@ class SlackWatcher implements InboxWatcher
             subject: match ($kind) {
                 'dm' => 'Mensaje directo',
                 'group' => "Grupo con {$message->conversationLabel}",
+                'channel' => 'Canal '.$message->conversationLabel,
                 default => "Mención en {$message->conversationLabel}",
             },
             excerpt: $message->text,
@@ -142,7 +165,7 @@ class SlackWatcher implements InboxWatcher
             isReply: $message->threadRef !== null && $message->threadRef !== $message->ref,
             url: $message->url,
             // A thread is one conversation; so is a direct message without threads.
-            threadKey: $message->threadRef ?? ($kind === 'mention' ? $message->ref : $channelRef),
+            threadKey: $message->threadRef ?? (in_array($kind, ['mention', 'channel'], true) ? $message->ref : $channelRef),
         );
     }
 

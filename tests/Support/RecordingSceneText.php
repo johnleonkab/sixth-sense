@@ -2,6 +2,7 @@
 
 namespace Tests\Support;
 
+use App\Ai\AiGenerationContext;
 use App\Scenes\SceneText;
 
 /**
@@ -26,14 +27,14 @@ class RecordingSceneText implements SceneText
      */
     public function __construct(public array $capableAnswers = [], public array $lightAnswers = []) {}
 
-    public function capable(string $system, string $user, array $schema): array
+    public function capable(string $system, string $user, array $schema, ?AiGenerationContext $context = null): array
     {
         $this->capableCalls[] = compact('system', 'user', 'schema');
 
         return array_shift($this->capableAnswers) ?? [];
     }
 
-    public function light(string $system, string $user, array $schema): array
+    public function light(string $system, string $user, array $schema, ?AiGenerationContext $context = null): array
     {
         $this->lightCalls[] = compact('system', 'user', 'schema');
 

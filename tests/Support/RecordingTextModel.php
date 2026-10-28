@@ -2,6 +2,7 @@
 
 namespace Tests\Support;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use Closure;
 use RuntimeException;
@@ -23,7 +24,7 @@ class RecordingTextModel implements TextModel
      */
     public function __construct(public array|Closure $answers) {}
 
-    public function json(string $system, string $user, array $schema, float $temperature = 0): array
+    public function json(string $system, string $user, array $schema, float $temperature = 0, ?AiGenerationContext $context = null): array
     {
         $this->calls[] = [
             'system' => $system,

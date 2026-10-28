@@ -2,6 +2,7 @@
 
 namespace App\Scheduling\Assessors;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Models\User;
 use App\Scheduling\SchedulingRequest;
@@ -35,7 +36,7 @@ class LlmTaskAssessor implements TaskAssessor
                 'description' => ['type' => 'STRING'],
             ],
             'required' => ['title', 'urgency', 'reason', 'duration_minutes', 'kind', 'deadline', 'people', 'description'],
-        ], 0.2);
+        ], 0.2, AiGenerationContext::forUser($user));
 
         $urgency = Urgency::tryFrom((string) ($answer['urgency'] ?? ''));
 

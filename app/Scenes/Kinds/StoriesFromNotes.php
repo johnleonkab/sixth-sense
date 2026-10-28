@@ -3,6 +3,7 @@
 namespace App\Scenes\Kinds;
 
 use App\Actions\Actions;
+use App\Ai\AiGenerationContext;
 use App\Connectors\GitHub\GithubContents;
 use App\Jobs\RunSceneStep;
 use App\Models\GithubRepository;
@@ -46,9 +47,10 @@ class StoriesFromNotes implements SceneKind
 
     public function run(Scene $scene): void
     {
+        $context = AiGenerationContext::forScene($scene);
         $notes = trim((string) ($scene->input['notes'] ?? ''));
         $project = (string) ($scene->input['project'] ?? '');
-        $agent = $this->agent($scene->user, $scene->input, $notes);
+        $agent = $this->agent($scene->user, $scene->input, $notes, $context);
 
         if ($agent === null) {
             $this->board->fill($scene, 'list', [
@@ -80,6 +82,7 @@ class StoriesFromNotes implements SceneKind
                 ],
                 'required' => ['titles'],
             ],
+            $context,
         );
 
         $titles = array_values(array_filter(
@@ -135,6 +138,7 @@ class StoriesFromNotes implements SceneKind
             return;
         }
 
+        $context = AiGenerationContext::forScene($scene);
         $draft = $this->text->capable(
             'Escribes una historia de usuario. Devuelve json con why, outcome y body. El título ya está decidido. En español.',
             "Briefing:\n{$agent->briefing()}\n\nNotas:\n{$scene->input['notes']}\n\nTítulo:\n{$title}",
@@ -147,6 +151,7 @@ class StoriesFromNotes implements SceneKind
                 ],
                 'required' => ['why', 'outcome', 'body'],
             ],
+            $context,
         );
 
         $problem = $this->propose($scene, $repository, $project, $title, $key, $agent, $draft);
@@ -213,7 +218,7 @@ class StoriesFromNotes implements SceneKind
     /**
      * @param  array<string, mixed>  $input
      */
-    private function agent(User $user, array $input, string $notes): ?SenseAgent
+    private function agent(User $user, array $input, string $notes, AiGenerationContext $context): ?SenseAgent
     {
         $named = $input['slug'] ?? null;
 
@@ -240,6 +245,7 @@ class StoriesFromNotes implements SceneKind
                 'properties' => ['slug' => ['type' => 'string']],
                 'required' => ['slug'],
             ],
+            $context,
         );
 
         $slug = trim((string) ($picked['slug'] ?? ''));

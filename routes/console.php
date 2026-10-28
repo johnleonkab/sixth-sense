@@ -16,3 +16,5 @@ Schedule::command('chats:warm')->hourly()->withoutOverlapping();
 Schedule::command('context:build')->dailyAt(config('work_context.run_at'))->withoutOverlapping();
 Schedule::command('alerts:unstick')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('wingman:sync')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('slack:learn-attention')->weeklyOn(1, '6:00')->withoutOverlapping();
+Schedule::command('slack:promote-unanswered')->everyThirtyMinutes()->withoutOverlapping();

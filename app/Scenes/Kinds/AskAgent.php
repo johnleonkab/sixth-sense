@@ -2,6 +2,7 @@
 
 namespace App\Scenes\Kinds;
 
+use App\Ai\AiGenerationContext;
 use App\Models\Scene;
 use App\Models\SenseAgent;
 use App\Models\User;
@@ -33,8 +34,9 @@ class AskAgent implements SceneKind
 
     public function run(Scene $scene): void
     {
+        $context = AiGenerationContext::forScene($scene);
         $question = trim((string) ($scene->input['question'] ?? ''));
-        $agent = $this->agent($scene->user, $scene->input, $question);
+        $agent = $this->agent($scene->user, $scene->input, $question, $context);
 
         if ($agent === null) {
             $this->board->fill($scene, 'answer', [
@@ -53,6 +55,7 @@ class AskAgent implements SceneKind
                 'properties' => ['answer' => ['type' => 'string']],
                 'required' => ['answer'],
             ],
+            $context,
         );
 
         $text = trim((string) ($answer['answer'] ?? ''));
@@ -68,7 +71,7 @@ class AskAgent implements SceneKind
     /**
      * @param  array<string, mixed>  $input
      */
-    private function agent(User $user, array $input, string $question): ?SenseAgent
+    private function agent(User $user, array $input, string $question, AiGenerationContext $context): ?SenseAgent
     {
         $named = $input['slug'] ?? null;
 
@@ -91,6 +94,7 @@ class AskAgent implements SceneKind
                 'properties' => ['slug' => ['type' => 'string']],
                 'required' => ['slug'],
             ],
+            $context,
         );
 
         $slug = trim((string) ($picked['slug'] ?? ''));

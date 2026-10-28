@@ -228,6 +228,54 @@ class SlackChats implements Chats
         return new ChatView($conversation, $this->messages($account, $conversation, $raw));
     }
 
+    /**
+     * Messages of one thread, oldest as Slack returns them. The ref is the
+     * thread parent, or a message that starts one.
+     *
+     * @return list<ChatMessage>
+     */
+    public function thread(User $user, string $ref): array
+    {
+        [$account, $channel] = $this->resolve($user, $ref, Capability::SlackRead);
+
+        if ($account === null) {
+            return [];
+        }
+
+        $conversation = $this->conversationList($account)[$channel] ?? $this->conversationInfo($account, $channel);
+        $raw = $this->slack->get($account, 'conversations.replies', [
+            'channel' => $channel,
+            'ts' => self::tsOf($ref),
+            'limit' => 200,
+        ])['messages'] ?? [];
+
+        return $this->messages($account, $conversation, $raw);
+    }
+
+    /**
+     * Recent messages of a direct or group conversation, where replies are
+     * just the next message.
+     *
+     * @return list<ChatMessage>
+     */
+    public function recent(User $user, string $conversationRef, CarbonImmutable $since): array
+    {
+        [$account, $channel] = $this->resolve($user, $conversationRef, Capability::SlackRead);
+
+        if ($account === null) {
+            return [];
+        }
+
+        $conversation = $this->conversationList($account)[$channel] ?? $this->conversationInfo($account, $channel);
+        $raw = $this->slack->get($account, 'conversations.history', [
+            'channel' => $channel,
+            'oldest' => (string) $since->getTimestamp(),
+            'limit' => 200,
+        ])['messages'] ?? [];
+
+        return $this->messages($account, $conversation, $raw);
+    }
+
     public function search(User $user, ChatSearch $search): array
     {
         $found = [];

@@ -2,6 +2,7 @@
 
 namespace App\WorkContext\Summarizers;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Connectors\Issues\IssueTracker;
 use App\Models\User;
@@ -59,7 +60,7 @@ class LlmContextSummarizer implements ContextSummarizer
                 'jira' => $texts,
             ],
             'required' => ['summary', 'workstreams', 'people', 'open_loops', 'writing', 'contacts', 'hot_files', 'hot_pages', 'jira'],
-        ], 0.2);
+        ], 0.2, AiGenerationContext::forUser($user));
 
         $digest = WorkDigest::fromArray($answer);
 

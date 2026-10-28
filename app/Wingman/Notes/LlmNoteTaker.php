@@ -2,6 +2,7 @@
 
 namespace App\Wingman\Notes;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Models\WingmanMeeting;
 
@@ -27,7 +28,7 @@ class LlmNoteTaker implements NoteTaker
                 'commitments' => ['type' => 'ARRAY', 'items' => ['type' => 'OBJECT', 'properties' => ['who' => ['type' => 'STRING'], 'what' => ['type' => 'STRING'], 'when' => ['type' => 'STRING', 'nullable' => true]], 'required' => ['who', 'what']]],
             ],
             'required' => ['summary', 'topics', 'decisions', 'questions', 'commitments'],
-        ], 0.2);
+        ], 0.2, AiGenerationContext::forMeeting($meeting));
 
         return MeetingNotes::fromArray($answer);
     }

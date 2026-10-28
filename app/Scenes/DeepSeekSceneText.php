@@ -2,6 +2,8 @@
 
 namespace App\Scenes;
 
+use App\Ai\AiGenerationContext;
+use App\Ai\AiObservability;
 use App\Ai\DeepSeekTextModel;
 use App\Ai\ProviderKeys;
 use InvalidArgumentException;
@@ -12,14 +14,16 @@ use InvalidArgumentException;
  */
 class DeepSeekSceneText implements SceneText
 {
-    public function capable(string $system, string $user, array $schema): array
+    public function __construct(private AiObservability $observability) {}
+
+    public function capable(string $system, string $user, array $schema, ?AiGenerationContext $context = null): array
     {
-        return $this->model(true)->json($system, $user, $schema);
+        return $this->model(true)->json($system, $user, $schema, context: $context);
     }
 
-    public function light(string $system, string $user, array $schema): array
+    public function light(string $system, string $user, array $schema, ?AiGenerationContext $context = null): array
     {
-        return $this->model(false)->json($system, $user, $schema);
+        return $this->model(false)->json($system, $user, $schema, context: $context);
     }
 
     /**
@@ -41,6 +45,6 @@ class DeepSeekSceneText implements SceneText
             'timeout' => $config['timeout'],
             'max_tokens' => $capable ? $config['max_tokens'] : $config['light_max_tokens'],
             'thinking' => $capable ? $config['thinking'] : 'disabled',
-        ]);
+        ], $this->observability);
     }
 }

@@ -8,6 +8,7 @@ use App\Connections\Provider;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
 use App\Models\GithubRepository;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -67,7 +68,7 @@ class ConnectionController extends Controller
     /**
      * Disconnect an account and revoke its access at the provider.
      */
-    public function destroy(Request $request, AccessTokens $tokens, int $account): RedirectResponse
+    public function destroy(Request $request, AccessTokens $tokens, PostHogService $posthog, int $account): RedirectResponse
     {
         $account = $request->user()->connectedAccounts()->findOrFail($account);
 
@@ -76,6 +77,10 @@ class ConnectionController extends Controller
         } catch (Throwable $exception) {
             report($exception);
         }
+
+        $posthog->capture((string) $request->user()->getAuthIdentifier(), 'connection_disconnected', [
+            'provider' => $account->provider->value,
+        ]);
 
         $account->delete();
 

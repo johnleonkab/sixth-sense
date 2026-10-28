@@ -3,6 +3,7 @@
 namespace App\Scenes\Kinds;
 
 use App\Actions\Actions;
+use App\Ai\AiGenerationContext;
 use App\Connectors\Mail\EmailComposer;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\Mailbox;
@@ -90,6 +91,7 @@ class SlotThenReply implements SceneKind
             return;
         }
 
+        $context = AiGenerationContext::forScene($scene);
         $draft = $this->text->capable(
             'Redactas la respuesta a un email, en primera persona, breve, en español. La hora libre ya está decidida: úsala. Devuelve json con la clave body.',
             "Hora libre: {$when}\n\nDe: {$original->from?->name}\nAsunto: {$original->subject}\n\n{$original->body}",
@@ -98,6 +100,7 @@ class SlotThenReply implements SceneKind
                 'properties' => ['body' => ['type' => 'string']],
                 'required' => ['body'],
             ],
+            $context,
         );
 
         $body = trim((string) ($draft['body'] ?? ''));

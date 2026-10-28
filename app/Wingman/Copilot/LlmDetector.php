@@ -2,6 +2,7 @@
 
 namespace App\Wingman\Copilot;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Models\WingmanMeeting;
 use App\Wingman\Notes\MeetingNotes;
@@ -19,6 +20,7 @@ class LlmDetector implements Detector
 
     public function detect(WingmanMeeting $meeting, array $earlier, array $new, array $known): array
     {
+        $context = AiGenerationContext::forMeeting($meeting);
         $optional = fn (string $type): array => ['type' => $type, 'nullable' => true];
 
         $answer = $this->model->json($this->instructions($meeting), $this->describe($meeting, $earlier, $new, $known), [
@@ -45,7 +47,7 @@ class LlmDetector implements Detector
                 ]],
             ],
             'required' => ['findings'],
-        ], 0.1);
+        ], 0.1, $context);
 
         $findings = array_values(array_filter(array_map(
             fn (mixed $finding): ?Finding => is_array($finding) ? Finding::fromArray($finding) : null,
@@ -54,7 +56,7 @@ class LlmDetector implements Detector
 
         // A promised message comes without its text now and then: it is written on its own.
         return array_map(fn (Finding $finding): Finding => $finding->kind === 'message' && blank($finding->details['draft'] ?? null)
-            ? $this->withDraft($meeting, $finding, [...$earlier, ...$new])
+            ? $this->withDraft($meeting, $finding, [...$earlier, ...$new], $context)
             : $finding, $findings);
     }
 
@@ -63,10 +65,10 @@ class LlmDetector implements Detector
      *
      * @param  list<array{at: string, speaker: string, is_me: bool, text: string}>  $lines
      */
-    private function withDraft(WingmanMeeting $meeting, Finding $finding, array $lines): Finding
+    private function withDraft(WingmanMeeting $meeting, Finding $finding, array $lines, AiGenerationContext $context): Finding
     {
         $said = collect($lines)->map(fn (array $line): string => "{$line['speaker']}: {$line['text']}")->implode("\n");
-        $written = $this->draftMessage($meeting, (string) ($finding->details['to'] ?? ''), $finding->quote, $said);
+        $written = $this->draftMessage($meeting, (string) ($finding->details['to'] ?? ''), $finding->quote, $said, $context);
 
         return $written === null ? $finding : new Finding($finding->kind, $finding->quote, $finding->confidence, $finding->important, [
             ...$finding->details,

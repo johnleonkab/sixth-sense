@@ -1,3 +1,4 @@
+import { chosenMicrophone } from '@/voice/audio/microphone-choice';
 import workletUrl from './pcm-capture.worklet.ts?worker&url';
 
 /**
@@ -15,14 +16,7 @@ export class Microphone {
     }
 
     static async open(sampleRate: number): Promise<Microphone> {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-            },
-        });
+        const stream = await this.capture();
 
         const context = new AudioContext();
 
@@ -39,6 +33,33 @@ export class Microphone {
         } catch (error) {
             stream.getTracks().forEach((track) => track.stop());
             await context.close();
+
+            throw error;
+        }
+    }
+
+    /**
+     * The chosen input, or the system one when that device is gone.
+     */
+    private static async capture(): Promise<MediaStream> {
+        const audio: MediaTrackConstraints = {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+        };
+        const deviceId = chosenMicrophone();
+
+        if (deviceId === '') {
+            return navigator.mediaDevices.getUserMedia({ audio });
+        }
+
+        try {
+            return await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: deviceId } } });
+        } catch (error) {
+            if (error instanceof DOMException && (error.name === 'OverconstrainedError' || error.name === 'NotFoundError')) {
+                return navigator.mediaDevices.getUserMedia({ audio });
+            }
 
             throw error;
         }

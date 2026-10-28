@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Judges;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\MeetingBriefing;
@@ -28,7 +29,7 @@ class LlmMeetingAdvisor implements MeetingAdvisor
                 'preparation' => ['type' => 'STRING'],
             ],
             'required' => ['needs_preparation', 'lead_minutes', 'preparation'],
-        ]);
+        ], 0, AiGenerationContext::forUser($user));
 
         if (! isset($answer['needs_preparation'], $answer['lead_minutes'])) {
             throw new RuntimeException('Meeting advice returned an unexpected answer.');

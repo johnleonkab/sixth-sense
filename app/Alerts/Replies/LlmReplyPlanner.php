@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Replies;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Alerts\AlertSource;
 use App\Models\User;
@@ -41,7 +42,7 @@ class LlmReplyPlanner implements ReplyPlanner
                 ],
             ],
             'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'learned', 'manual_task'],
-        ], 0.3);
+        ], 0.3, AiGenerationContext::forUser($user));
 
         if (blank($answer['summary'] ?? null)) {
             throw new RuntimeException('Reply plan returned an unexpected answer.');

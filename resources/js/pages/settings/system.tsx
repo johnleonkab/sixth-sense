@@ -2,6 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import SettingsLayout from '@/layouts/settings-layout';
+import { allowMicrophones, chosenMicrophone, listMicrophones, rememberMicrophone, type MicrophoneOption } from '@/voice/audio/microphone-choice';
 
 type DisplaySize = {
     key: 'compact' | 'normal' | 'large';
@@ -116,6 +117,94 @@ type SystemProps = {
 type KeyChoice = { using: 'system' | 'own'; system_ready: boolean };
 
 const fieldClass = 'w-full rounded-xl border border-line bg-surface px-3 py-2 font-mono text-[13px] text-ink outline-none focus:border-accent';
+
+const selectClass = 'w-full max-w-xl rounded-xl border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent';
+
+/**
+ * Which microphone this browser uses, from the next time listening starts.
+ * The id stays on this machine: another computer has other devices.
+ */
+function MicrophoneChoice() {
+    const [devices, setDevices] = useState<MicrophoneOption[]>([]);
+    const [selected, setSelected] = useState(chosenMicrophone);
+    const [named, setNamed] = useState(false);
+    const [unavailable, setUnavailable] = useState(false);
+    const [blocked, setBlocked] = useState(false);
+
+    const refresh = async () => {
+        if (navigator.mediaDevices?.enumerateDevices === undefined) {
+            setUnavailable(true);
+
+            return;
+        }
+
+        const found = await listMicrophones();
+        setDevices(found.devices);
+        setNamed(found.named);
+        setUnavailable(false);
+    };
+
+    useEffect(() => {
+        void refresh();
+
+        const media = navigator.mediaDevices;
+
+        if (media === undefined) {
+            return;
+        }
+
+        const onChange = () => void refresh();
+        media.addEventListener('devicechange', onChange);
+
+        return () => media.removeEventListener('devicechange', onChange);
+    }, []);
+
+    const choose = (deviceId: string) => {
+        setSelected(deviceId);
+        rememberMicrophone(deviceId);
+    };
+
+    const allow = async () => {
+        try {
+            await allowMicrophones();
+            setBlocked(false);
+            await refresh();
+        } catch {
+            setBlocked(true);
+        }
+    };
+
+    const missing = selected !== '' && !devices.some((device) => device.id === selected);
+
+    return (
+        <fieldset className="mt-10">
+            <legend className="mb-1 text-[13px] text-muted">Micrófono</legend>
+            <p className="mb-3 max-w-xl text-[12.5px] text-faint">El de este navegador. Se usa desde la próxima vez que actives la escucha.</p>
+            {unavailable ? (
+                <p className="text-[13px] text-muted">Este navegador no deja elegir el micrófono.</p>
+            ) : (
+                <>
+                    <select aria-label="Micrófono" value={selected} onChange={(event) => choose(event.target.value)} className={selectClass}>
+                        <option value="">El del sistema</option>
+                        {missing && <option value={selected}>El que elegiste (ahora no está conectado)</option>}
+                        {devices.map((device) => (
+                            <option key={device.id} value={device.id}>
+                                {device.label}
+                            </option>
+                        ))}
+                    </select>
+                    {!named && (
+                        <button type="button" onClick={() => void allow()} className="mt-3 text-[13px] font-medium text-accent hover:underline">
+                            Mostrar los nombres
+                        </button>
+                    )}
+                    {blocked && <p className="mt-2 text-[12.5px] text-crit">El navegador ha bloqueado el micrófono. Permítelo para ver los nombres.</p>}
+                    {missing && <p className="mt-2 text-[12.5px] text-muted">Hasta que vuelva, la escucha usa el del sistema.</p>}
+                </>
+            )}
+        </fieldset>
+    );
+}
 
 /**
  * Gemini and DeepSeek keys. The stored secret never comes back to the browser.
@@ -246,7 +335,7 @@ export default function System({ sizes, current, voices, voice, default_voice: d
     const { playback, toggle } = useSamplePlayer();
 
     return (
-        <SettingsLayout title="Sistema" description="Cómo ves, cómo oyes y con qué claves.">
+        <SettingsLayout title="Sistema" description="Cómo ves, cómo hablas, cómo oyes y con qué claves.">
             <fieldset>
                 <legend className="mb-3 text-[13px] text-muted">Tamaño de visualización</legend>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -266,6 +355,8 @@ export default function System({ sizes, current, voices, voice, default_voice: d
                     ))}
                 </div>
             </fieldset>
+
+            <MicrophoneChoice />
 
             <fieldset className="mt-10">
                 <legend className="mb-1 text-[13px] text-muted">Voz del asistente</legend>

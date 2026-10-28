@@ -1,7 +1,9 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 import { deviceSubscribed, disableDevicePush, enableDevicePush } from '@/alerts/push';
+import type { ActionState } from '@/actions/types';
+import { AutonomyLevels, AutonomyNumbers, type AutonomyBoard } from '@/canvas/slack/slack-autonomy';
 import { ServiceIconFor } from '@/components/service-icon';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
@@ -140,7 +142,54 @@ function DeviceAlerts({ vapidPublicKey }: { vapidPublicKey: string | null }) {
     );
 }
 
-export default function Alerts({ sources, vapidPublicKey }: { sources: AlertSource[]; vapidPublicKey: string | null }) {
+function SlackAutonomySettings({ board, pending }: { board: AutonomyBoard; pending: ActionState | null }) {
+    const error = (usePage().props as { errors?: Record<string, string> }).errors?.slack_autonomy;
+
+    return (
+        <section aria-labelledby="slack-autonomy" className="rounded-2xl border border-line bg-surface px-[22px] py-[18px]">
+            <h2 id="slack-autonomy" className="text-[15px] font-medium tracking-[-0.01em]">
+                Autonomía de Slack
+            </h2>
+            <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
+                Ver explica. Proponer deja un borrador. Hacer envía y deja unos segundos para deshacer. Subir a hacer espera tu sí, y solo si esa acción ya se acepta.
+            </p>
+            <div className="mt-3">
+                <AutonomyLevels levels={board.levels} />
+                <AutonomyNumbers board={board.board} />
+            </div>
+            {typeof error === 'string' && <p className="mt-3 text-[13px] text-warn">{error}</p>}
+            {pending && (
+                <form
+                    className="mt-4 flex flex-wrap items-center gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        router.post(`/settings/slack-autonomy/${pending.id}/confirm`, {}, { preserveScroll: true });
+                    }}
+                >
+                    <p className="min-w-0 flex-1 text-[13px]">{pending.label}</p>
+                    <button type="button" onClick={() => router.post(`/settings/slack-autonomy/${pending.id}/cancel`, {}, { preserveScroll: true })} className="rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft">
+                        Cancelar
+                    </button>
+                    <button type="submit" className="rounded-full bg-ink px-3 py-1 text-[12.5px] font-medium text-bg hover:opacity-90">
+                        Sí, subir
+                    </button>
+                </form>
+            )}
+        </section>
+    );
+}
+
+export default function Alerts({
+    sources,
+    vapidPublicKey,
+    slackAutonomy,
+    autonomyAction,
+}: {
+    sources: AlertSource[];
+    vapidPublicKey: string | null;
+    slackAutonomy: AutonomyBoard;
+    autonomyAction: ActionState | null;
+}) {
     return (
         <SettingsLayout
             title="Avisos"
@@ -148,6 +197,7 @@ export default function Alerts({ sources, vapidPublicKey }: { sources: AlertSour
         >
             <div className="flex flex-col gap-4">
                 <DeviceAlerts vapidPublicKey={vapidPublicKey} />
+                <SlackAutonomySettings board={slackAutonomy} pending={autonomyAction} />
                 {sources.map((source) => (
                     <SourceCard key={source.key} source={source} />
                 ))}

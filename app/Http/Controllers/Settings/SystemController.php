@@ -158,7 +158,7 @@ class SystemController extends Controller
         abort_unless(array_key_exists($voice, config('voice.providers.gemini.voices', [])), 404);
 
         try {
-            $path = $samples->pathFor($voice);
+            $path = $samples->pathFor($voice, request()->user());
         } catch (Throwable $exception) {
             report($exception);
 

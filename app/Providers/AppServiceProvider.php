@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Ai\AiObservability;
 use App\Ai\DeepSeekTextModel;
 use App\Ai\GeminiTextModel;
 use App\Ai\JobOwner;
@@ -21,6 +22,8 @@ use App\Alerts\RelevanceJudge;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\LlmReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
+use App\Analytics\PostHogProductAnalytics;
+use App\Analytics\ProductAnalytics;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\FakeCalendarReader;
@@ -130,6 +133,8 @@ class AppServiceProvider extends ServiceProvider
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
+        $this->app->singleton(ProductAnalytics::class, PostHogProductAnalytics::class);
+
         $this->app->singleton(IntentClassifier::class, fn (): IntentClassifier => match (true) {
             $this->usesTextModel(config('alerts.judge')) => new LlmIntentClassifier($this->textModel('light')),
             config('alerts.judge') === 'fake' => new FakeIntentClassifier,
@@ -191,7 +196,10 @@ class AppServiceProvider extends ServiceProvider
             default => throw new InvalidArgumentException('Unsupported Wingman follow-up planner ['.config('wingman.follow_ups.planner').'].'),
         });
 
-        $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(config('voice.providers.gemini')));
+        $this->app->singleton(VoiceSamples::class, fn (): VoiceSamples => new VoiceSamples(
+            config('voice.providers.gemini'),
+            $this->app->make(AiObservability::class),
+        ));
     }
 
     /**
@@ -228,11 +236,11 @@ class AppServiceProvider extends ServiceProvider
                 ...$options,
                 'max_tokens' => $tier === 'light' ? $config['light_max_tokens'] : $config['max_tokens'],
                 'thinking' => $tier === 'light' ? 'disabled' : $config['thinking'],
-            ]);
+            ], $this->app->make(AiObservability::class));
         }
 
         if ($provider === 'gemini') {
-            return new GeminiTextModel([...$options, 'thinking_level' => $config['thinking_level']]);
+            return new GeminiTextModel([...$options, 'thinking_level' => $config['thinking_level']], $this->app->make(AiObservability::class));
         }
 
         throw new InvalidArgumentException("Unsupported text provider [{$provider}].");

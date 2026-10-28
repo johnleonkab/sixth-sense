@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\PostHogLogChannel;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -129,6 +130,11 @@ return [
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
+        ],
+
+        'posthog' => [
+            'driver' => 'custom',
+            'via' => PostHogLogChannel::class,
         ],
 
         'emergency' => [

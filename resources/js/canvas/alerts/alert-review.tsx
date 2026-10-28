@@ -6,6 +6,7 @@ import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-t
 import type { Alert } from '@/alerts/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
+import SlackCorrections from '@/canvas/slack/slack-corrections';
 import type { CanvasComponent } from '@/canvas/types';
 import { ServiceIconFor } from '@/components/service-icon';
 
@@ -14,6 +15,7 @@ type Proposal = {
     reply: { to: 'sender' | 'all' | 'thread' | 'conversation'; text: string } | null;
     other_actions: string[];
     question: string | null;
+    redirect?: { to: string | null; text: string } | null;
 };
 
 type AlertReviewProps = {
@@ -168,6 +170,13 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                 </div>
                             )}
 
+                            {props.proposal.redirect?.text && (
+                                <div className="mt-3 rounded-lg border border-line bg-surface p-3">
+                                    <p className="text-[11.5px] text-muted">Pasárselo a {props.proposal.redirect.to ?? 'otra persona'}</p>
+                                    <p className="mt-1 text-[13.5px] leading-[1.5] whitespace-pre-wrap">{props.proposal.redirect.text}</p>
+                                </div>
+                            )}
+
                             {props.proposal.other_actions.length > 0 && (
                                 <ul className="mt-3 space-y-1 text-[13px]">
                                     {props.proposal.other_actions.map((action) => (
@@ -188,6 +197,10 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                         </div>
                     ) : (
                         <p className="mt-1.5 text-[13.5px] text-muted">{pending ? 'Sin propuesta todavía. Dime cómo quieres responder.' : 'Sin propuesta.'}</p>
+                    )}
+
+                    {pending && props.source_label === 'Slack' && (
+                        <SlackCorrections onCorrect={(correction) => runTool('correct_slack_triage', { alert_id: alert.id, correction })} />
                     )}
                 </section>
             </div>

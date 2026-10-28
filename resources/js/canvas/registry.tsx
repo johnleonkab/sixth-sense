@@ -24,6 +24,9 @@ import NotionNew from '@/canvas/notion/notion-new';
 import NotionPage from '@/canvas/notion/notion-page';
 import NotionResults from '@/canvas/notion/notion-results';
 import SlackConversation from '@/canvas/slack/slack-conversation';
+import SlackAutonomy from '@/canvas/slack/slack-autonomy';
+import SlackDigest from '@/canvas/slack/slack-digest';
+import SlackRule from '@/canvas/slack/slack-rule';
 import SlackDraft from '@/canvas/slack/slack-draft';
 import SlackResults from '@/canvas/slack/slack-results';
 import WingmanDoc from '@/canvas/wingman/wingman-doc';
@@ -54,6 +57,9 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'docs.edit': DocsEdit,
     'docs.comment': DocsComment,
     'slack.unread': SlackUnread,
+    'slack.digest': SlackDigest,
+    'slack.autonomy': SlackAutonomy,
+    'slack.rule': SlackRule,
     'slack.conversation': SlackConversation,
     'slack.results': SlackResults,
     'slack.draft': SlackDraft,

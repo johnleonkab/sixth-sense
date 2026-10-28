@@ -161,6 +161,46 @@ class User extends Authenticatable
     }
 
     /**
+     * How this person has been answering Slack, learned from the last month.
+     *
+     * @return HasOne<SlackAttentionProfile, $this>
+     */
+    public function slackAttentionProfile(): HasOne
+    {
+        return $this->hasOne(SlackAttentionProfile::class);
+    }
+
+    /**
+     * Slack messages already triaged, including the ones that did not ring.
+     *
+     * @return HasMany<SlackTriageDecision, $this>
+     */
+    public function slackTriageDecisions(): HasMany
+    {
+        return $this->hasMany(SlackTriageDecision::class);
+    }
+
+    /**
+     * Attention rules she has stated, proposed until she says yes.
+     *
+     * @return HasMany<SlackPreferenceRule, $this>
+     */
+    public function slackPreferenceRules(): HasMany
+    {
+        return $this->hasMany(SlackPreferenceRule::class);
+    }
+
+    /**
+     * How far each Slack action may go. A missing row stays at draft.
+     *
+     * @return HasMany<SlackAutonomyLevel, $this>
+     */
+    public function slackAutonomyLevels(): HasMany
+    {
+        return $this->hasMany(SlackAutonomyLevel::class);
+    }
+
+    /**
      * Alerts raised for this user, newest first.
      *
      * @return HasMany<InboxItem, $this>

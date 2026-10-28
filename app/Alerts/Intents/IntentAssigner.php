@@ -9,7 +9,10 @@ use App\Alerts\Triage;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\PlanAlertReply;
+use App\Jobs\ScheduleTask;
+use App\Models\AgendaTask;
 use App\Models\InboxItem;
+use App\Models\SlackTriageDecision;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -28,6 +31,9 @@ class IntentAssigner
     public function __construct(
         private IntentClassifier $classifier,
         private RuleIntentClassifier $rules,
+        private SlackThreadReader $threads,
+        private SlackTriage $triage,
+        private SlackAutonomy $autonomy,
     ) {}
 
     /**
@@ -42,12 +48,29 @@ class IntentAssigner
         }
 
         $intents = $this->intents($user);
+        $context = $this->context($user);
+        $state = null;
+
+        if ($candidate->source === AlertSource::Slack) {
+            $state = $this->threads->read($user, $candidate);
+            $context = trim($context."\n\n".$state->prompt());
+        }
+
         $decision = ($byRules ? $this->rules : $this->classifier)->classify(
             $user,
             $candidate,
             $intents->map(fn (InboxItem $item): array => $this->describe($item))->all(),
-            $this->context($user),
+            $context,
         );
+
+        $row = null;
+
+        if ($state !== null) {
+            $profile = $user->slackAttentionProfile;
+            $decision = $this->triage->adjust($decision, $state, $profile?->signals);
+            $decision = $this->triage->recover($user, $candidate, $decision, $state);
+            $row = $this->triage->record($user, $candidate, $decision, $state, $profile);
+        }
 
         $intent = $decision->intentId !== null ? $intents->firstWhere('id', $decision->intentId) : null;
 
@@ -56,18 +79,28 @@ class IntentAssigner
         }
 
         if ($intent !== null && $this->closed($intent)) {
-            return $decision->important ? $this->reopen($intent, $candidate, $decision) : null;
+            return $decision->shown() ? $this->remember($row, $this->reopen($intent, $candidate, $decision)) : null;
         }
 
         if ($intent !== null) {
-            return $this->append($intent, $candidate, $decision, $earlier);
+            return $this->remember($row, $this->append($intent, $candidate, $decision, $earlier));
         }
 
-        if (! $decision->important) {
+        if (! $decision->shown()) {
             return null;
         }
 
-        return $this->open($user, $candidate, $decision, $earlier);
+        return $this->remember($row, $this->open($user, $candidate, $decision, $earlier));
+    }
+
+    /**
+     * Opens an alert from a decision that was already taken, without asking
+     * the model again. Used when an unanswered question in her channel is
+     * promoted hours later.
+     */
+    public function raise(User $user, InboxCandidate $candidate, IntentDecision $decision): ?InboxItem
+    {
+        return $this->open($user, $candidate, $decision, []);
     }
 
     /**
@@ -97,6 +130,12 @@ class IntentAssigner
 
         if ($work !== null && $work->usable()) {
             $parts[] = $work->summary;
+        }
+
+        $attention = $user->slackAttentionProfile;
+
+        if ($attention !== null && filled($attention->body)) {
+            $parts[] = "Política de atención en Slack, aprendida de cómo ha respondido:\n".$attention->body;
         }
 
         $lessons = $user->intentLessons()->latest('id')->limit(8)->pluck('body');
@@ -167,7 +206,7 @@ class IntentAssigner
         ]);
 
         InboxItemCreated::dispatch($item);
-        PlanAlertReply::dispatch($item);
+        $this->follow($item, $decision);
 
         return $item;
     }
@@ -194,7 +233,7 @@ class IntentAssigner
         $payload['from'] = $candidate->from?->toArray() ?? ($payload['from'] ?? null);
         $payload['candidate'] = $candidate->toArray();
 
-        if (! $decision->important) {
+        if (! $decision->shown()) {
             $intent->update(['payload' => $payload]);
 
             return $intent;
@@ -217,7 +256,7 @@ class IntentAssigner
         $intent->save();
 
         InboxItemUpdated::dispatch($intent);
-        PlanAlertReply::dispatch($intent);
+        $this->follow($intent, $decision);
 
         return $intent;
     }
@@ -255,8 +294,67 @@ class IntentAssigner
         $intent->save();
 
         InboxItemUpdated::dispatch($intent);
-        PlanAlertReply::dispatch($intent);
+        $this->follow($intent, $decision);
 
         return $intent;
+    }
+
+    private function follow(InboxItem $item, IntentDecision $decision): void
+    {
+        if ($decision->action !== null && $this->autonomy->level($item->user, $decision->action) === AutonomyLevel::Watch) {
+            $item->update([
+                'proposal' => [
+                    'summary' => $decision->reason,
+                    'reply' => null,
+                    'other_actions' => [],
+                    'question' => null,
+                    'task' => null,
+                ],
+                'planning' => false,
+            ]);
+
+            return;
+        }
+
+        if ($decision->action === SlackAction::Task) {
+            $item->update([
+                'proposal' => [
+                    'summary' => $decision->reason,
+                    'reply' => null,
+                    'other_actions' => [],
+                    'question' => null,
+                    'task' => null,
+                ],
+                'planning' => false,
+            ]);
+            $this->agenda($item, $decision);
+
+            return;
+        }
+
+        PlanAlertReply::dispatch($item);
+    }
+
+    private function agenda(InboxItem $item, IntentDecision $decision): void
+    {
+        if (AgendaTask::query()->where('inbox_item_id', $item->id)->exists()) {
+            return;
+        }
+
+        $task = $item->user->agendaTasks()->create([
+            'inbox_item_id' => $item->id,
+            'origin' => 'alert',
+            'title' => $decision->goal,
+            'context' => trim("{$item->actor_name}: {$decision->reason}"),
+        ]);
+
+        ScheduleTask::dispatch($task, 30, null, []);
+    }
+
+    private function remember(?SlackTriageDecision $row, InboxItem $item): InboxItem
+    {
+        $row?->update(['inbox_item_id' => $item->id]);
+
+        return $item;
     }
 }

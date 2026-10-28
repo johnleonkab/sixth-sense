@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Actions\Handlers\AcceptSlackAutonomy;
+use App\Actions\Handlers\AcceptSlackPreference;
 use App\Actions\Handlers\ChangeCalendar;
 use App\Actions\Handlers\ChangeJira;
 use App\Actions\Handlers\ChangeSense;
@@ -12,6 +14,7 @@ use App\Actions\Handlers\ReplyDocumentComment;
 use App\Actions\Handlers\ScheduleAgendaTask;
 use App\Actions\Handlers\SendChatMessage;
 use App\Actions\Handlers\SendEmail;
+use App\Alerts\Intents\SlackAutonomy;
 use App\Jobs\ExecutePendingAction;
 use App\Models\PendingAction;
 use App\Models\User;
@@ -51,6 +54,8 @@ class Actions
         'agenda.schedule' => ScheduleAgendaTask::class,
         'sense.write' => ChangeSense::class,
         'sense.delete' => ChangeSense::class,
+        'slack.preference' => AcceptSlackPreference::class,
+        'slack.autonomy' => AcceptSlackAutonomy::class,
     ];
 
     public function __construct(private Container $container) {}
@@ -90,6 +95,8 @@ class Actions
             'status' => ActionStatus::Confirmed,
             'undo_until' => now()->addSeconds(self::UNDO_WINDOW),
         ]);
+
+        $this->container->make(SlackAutonomy::class)->note($action);
 
         ExecutePendingAction::dispatch($action)->delay(now()->addSeconds(self::UNDO_WINDOW));
 

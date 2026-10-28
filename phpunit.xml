@@ -39,5 +39,6 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="POSTHOG_DISABLED" value="true" force="true"/>
     </php>
 </phpunit>

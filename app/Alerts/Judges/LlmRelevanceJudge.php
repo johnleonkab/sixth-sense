@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Judges;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
@@ -31,7 +32,7 @@ class LlmRelevanceJudge implements RelevanceJudge
                 'relevance' => ['type' => 'INTEGER'],
             ],
             'required' => ['important', 'reason', 'relevance'],
-        ]);
+        ], 0, AiGenerationContext::forUser($user));
 
         if (! isset($answer['important'], $answer['reason'])) {
             throw new RuntimeException('Relevance check returned an unexpected answer.');

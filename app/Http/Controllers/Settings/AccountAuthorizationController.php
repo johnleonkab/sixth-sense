@@ -13,9 +13,11 @@ use App\Connections\Authorizers\SlackAuthorizer;
 use App\Connections\Provider;
 use App\Connectors\GitHub\GithubRepositories;
 use App\Http\Controllers\Controller;
+use App\Jobs\LearnSlackAttention;
 use App\Jobs\WarmChats;
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -40,7 +42,7 @@ class AccountAuthorizationController extends Controller
     /**
      * Store the account the provider sends back.
      */
-    public function callback(Request $request, Provider $provider, GithubRepositories $repositories): RedirectResponse
+    public function callback(Request $request, Provider $provider, GithubRepositories $repositories, PostHogService $posthog): RedirectResponse
     {
         abort_unless($provider->isConnectable(), 404);
 
@@ -56,8 +58,15 @@ class AccountAuthorizationController extends Controller
 
         $account = $this->store($user, $provider, $authorized);
 
+        $posthog->capture((string) $user->getAuthIdentifier(), 'connection_authorized', [
+            'provider' => $provider->value,
+            'account_created' => $account->wasRecentlyCreated,
+            'missing_scope_count' => count($account->missingScopes()),
+        ]);
+
         if ($provider === Provider::Slack) {
             WarmChats::dispatch($user);
+            LearnSlackAttention::dispatch($user);
         }
 
         if ($provider === Provider::GitHub) {

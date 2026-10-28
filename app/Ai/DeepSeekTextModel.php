@@ -20,9 +20,9 @@ class DeepSeekTextModel implements TextModel
     /**
      * @param  array{api_key: ?string, base_url: string, model: string, fallback_model?: ?string, timeout: int, max_tokens: int, thinking: string}  $config
      */
-    public function __construct(private array $config) {}
+    public function __construct(private array $config, private ?AiObservability $observability = null) {}
 
-    public function json(string $system, string $user, array $schema, float $temperature = 0): array
+    public function json(string $system, string $user, array $schema, float $temperature = 0, ?AiGenerationContext $context = null): array
     {
         if (blank($this->config['api_key'])) {
             throw new RuntimeException('DEEPSEEK_API_KEY is not set.');
@@ -39,7 +39,7 @@ class DeepSeekTextModel implements TextModel
             ...$this->thinking(),
         ];
 
-        [$response, $model] = $this->post($body);
+        [$response, $model] = $this->post($body, $context, $temperature);
 
         if ($response->failed()) {
             throw new RuntimeException("Text model failed with HTTP {$response->status()}: ".($response->json('error.message') ?? ''));
@@ -50,7 +50,7 @@ class DeepSeekTextModel implements TextModel
         // Thinking spends the token budget before the json. One more try, with
         // that budget left for the answer itself.
         if ($answer === null) {
-            $response = $this->request($model, [...$body, ...$this->thinking(false)]);
+            $response = $this->request($model, [...$body, ...$this->thinking(false)], $context, $temperature);
 
             if ($response->failed()) {
                 throw new RuntimeException("Text model failed with HTTP {$response->status()}: ".($response->json('error.message') ?? ''));
@@ -119,7 +119,7 @@ class DeepSeekTextModel implements TextModel
      * @param  array<string, mixed>  $body
      * @return array{0: Response, 1: string}
      */
-    private function post(array $body): array
+    private function post(array $body, ?AiGenerationContext $context, float $temperature): array
     {
         $models = array_values(array_unique(array_filter([$this->config['model'], $this->config['fallback_model'] ?? null])));
 
@@ -128,7 +128,7 @@ class DeepSeekTextModel implements TextModel
         }
 
         foreach ($models as $position => $model) {
-            $response = $this->request($model, $body);
+            $response = $this->request($model, $body, $context, $temperature);
 
             if (! in_array($response->status(), [429, 503], true) || $position === count($models) - 1) {
                 return [$response, $model];
@@ -141,9 +141,10 @@ class DeepSeekTextModel implements TextModel
     /**
      * @param  array<string, mixed>  $body
      */
-    private function request(string $model, array $body): Response
+    private function request(string $model, array $body, ?AiGenerationContext $context, float $temperature): Response
     {
-        return Http::baseUrl($this->config['base_url'])
+        $startedAt = microtime(true);
+        $response = Http::baseUrl($this->config['base_url'])
             ->withToken((string) $this->config['api_key'])
             ->connectTimeout(3)
             ->timeout($this->config['timeout'])
@@ -151,6 +152,20 @@ class DeepSeekTextModel implements TextModel
             ->retry(2, 1500, fn (Throwable $exception): bool => $exception instanceof RequestException
                 && in_array($exception->response->status(), [500, 502, 503, 504], true), throw: false)
             ->post('/chat/completions', ['model' => $model, ...$body]);
+
+        if ($context !== null && $this->observability !== null) {
+            $this->observability->capture($context, 'deepseek', $model, $body['messages'], $this->content($response) ?: null, [
+                'input_tokens' => $response->json('usage.prompt_tokens'),
+                'output_tokens' => $response->json('usage.completion_tokens'),
+                'status' => $response->status(),
+                'stop_reason' => $response->json('choices.0.finish_reason'),
+                'latency' => microtime(true) - $startedAt,
+                'temperature' => $temperature,
+                'max_tokens' => $body['max_tokens'] ?? null,
+            ]);
+        }
+
+        return $response;
     }
 
     private function content(Response $response): string

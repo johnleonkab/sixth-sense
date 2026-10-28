@@ -2,6 +2,7 @@
 
 namespace App\Wingman\Copilot;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Models\WingmanMeeting;
 use App\Wingman\Notes\MeetingNotes;
@@ -18,7 +19,7 @@ trait DraftsMessages
     /**
      * @return array{about: string, draft: string}|null
      */
-    private function draftMessage(WingmanMeeting $meeting, string $to, string $promise, string $said = ''): ?array
+    private function draftMessage(WingmanMeeting $meeting, string $to, string $promise, string $said = '', ?AiGenerationContext $context = null): ?array
     {
         $person = $meeting->user->name;
         $summary = MeetingNotes::fromArray($meeting->notes)->summary;
@@ -29,6 +30,7 @@ trait DraftsMessages
                 "Reunión: «{$meeting->title}».".($summary !== '' ? " Resumen: {$summary}" : '').($said !== '' ? "\n\nLo que se dijo:\n{$said}" : '')."\n\nLo que {$person} se comprometió a mandar: «{$promise}». Escribe el mensaje para {$to}.",
                 ['type' => 'OBJECT', 'properties' => ['about' => ['type' => 'STRING'], 'draft' => ['type' => 'STRING']], 'required' => ['about', 'draft']],
                 0.4,
+                $context,
             );
         } catch (Throwable $exception) {
             report($exception);

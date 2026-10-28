@@ -102,6 +102,10 @@ Route::middleware('auth')->group(function () {
         Route::put('system/keys', [SystemController::class, 'updateKeys'])->middleware('throttle:6,1')->name('system.keys');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
+        Route::post('slack-autonomy/lower', [AlertController::class, 'lowerAutonomy'])->name('slack-autonomy.lower');
+        Route::post('slack-autonomy/promote', [AlertController::class, 'promoteAutonomy'])->name('slack-autonomy.promote');
+        Route::post('slack-autonomy/{pending}/confirm', [AlertController::class, 'confirmAutonomy'])->whereNumber('pending')->name('slack-autonomy.confirm');
+        Route::post('slack-autonomy/{pending}/cancel', [AlertController::class, 'cancelAutonomy'])->whereNumber('pending')->name('slack-autonomy.cancel');
         Route::put('alerts/{source}', [AlertController::class, 'update'])->name('alerts.update');
         Route::get('context', [WorkContextController::class, 'index'])->name('context.index');
         Route::put('context', [WorkContextController::class, 'update'])->name('context.update');

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Jobs\BuildWorkContext;
 use App\Models\WorkContext;
+use App\Services\PostHogService;
 use App\WorkContext\WorkContextStatus;
 use App\WorkContext\WorkDigest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -46,14 +48,21 @@ class WorkContextController extends Controller
     /**
      * Switch it on or off. Switching it on builds it now if there is none yet.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, PostHogService $posthog): RedirectResponse
     {
         $enabled = (bool) $request->validate(['enabled' => ['required', 'boolean']])['enabled'];
 
         $context = $request->user()->workContext()->updateOrCreate([], ['enabled' => $enabled]);
 
+        $posthog->capture((string) $request->user()->getAuthIdentifier(), 'work_context_toggled', [
+            'enabled' => $enabled,
+        ]);
+
         if ($enabled && $context->generated_at === null && ! $context->building()) {
             BuildWorkContext::dispatch($request->user());
+            Log::channel('posthog')->info('work_context_build_dispatched', [
+                'trigger' => 'enablement',
+            ]);
         }
 
         return back();
@@ -62,7 +71,7 @@ class WorkContextController extends Controller
     /**
      * Build it again now, without waiting for the night.
      */
-    public function build(Request $request): RedirectResponse
+    public function build(Request $request, PostHogService $posthog): RedirectResponse
     {
         $context = $request->user()->workContext()->first();
 
@@ -70,6 +79,11 @@ class WorkContextController extends Controller
 
         if (! $context->building()) {
             BuildWorkContext::dispatch($request->user());
+
+            $posthog->capture((string) $request->user()->getAuthIdentifier(), 'work_context_build_requested');
+            Log::channel('posthog')->info('work_context_build_dispatched', [
+                'trigger' => 'manual',
+            ]);
         }
 
         return back();

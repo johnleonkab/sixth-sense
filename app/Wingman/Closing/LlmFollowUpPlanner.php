@@ -2,6 +2,7 @@
 
 namespace App\Wingman\Closing;
 
+use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Models\WingmanMeeting;
 use App\Wingman\Copilot\DraftsMessages;
@@ -24,6 +25,7 @@ class LlmFollowUpPlanner implements FollowUpPlanner
     public function plan(WingmanMeeting $meeting, MeetingNotes $notes, array $prepared): array
     {
         $person = $meeting->user->name;
+        $context = AiGenerationContext::forMeeting($meeting);
         $now = CarbonImmutable::now((string) config('agenda.timezone'))->locale('es');
         $optional = fn (string $type): array => ['type' => $type, 'nullable' => true];
         $prompt = "Reunión: «{$meeting->title}». Asistentes: ".(collect($meeting->attendees ?? [])->pluck('name')->filter()->implode(', ') ?: 'sin lista')
@@ -68,7 +70,7 @@ class LlmFollowUpPlanner implements FollowUpPlanner
                 ]],
             ],
             'required' => ['followups'],
-        ], 0.3);
+        ], 0.3, $context);
 
         $followUps = array_slice(array_values(array_filter(array_map(
             fn (mixed $followUp): ?FollowUp => is_array($followUp) ? FollowUp::fromArray($followUp) : null,
@@ -76,12 +78,12 @@ class LlmFollowUpPlanner implements FollowUpPlanner
         ))), 0, self::MAX);
 
         // A message without its text is written on its own.
-        return array_map(function (FollowUp $followUp) use ($meeting): FollowUp {
+        return array_map(function (FollowUp $followUp) use ($meeting, $context): FollowUp {
             if ($followUp->kind !== 'message' || filled($followUp->details['draft'] ?? null) || blank($followUp->details['to'] ?? null)) {
                 return $followUp;
             }
 
-            $written = $this->draftMessage($meeting, $followUp->details['to'], $followUp->title);
+            $written = $this->draftMessage($meeting, $followUp->details['to'], $followUp->title, '', $context);
 
             return $written === null ? $followUp : new FollowUp($followUp->kind, $followUp->title, [...$followUp->details, 'about' => $followUp->details['about'] ?? ($written['about'] ?: null), 'draft' => $written['draft']]);
         }, $followUps);
