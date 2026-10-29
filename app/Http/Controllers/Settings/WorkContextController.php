@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\BuildWorkContext;
+use App\Knowledge\KnowledgeBase;
 use App\Models\WorkContext;
 use App\Services\PostHogService;
 use App\WorkContext\WorkContextStatus;
@@ -17,9 +18,10 @@ use Inertia\Response;
 class WorkContextController extends Controller
 {
     /**
-     * Whether the nightly context is on, how the last one went and what the assistant knows.
+     * Whether the nightly context is on, how the last one went, what the
+     * assistant knows, and how much of the knowledge base is copied.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, KnowledgeBase $knowledge): Response
     {
         $context = $request->user()->workContext ?? new WorkContext;
         $interrupted = $context->status === WorkContextStatus::Running && ! $context->building();
@@ -42,6 +44,7 @@ class WorkContextController extends Controller
                 'digest' => $context->digest ? WorkDigest::fromArray($context->digest)->toArray() : null,
             ],
             'run_at' => config('work_context.run_at'),
+            'knowledge' => $knowledge->status($request->user()),
         ]);
     }
 

@@ -36,6 +36,20 @@ type WorkContext = {
     } | null;
 };
 
+type KnowledgeSource = {
+    source: 'archive' | 'jira' | 'notion';
+    label: string;
+    total: number;
+    copied: number;
+    last_copied_at: string | null;
+};
+
+const knowledgeUnits: Record<KnowledgeSource['source'], string> = {
+    archive: 'archivos',
+    jira: 'issues',
+    notion: 'páginas',
+};
+
 const statusDot: Record<WorkContext['status'], string> = {
     idle: 'bg-faint',
     running: 'bg-accent animate-pulse',
@@ -104,6 +118,52 @@ function Status({ context, runAt }: { context: WorkContext; runAt: string }) {
                 </p>
             )}
         </div>
+    );
+}
+
+/**
+ * How much of the archive, Jira and Notion is copied for every agent to search.
+ */
+function Knowledge({ sources }: { sources: KnowledgeSource[] }) {
+    return (
+        <section aria-labelledby="context-knowledge" className="rounded-2xl border border-line bg-surface">
+            <header className="px-[22px] pt-[18px] pb-4">
+                <h2 id="context-knowledge" className="text-[15px] font-medium tracking-[-0.01em]">
+                    Base de conocimiento
+                </h2>
+                <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
+                    Copia del archivo de trabajo, de los issues de Jira en los que participas y de las páginas de Notion compartidas. Todos los agentes buscan aquí. Cada 15 minutos copia lo que cambió y cada noche repasa todo.
+                </p>
+            </header>
+
+            <ul className="divide-y divide-line border-t border-line">
+                {sources.map((item) => {
+                    const done = item.total > 0 && item.copied >= item.total;
+                    const share = item.total === 0 ? 0 : Math.round((item.copied / item.total) * 100);
+
+                    return (
+                        <li key={item.source} className="px-[22px] py-3 text-[13px]">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                                <span className="font-medium">{item.label}</span>
+                                <span className="text-muted">
+                                    {item.total === 0
+                                        ? 'Nada copiado todavía'
+                                        : done
+                                          ? `${item.total} ${knowledgeUnits[item.source]}, todo copiado`
+                                          : `${item.copied} de ${item.total} ${knowledgeUnits[item.source]} copiados`}
+                                </span>
+                            </div>
+                            {item.total > 0 && (
+                                <div className="mt-2 h-1 overflow-hidden rounded-full bg-soft" role="progressbar" aria-label={`${item.label} copiado`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
+                                    <div className={`h-full rounded-full ${done ? 'bg-ok' : 'bg-accent'}`} style={{ width: `${share}%` }} />
+                                </div>
+                            )}
+                            <p className="mt-1.5 text-[12.5px] text-faint">{item.last_copied_at ? `Última copia: ${formatMoment(item.last_copied_at)}` : 'Sin copias todavía'}</p>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 }
 
@@ -242,7 +302,7 @@ function Digest({ digest, usable }: { digest: NonNullable<WorkContext['digest']>
     );
 }
 
-export default function Context({ context, run_at: runAt }: { context: WorkContext; run_at: string }) {
+export default function Context({ context, run_at: runAt, knowledge }: { context: WorkContext; run_at: string; knowledge: KnowledgeSource[] }) {
     const building = context.status === 'running';
     const { start, stop } = usePoll(3000, { only: ['context'] }, { autoStart: false });
 
@@ -282,6 +342,8 @@ export default function Context({ context, run_at: runAt }: { context: WorkConte
 
                     <Status context={context} runAt={runAt} />
                 </section>
+
+                <Knowledge sources={knowledge} />
 
                 {context.digest && <Digest digest={context.digest} usable={context.usable} />}
             </div>

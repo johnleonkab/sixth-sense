@@ -1,6 +1,8 @@
 <?php
 
 use App\Jobs\BuildWorkContext;
+use App\Knowledge\KnowledgeSource;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
 use App\Models\WorkContext;
 use App\Voice\Providers\FakeVoiceProvider;
@@ -33,6 +35,27 @@ test('the context page shows what the assistant knows', function () {
             ->where('context.sources.slack', 42)
             ->where('context.digest.workstreams.0.name', 'Lanzamiento del prepago')
             ->where('context.digest.open_loops', ['Confirmar a Pablo el reembolso parcial']));
+});
+
+test('the context page shows how much of each knowledge source is copied', function () {
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'indexed_at' => '2026-10-29 21:24:08']);
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'indexed_at' => null, 'content' => null]);
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Archive]);
+    KnowledgeDocument::factory()->create(['source' => KnowledgeSource::Notion]);
+
+    $this->actingAs($this->user)->get(route('settings.context.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('knowledge', 3)
+            ->where('knowledge.0.source', 'archive')
+            ->where('knowledge.0.total', 1)
+            ->where('knowledge.0.copied', 1)
+            ->where('knowledge.1.label', 'Jira')
+            ->where('knowledge.1.total', 2)
+            ->where('knowledge.1.copied', 1)
+            ->where('knowledge.1.last_copied_at', fn (string $at): bool => str_starts_with($at, '2026-10-29T21:24:08'))
+            ->where('knowledge.2.source', 'notion')
+            ->where('knowledge.2.total', 0)
+            ->where('knowledge.2.last_copied_at', null));
 });
 
 test('a build left running by a dead worker shows as interrupted', function () {

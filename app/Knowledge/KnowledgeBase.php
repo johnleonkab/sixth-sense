@@ -4,6 +4,7 @@ namespace App\Knowledge;
 
 use App\Models\KnowledgeDocument;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -67,6 +68,34 @@ class KnowledgeBase
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * How much of each source is copied: listed, with content, and when the
+     * last content arrived. Every source appears, even an empty one.
+     *
+     * @return list<array{source: string, label: string, total: int, copied: int, last_copied_at: ?string}>
+     */
+    public function status(User $user): array
+    {
+        $rows = $user->knowledgeDocuments()
+            ->selectRaw('source, count(*) as total, count(indexed_at) as copied, max(indexed_at) as last_copied_at')
+            ->groupBy('source')
+            ->get()
+            ->keyBy(fn (KnowledgeDocument $row): string => $row->getRawOriginal('source'));
+
+        return array_map(function (KnowledgeSource $source) use ($rows): array {
+            $row = $rows->get($source->value);
+            $last = $row?->getRawOriginal('last_copied_at');
+
+            return [
+                'source' => $source->value,
+                'label' => $source->label(),
+                'total' => (int) ($row?->getRawOriginal('total') ?? 0),
+                'copied' => (int) ($row?->getRawOriginal('copied') ?? 0),
+                'last_copied_at' => $last === null ? null : CarbonImmutable::parse($last)->toIso8601String(),
+            ];
+        }, KnowledgeSource::cases());
     }
 
     /**
