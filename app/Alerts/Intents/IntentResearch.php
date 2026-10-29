@@ -11,14 +11,15 @@ use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Mail\Mailbox;
 use App\Connectors\Mail\MailSearch;
 use App\Connectors\Wiki\Wiki;
+use App\Knowledge\KnowledgeBase;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * What the reply agent reads before it drafts: the work context, what it has
- * learned before, and a short look through mail, chat, documents, pages and
- * issues. A source that fails is skipped; the draft still happens.
+ * learned before, the best excerpts of the archive, Jira and Notion, and a
+ * short live look through mail, chat, documents, pages and issues. A source that fails is skipped; the draft still happens.
  */
 class IntentResearch
 {
@@ -28,6 +29,7 @@ class IntentResearch
         private Documents $documents,
         private Wiki $wiki,
         private IssueTracker $issues,
+        private KnowledgeBase $knowledge,
     ) {}
 
     public function gather(User $user, AlertBrief $brief): string
@@ -45,6 +47,8 @@ class IntentResearch
         if ($lessons->isNotEmpty()) {
             $lines[] = "Ya aprendido:\n".$lessons->implode("\n");
         }
+
+        $lines[] = $this->safely(fn (): string => $this->knowledge->context($user, trim($brief->subject.' '.Str::limit($brief->text, 600, ''))));
 
         if ($query !== '') {
             array_push($lines, ...$this->look($user, $query));

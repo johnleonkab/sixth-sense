@@ -35,6 +35,11 @@ class FakeWiki implements Wiki
         )), 0, $limit);
     }
 
+    public function edited(User $user, ?CarbonImmutable $since, int $limit = 500): array
+    {
+        return $this->search($user, null, $limit);
+    }
+
     public function outline(User $user, array $widths): array
     {
         return array_map(

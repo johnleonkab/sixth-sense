@@ -12,7 +12,8 @@ use Illuminate\Support\Str;
 /**
  * The activity, arranged the way the nightly summary should read it: Slack
  * by chat, Gmail by thread, the person's own writing, recent Drive files,
- * Notion from the top down, and Jira as each site's rules already filter it.
+ * Notion from the top down, Jira as each site's rules already filter it, and
+ * what changed in the work archive.
  */
 class ActivityBrief
 {
@@ -30,6 +31,7 @@ class ActivityBrief
             $this->drive($activity, $when, $line),
             $this->notion($activity, $when, $line),
             $this->jira($activity, $jiraRules),
+            $this->archive($activity),
         ];
 
         return implode("\n\n", array_filter($sections, fn (string $section): bool => $section !== ''));
@@ -202,6 +204,21 @@ class ActivityBrief
 
         if (trim($rules) !== '') {
             $blocks[] = "Reglas de Jira que hay que seguir al resumirlo:\n".Str::limit(trim($rules), 2000);
+        }
+
+        return implode("\n", $blocks);
+    }
+
+    private function archive(WorkActivity $activity): string
+    {
+        if ($activity->archive === []) {
+            return '';
+        }
+
+        $blocks = ['--- Archivo de trabajo, cambiado en el último día ---'];
+
+        foreach ($activity->archive as $file) {
+            $blocks[] = "«{$file['title']}»\n  {$file['excerpt']}";
         }
 
         return implode("\n", $blocks);

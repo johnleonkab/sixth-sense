@@ -6,6 +6,7 @@ use App\Connections\Capability;
 use App\Connectors\Docs\DocumentComment;
 use App\Connectors\Docs\EditNotPossible;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 /**
  * Knowledge pages (Notion today) across every account of the user.
@@ -19,6 +20,15 @@ interface Wiki
      * @return list<WikiPageSummary>
      */
     public function search(User $user, ?string $query, int $limit = 10): array;
+
+    /**
+     * Every page the person shared, edited since that moment, the most
+     * recently edited first. Without a moment, all of them. To keep a local
+     * copy, not to answer a question.
+     *
+     * @return list<WikiPageSummary>
+     */
+    public function edited(User $user, ?CarbonImmutable $since, int $limit = 500): array;
 
     /**
      * Pages from the top of what the person can see, then fewer at each

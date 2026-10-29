@@ -21,6 +21,7 @@ final readonly class WorkActivity
      * @param  list<array{page: WikiPageSummary, depth: int, excerpt: ?string}>  $pages  Notion, from the top of the workspace downward.
      * @param  list<string>  $failedSources  Sources that could not be read.
      * @param  list<IssueSummary>  $issues  Recent Jira issues, following each site's rules.
+     * @param  list<array{path: string, title: string, excerpt: string}>  $archive  Work archive files changed in the last day.
      */
     public function __construct(
         public array $messages = [],
@@ -29,17 +30,18 @@ final readonly class WorkActivity
         public array $pages = [],
         public array $failedSources = [],
         public array $issues = [],
+        public array $archive = [],
     ) {}
 
     public function isEmpty(): bool
     {
-        return $this->messages === [] && $this->emails === [] && $this->documents === [] && $this->pages === [] && $this->issues === [];
+        return $this->messages === [] && $this->emails === [] && $this->documents === [] && $this->pages === [] && $this->issues === [] && $this->archive === [];
     }
 
     /**
      * How much was read from each source.
      *
-     * @return array{slack: int, gmail: int, docs: int, notion: int, jira: int}
+     * @return array{slack: int, gmail: int, docs: int, notion: int, jira: int, archive: int}
      */
     public function counts(): array
     {
@@ -49,6 +51,7 @@ final readonly class WorkActivity
             'docs' => count($this->documents),
             'notion' => count($this->pages),
             'jira' => count($this->issues),
+            'archive' => count($this->archive),
         ];
     }
 }

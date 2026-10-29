@@ -22,3 +22,5 @@ Schedule::command('alerts:unstick')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('wingman:sync')->everyTenMinutes()->withoutOverlapping(30);
 Schedule::command('slack:learn-attention')->weeklyOn(1, '6:00')->withoutOverlapping(120);
 Schedule::command('slack:promote-unanswered')->everyThirtyMinutes()->withoutOverlapping(60);
+Schedule::command('knowledge:sync')->everyFifteenMinutes()->withoutOverlapping(30);
+Schedule::command('knowledge:sync --full')->dailyAt('03:30')->withoutOverlapping(120);

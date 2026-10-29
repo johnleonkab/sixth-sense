@@ -9,6 +9,7 @@ use App\Connectors\Chat\ChatSearch;
 use App\Connectors\Docs\DocumentLinks;
 use App\Connectors\Docs\Documents;
 use App\Connectors\Docs\DocumentSearch;
+use App\Knowledge\KnowledgeBase;
 use App\Models\SenseAgent;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
@@ -24,7 +25,7 @@ use Throwable;
  */
 class SlackDraft
 {
-    public function __construct(private Chats $chats, private Documents $documents) {}
+    public function __construct(private Chats $chats, private Documents $documents, private KnowledgeBase $knowledge) {}
 
     public function prepare(User $user, AlertBrief $brief, SlackTriageDecision $decision): SlackDraftBrief
     {
@@ -114,6 +115,12 @@ class SlackDraft
      */
     private function fromArchive(User $user, array $words): ?array
     {
+        $hit = $this->knowledge->search($user, implode(' ', $words), [], 1)[0] ?? null;
+
+        if ($hit !== null) {
+            return ['kind' => 'archive', 'who' => "{$hit['source']}, {$hit['title']}", 'text' => Str::limit($hit['excerpt'], 160)];
+        }
+
         $work = $user->workContext;
 
         if ($work === null || ! $work->usable() || ! $this->overlaps((string) $work->summary, $words)) {
@@ -223,7 +230,7 @@ class SlackDraft
         if ($citation !== null) {
             $parts[] = match ($citation['kind']) {
                 'thread' => "Según el hilo, {$citation['who']}: «{$citation['text']}».",
-                'archive' => "Según el archivo: «{$citation['text']}».",
+                'archive' => $citation['who'] !== '' ? "Según {$citation['who']}: «{$citation['text']}»." : "Según el archivo: «{$citation['text']}».",
                 'precedent' => "La última vez respondió: «{$citation['text']}».",
                 default => "Según «{$citation['who']}»: «{$citation['text']}».",
             };

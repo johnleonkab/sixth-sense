@@ -60,6 +60,44 @@ class JiraIssueTracker implements IssueTracker
         return array_slice($found, 0, $limit);
     }
 
+    public function involved(User $user, ?CarbonImmutable $since, int $limit = 100): array
+    {
+        // JQL compares dates by day: the day before is read again, and the
+        // caller skips what did not change.
+        $from = ($since ?? CarbonImmutable::now()->subYear())->subDay()->format('Y-m-d');
+        $jql = "(assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND updated >= \"{$from}\" ORDER BY updated ASC";
+        $found = [];
+
+        foreach ($user->accountsWith(Capability::JiraRead) as $account) {
+            $token = null;
+
+            do {
+                try {
+                    $page = $this->jira->post($account, 'search/jql', array_filter([
+                        'jql' => $jql,
+                        'maxResults' => min(100, $limit),
+                        'fields' => self::LIST_FIELDS,
+                        'nextPageToken' => $token,
+                    ]));
+                } catch (JiraError $exception) {
+                    report($exception);
+
+                    break;
+                }
+
+                foreach ($page['issues'] ?? [] as $issue) {
+                    $found[] = $this->summary($account, $issue);
+                }
+
+                $token = $page['nextPageToken'] ?? null;
+            } while (is_string($token) && count($found) < $limit);
+        }
+
+        usort($found, fn (IssueSummary $a, IssueSummary $b): int => $a->updatedAt <=> $b->updatedAt);
+
+        return array_slice($found, 0, $limit);
+    }
+
     public function issue(User $user, string $reference): ?Issue
     {
         [$account, $key] = $this->resolve($user, $reference, Capability::JiraRead);

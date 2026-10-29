@@ -110,6 +110,17 @@ class GithubApi
      */
     public function paths(GithubRepository $repository, ?string $branch = null): array
     {
+        return array_keys($this->blobs($repository, $branch));
+    }
+
+    /**
+     * Every file in the branch with the sha of its contents, which changes
+     * whenever the file does.
+     *
+     * @return array<string, string> Path to blob sha.
+     */
+    public function blobs(GithubRepository $repository, ?string $branch = null): array
+    {
         $response = $this->send(
             $repository->account,
             'get',
@@ -127,15 +138,15 @@ class GithubApi
             return [];
         }
 
-        $paths = [];
+        $blobs = [];
 
         foreach ($tree as $item) {
             if (is_array($item) && ($item['type'] ?? null) === 'blob' && is_string($item['path'] ?? null)) {
-                $paths[] = $item['path'];
+                $blobs[$item['path']] = (string) ($item['sha'] ?? '');
             }
         }
 
-        return $paths;
+        return $blobs;
     }
 
     /**

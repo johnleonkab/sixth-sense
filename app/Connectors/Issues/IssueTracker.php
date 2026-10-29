@@ -6,6 +6,7 @@ use App\Connections\Capability;
 use App\Connectors\Docs\EditNotPossible;
 use App\Connectors\Jira\JiraRules;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 /**
  * Issues (Jira today) across every connected site of the user. Writing is
@@ -22,6 +23,15 @@ interface IssueTracker
      * @return list<IssueSummary>
      */
     public function search(User $user, ?string $jql, ?string $text = null, int $limit = 15): array;
+
+    /**
+     * Issues the person takes part in (assigned, reported or watched),
+     * updated since that moment, oldest first. Without a moment, the last
+     * year. To keep a local copy, not to answer a question.
+     *
+     * @return list<IssueSummary>
+     */
+    public function involved(User $user, ?CarbonImmutable $since, int $limit = 100): array;
 
     /**
      * One issue by its ref, its key or its link.

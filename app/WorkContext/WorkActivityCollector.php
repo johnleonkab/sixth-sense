@@ -13,13 +13,16 @@ use App\Connectors\Mail\MailMessage;
 use App\Connectors\Mail\MailSearch;
 use App\Connectors\Wiki\Wiki;
 use App\Connectors\Wiki\WikiPageSummary;
+use App\Knowledge\KnowledgeSource;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Reads recent Slack, Gmail, Drive, Notion and Jira. Only read methods: it
+ * Reads recent Slack, Gmail, Drive, Notion and Jira, and what changed in the
+ * work archive. Only read methods: it
  * never changes those services. A source that fails is left out; the others
  * are still read.
  */
@@ -55,7 +58,30 @@ class WorkActivityCollector
             pages: $read('notion', fn (): array => $this->pages($user)),
             failedSources: $failed,
             issues: $read('jira', fn (): array => $this->issues->search($user, null, null, (int) config('work_context.limits.issues'))),
+            archive: $read('archive', fn (): array => $this->archive($user, $now->subDay())),
         );
+    }
+
+    /**
+     * Work archive files whose new version was copied since then, from the
+     * knowledge base the nightly full sync just refreshed.
+     *
+     * @return list<array{path: string, title: string, excerpt: string}>
+     */
+    private function archive(User $user, CarbonImmutable $since): array
+    {
+        return $user->knowledgeDocuments()
+            ->where('source', KnowledgeSource::Archive)
+            ->where('indexed_at', '>=', $since)
+            ->orderByDesc('indexed_at')
+            ->limit(20)
+            ->get()
+            ->map(fn (KnowledgeDocument $document): array => [
+                'path' => $document->ref,
+                'title' => $document->title,
+                'excerpt' => Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $document->content)), 400),
+            ])
+            ->all();
     }
 
     /**

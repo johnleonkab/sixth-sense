@@ -25,6 +25,11 @@ class FakeIssueTracker implements IssueTracker
         )), 0, $limit);
     }
 
+    public function involved(User $user, ?CarbonImmutable $since, int $limit = 100): array
+    {
+        return array_slice(array_map(fn (array $issue): IssueSummary => $this->summary($issue), $this->issues()), 0, $limit);
+    }
+
     public function issue(User $user, string $reference): ?Issue
     {
         preg_match('/[A-Z]+-\d+/', $reference, $match);

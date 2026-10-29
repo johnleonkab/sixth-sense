@@ -67,6 +67,54 @@ class NotionWiki implements Wiki
         return array_slice($found, 0, $limit);
     }
 
+    public function edited(User $user, ?CarbonImmutable $since, int $limit = 500): array
+    {
+        $found = [];
+
+        foreach ($user->accountsWith(Capability::NotionRead) as $account) {
+            $cursor = null;
+
+            do {
+                try {
+                    $results = $this->notion->post($account, 'search', array_filter([
+                        'filter' => ['property' => 'object', 'value' => 'page'],
+                        'sort' => ['direction' => 'descending', 'timestamp' => 'last_edited_time'],
+                        'page_size' => 100,
+                        'start_cursor' => $cursor,
+                    ]));
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    break;
+                }
+
+                $older = false;
+
+                foreach ($results['results'] ?? [] as $page) {
+                    if ($page['in_trash'] ?? $page['archived'] ?? false) {
+                        continue;
+                    }
+
+                    $summary = $this->summary($account, $page);
+
+                    if ($since !== null && $summary->editedAt !== null && $summary->editedAt->lessThan($since)) {
+                        $older = true;
+
+                        break;
+                    }
+
+                    $found[] = $summary;
+                }
+
+                $cursor = ($results['has_more'] ?? false) ? ($results['next_cursor'] ?? null) : null;
+            } while (! $older && is_string($cursor) && count($found) < $limit);
+        }
+
+        usort($found, fn (WikiPageSummary $a, WikiPageSummary $b): int => $b->editedAt <=> $a->editedAt);
+
+        return array_slice($found, 0, $limit);
+    }
+
     public function outline(User $user, array $widths): array
     {
         $widths = array_values(array_filter($widths, fn (int $width): bool => $width > 0));

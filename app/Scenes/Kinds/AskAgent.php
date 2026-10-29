@@ -3,6 +3,7 @@
 namespace App\Scenes\Kinds;
 
 use App\Ai\AiGenerationContext;
+use App\Knowledge\KnowledgeBase;
 use App\Models\Scene;
 use App\Models\SenseAgent;
 use App\Models\User;
@@ -15,7 +16,7 @@ use App\Scenes\SceneText;
  */
 class AskAgent implements SceneKind
 {
-    public function __construct(private SceneBoard $board, private SceneText $text) {}
+    public function __construct(private SceneBoard $board, private SceneText $text, private KnowledgeBase $knowledge) {}
 
     public function type(): string
     {
@@ -48,8 +49,8 @@ class AskAgent implements SceneKind
         }
 
         $answer = $this->text->capable(
-            'Respondes como el agente cuyo briefing te doy. Una respuesta breve, en español. Devuelve json con la clave answer.',
-            "Briefing:\n{$agent->briefing()}\n\nPregunta:\n{$question}",
+            'Respondes como el agente cuyo briefing te doy. Una respuesta breve, en español. Si usas lo que dicen el archivo, Jira o Notion, di de dónde sale. Devuelve json con la clave answer.',
+            trim("Briefing:\n{$agent->briefing()}\n\n{$this->knowledge->context($scene->user, $question)}\n\nPregunta:\n{$question}"),
             [
                 'type' => 'object',
                 'properties' => ['answer' => ['type' => 'string']],

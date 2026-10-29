@@ -45,12 +45,26 @@ final readonly class AssistantProfile
                 $chats ? self::familiarChats($chats->familiar($user)) : '',
                 self::workContext($user),
                 self::sense($user),
+                self::knowledge($user),
                 'Si el encargo necesita más de una herramienta (buscar hueco y contestar, dejar varias historias, preguntar a un agente), la única llamada es open_scene. No encadenes las herramientas de ese encargo.',
                 'Para encontrar un documento, una hoja, unas diapositivas o una página, la única llamada es find_files, con uno o varios términos. No busques primero en Docs y luego en Notion.',
                 $issues ? self::jiraRules($issues->rules($user)) : '',
             ]))),
             tools: $toolbox?->declarations() ?? [],
         );
+    }
+
+    /**
+     * The local copy of the archive, Jira and Notion, so questions about the
+     * work are answered from it instead of from memory.
+     */
+    private static function knowledge(User $user): string
+    {
+        if (! $user->knowledgeDocuments()->exists()) {
+            return '';
+        }
+
+        return 'Antes de responder sobre un proyecto, una decisión, un proceso, una persona o cualquier contexto del trabajo, llama a search_knowledge: busca a la vez en el archivo de trabajo, en Jira y en Notion. Responde con lo que encuentres y di de dónde sale. Si no hay nada, dilo; no lo inventes.';
     }
 
     /**

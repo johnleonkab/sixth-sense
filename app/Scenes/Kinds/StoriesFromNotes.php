@@ -6,6 +6,7 @@ use App\Actions\Actions;
 use App\Ai\AiGenerationContext;
 use App\Connectors\GitHub\GithubContents;
 use App\Jobs\RunSceneStep;
+use App\Knowledge\KnowledgeBase;
 use App\Models\GithubRepository;
 use App\Models\Scene;
 use App\Models\SenseAgent;
@@ -28,6 +29,7 @@ class StoriesFromNotes implements SceneKind
         private GithubContents $contents,
         private FileRules $rules,
         private Actions $actions,
+        private KnowledgeBase $knowledge,
     ) {}
 
     public function type(): string
@@ -141,7 +143,7 @@ class StoriesFromNotes implements SceneKind
         $context = AiGenerationContext::forScene($scene);
         $draft = $this->text->capable(
             'Escribes una historia de usuario. Devuelve json con why, outcome y body. El título ya está decidido. En español.',
-            "Briefing:\n{$agent->briefing()}\n\nNotas:\n{$scene->input['notes']}\n\nTítulo:\n{$title}",
+            "Briefing:\n{$agent->briefing()}\n\n{$this->knowledge->context($scene->user, $title)}\n\nNotas:\n{$scene->input['notes']}\n\nTítulo:\n{$title}",
             [
                 'type' => 'object',
                 'properties' => [

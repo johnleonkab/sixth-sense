@@ -140,6 +140,16 @@ class User extends Authenticatable
     }
 
     /**
+     * The archive, Jira and Notion copied for search.
+     *
+     * @return HasMany<KnowledgeDocument, $this>
+     */
+    public function knowledgeDocuments(): HasMany
+    {
+        return $this->hasMany(KnowledgeDocument::class);
+    }
+
+    /**
      * Skills copied from the work repository.
      *
      * @return HasMany<SenseSkill, $this>
