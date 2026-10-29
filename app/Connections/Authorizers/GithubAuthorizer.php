@@ -6,6 +6,7 @@ use App\Connections\AccountAuthorizer;
 use App\Connections\AuthorizationCancelled;
 use App\Connections\AuthorizedAccount;
 use App\Connections\Provider;
+use App\Connectors\GitHub\GithubTokens;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -40,7 +41,7 @@ class GithubAuthorizer implements AccountAuthorizer
         return self::AUTHORIZE_URL.'?'.http_build_query([
             'client_id' => config('services.github.client_id'),
             'redirect_uri' => config('services.github.redirect'),
-            'scope' => implode(' ', [...Provider::GitHub->scopes(), 'read:user', 'user:email']),
+            'scope' => implode(' ', [...Provider::GitHub->scopes(), 'read:user', 'user:email', 'offline_access']),
             'state' => Crypt::encryptString($nonce),
         ]);
     }
@@ -59,18 +60,20 @@ class GithubAuthorizer implements AccountAuthorizer
             throw new RuntimeException('GitHub authorisation state is missing, expired or already used.');
         }
 
-        $token = Http::acceptJson()->timeout(15)->post(self::TOKEN_URL, [
+        $token = Http::asForm()->acceptJson()->timeout(15)->post(self::TOKEN_URL, [
             'client_id' => config('services.github.client_id'),
             'client_secret' => config('services.github.client_secret'),
             'code' => $request->query('code'),
             'redirect_uri' => config('services.github.redirect'),
         ]);
 
-        if ($token->failed() || blank($token->json('access_token'))) {
-            throw new RuntimeException('GitHub did not authorise: '.$token->json('error', 'no access token'));
+        $fields = GithubTokens::fields($token);
+
+        if ($token->failed() || blank($fields['access_token'] ?? null)) {
+            throw new RuntimeException('GitHub did not authorise: '.($fields['error'] ?? 'no access token'));
         }
 
-        $accessToken = $token->json('access_token');
+        $accessToken = $fields['access_token'];
         $profile = Http::withToken($accessToken)->acceptJson()->timeout(15)
             ->withHeaders($this->headers())
             ->get(self::API.'/user');
@@ -85,9 +88,9 @@ class GithubAuthorizer implements AccountAuthorizer
             name: $profile->json('name') ?: $profile->json('login'),
             avatarUrl: $profile->json('avatar_url'),
             accessToken: $accessToken,
-            refreshToken: $token->json('refresh_token'),
-            expiresIn: filled($token->json('expires_in')) ? (int) $token->json('expires_in') : null,
-            scopes: array_values(array_filter(preg_split('/[\s,]+/', (string) $token->json('scope')) ?: [])),
+            refreshToken: $fields['refresh_token'] ?? null,
+            expiresIn: filled($fields['expires_in'] ?? null) ? (int) $fields['expires_in'] : null,
+            scopes: array_values(array_filter(preg_split('/[\s,]+/', (string) ($fields['scope'] ?? '')) ?: [])),
             metadata: [
                 'login' => $profile->json('login'),
             ],

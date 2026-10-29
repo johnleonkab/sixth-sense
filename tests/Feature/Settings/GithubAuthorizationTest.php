@@ -45,7 +45,7 @@ test('users are sent to github asking for every repository and their identity', 
     expect($location)->toStartWith('https://github.com/login/oauth/authorize')
         ->and($query['client_id'])->toBe('github-client')
         ->and($query['redirect_uri'])->toBe('https://tunnel.example.com/settings/connections/github/callback')
-        ->and(explode(' ', $query['scope']))->toEqualCanonicalizing([...Provider::GitHub->scopes(), 'read:user', 'user:email']);
+        ->and(explode(' ', $query['scope']))->toEqualCanonicalizing([...Provider::GitHub->scopes(), 'read:user', 'user:email', 'offline_access']);
 });
 
 test('the callback stores the account and the repositories it can see', function () {
@@ -72,7 +72,28 @@ test('the callback stores the account and the repositories it can see', function
         ->and($account->githubRepositories()->where('full_name', 'jhon/notes')->first()->can_push)->toBeFalse()
         ->and($account->githubRepositories()->where('included', true)->exists())->toBeFalse();
 
-    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'access_token') && $request['code'] === 'abc' && $request['client_secret'] === 'github-secret');
+    Http::assertSent(fn (Request $request) => str_contains($request->url(), 'access_token') && $request->isForm() && $request['code'] === 'abc' && $request['client_secret'] === 'github-secret');
+});
+
+test('a form-encoded grant keeps the refresh token', function () {
+    [, $query] = githubRedirect();
+    Http::fake([
+        'github.com/login/oauth/access_token' => Http::response(
+            'access_token=gho_form&expires_in=28800&refresh_token=ghr_form&scope=repo%2Cread%3Auser%2Cuser%3Aemail&token_type=bearer',
+            200,
+            ['Content-Type' => 'application/x-www-form-urlencoded'],
+        ),
+        'api.github.com/user/repos*' => Http::response([]),
+        'api.github.com/user' => Http::response(['id' => 42, 'login' => 'jhon', 'name' => 'John León', 'email' => 'jhon@covermanager.com']),
+    ]);
+
+    $this->get(route('settings.connections.callback', ['provider' => 'github', 'code' => 'abc', 'state' => $query['state']]));
+
+    $account = ConnectedAccount::sole();
+
+    expect($account->access_token)->toBe('gho_form')
+        ->and($account->refresh_token)->toBe('ghr_form')
+        ->and($account->expires_at)->not->toBeNull();
 });
 
 test('an expiring grant keeps the refresh token, encrypted, and when it runs out', function () {
