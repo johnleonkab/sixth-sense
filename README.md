@@ -82,6 +82,10 @@ A GitHub repository can hold the longer archive: the notes and the agents for th
 
 [Wingman](extensions/wingman-meet) is a small browser extension. It reads Meet’s own captions on your screen. No bot joins the call. During the meeting it can surface the ticket you just named, a slot that is free, or a message you promised to send. When you hang up, what you committed to is waiting as actions you can confirm. Transcripts are discarded once the notes exist.
 
+## On the Mac
+
+[Sixth Sense in the notch](extensions/macos-notch) is a small macOS app. Press ⌥ Space from any app, or click the notch, and the assistant drops down. Folding it does not cut the conversation, and an orange dot shows when the microphone is on.
+
 ## Principles
 
 - **Voice first.** The keyboard is there: click the line of what you are saying and type.
@@ -211,6 +215,7 @@ resources/js/
 ├── voice/          The voice session
 └── pages/          The assistant, the landing, and settings
 extensions/wingman-meet/   The Meet extension
+extensions/macos-notch/    The macOS notch app
 ```
 
 ## License
