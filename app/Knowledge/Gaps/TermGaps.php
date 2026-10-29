@@ -47,16 +47,14 @@ class TermGaps
         $user->knowledgeDocuments()
             ->whereIn('source', [KnowledgeSource::Jira, KnowledgeSource::Notion, KnowledgeSource::Meeting])
             ->where('indexed_at', '>=', $now->subDays(self::DAYS))
-            ->select(['id', 'title', 'content'])
+            ->select(['id', 'title', 'terms'])
             ->lazyById(100)
             ->each(function (KnowledgeDocument $document) use (&$counts, &$examples): void {
-                $text = $document->title."\n".$document->content;
-
-                foreach (array_unique(self::terms($text)) as $term) {
+                foreach (array_unique(self::terms($document->title.' '.$document->terms)) as $term) {
                     $counts[$term] = ($counts[$term] ?? 0) + 1;
 
-                    if (count($examples[$term] ?? []) < 2) {
-                        $examples[$term][] = self::around($text, $term);
+                    if (count($examples[$term] ?? []) < 3) {
+                        $examples[$term][] = "Aparece en «{$document->title}»";
                     }
                 }
             });
@@ -127,14 +125,7 @@ class TermGaps
 
         return $user->knowledgeDocuments()
             ->whereIn('source', [KnowledgeSource::Archive, KnowledgeSource::Memory])
-            ->where('content', 'like', "%{$term}%")
+            ->where(fn ($documents) => $documents->where('terms', 'like', "%{$term}%")->orWhere('summary', 'like', "%{$term}%"))
             ->exists();
-    }
-
-    private static function around(string $text, string $term): string
-    {
-        $position = mb_strpos($text, $term) ?: 0;
-
-        return trim((string) preg_replace('/\s+/u', ' ', mb_substr($text, max(0, $position - 80), 200)));
     }
 }

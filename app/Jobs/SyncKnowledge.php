@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Knowledge\KnowledgeSummaries;
 use App\Knowledge\KnowledgeSync;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -9,8 +10,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Copies what changed in the person's archive, Jira and Notion into the
- * knowledge base. It runs on the single long-jobs worker, one person at a
+ * Indexes what changed in the person's archive, Jira, Notion and meetings,
+ * and refreshes the summaries of the documents that matter most. It runs on the single long-jobs worker, one person at a
  * time, so a large first copy never competes with the alerts.
  */
 class SyncKnowledge implements ShouldBeUnique, ShouldQueue
@@ -35,8 +36,9 @@ class SyncKnowledge implements ShouldBeUnique, ShouldQueue
         return (string) $this->user->id;
     }
 
-    public function handle(KnowledgeSync $sync): void
+    public function handle(KnowledgeSync $sync, KnowledgeSummaries $summaries): void
     {
         $sync->sync($this->user, $this->full);
+        $summaries->refresh($this->user);
     }
 }

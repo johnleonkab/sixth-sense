@@ -23,22 +23,22 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Keeps the local copy of the work archive, the Jira issues the person takes
- * part in, the Notion pages they shared, the notes and transcripts of their
+ * Keeps the index of the work archive, the Jira issues the person takes part
+ * in, the Notion pages they shared, the notes and transcripts of their
  * meetings, and what they answered when asked. Only read methods: it never
  * changes those services.
  *
- * Each run lists what changed (cheap) and then reads the content of a few
- * documents, so a large first copy spreads over several runs instead of
- * holding a worker for minutes. A full run also drops what disappeared.
+ * It keeps no copy of a document: only its title, link and distinct words.
+ * The text is read live when someone needs it (text()).
+ *
+ * Each run lists what changed (cheap) and then indexes a few documents, so a
+ * large first index spreads over several runs instead of holding a worker for
+ * minutes. A full run also drops what disappeared.
  */
 class KnowledgeSync
 {
     /** Documents whose content is read per source and run. */
     private const CONTENT_PER_RUN = 40;
-
-    /** What is kept of one document; enough to answer from it. */
-    private const MAX_CHARACTERS = 60000;
 
     /** How far back meeting notes and transcripts are looked for at first. */
     private const MEETING_DAYS = 30;
@@ -87,18 +87,12 @@ class KnowledgeSync
     }
 
     /**
-     * Read one document again now, so it can be opened before the next run
-     * gets to it. False when the service no longer has it.
+     * Index one document again now: its title and distinct words, read live.
+     * False when the service no longer has it.
      */
     public function refresh(KnowledgeDocument $document): bool
     {
-        $read = match ($document->source) {
-            KnowledgeSource::Archive => $this->archiveFile($document),
-            KnowledgeSource::Jira => $this->jiraIssue($document),
-            KnowledgeSource::Notion => $this->notionPage($document),
-            KnowledgeSource::Meeting => $this->meeting($document),
-            KnowledgeSource::Memory => $this->answer($document),
-        };
+        $read = $this->read($document);
 
         if ($read === null) {
             $document->delete();
@@ -108,11 +102,35 @@ class KnowledgeSync
 
         $document->update([
             'title' => mb_substr($read['title'] ?? $document->title, 0, 500),
-            'content' => mb_substr($read['content'], 0, self::MAX_CHARACTERS),
+            'terms' => KnowledgeTerms::of(($read['title'] ?? $document->title)."\n".$read['content']),
+            'summary' => $document->source === KnowledgeSource::Memory ? $read['content'] : $document->summary,
             'indexed_at' => now(),
         ]);
 
         return true;
+    }
+
+    /**
+     * The document's text, read live from its service and not kept. Null
+     * when the service no longer has it.
+     */
+    public function text(KnowledgeDocument $document): ?string
+    {
+        return $this->read($document)['content'] ?? null;
+    }
+
+    /**
+     * @return array{title?: string, content: string}|null
+     */
+    private function read(KnowledgeDocument $document): ?array
+    {
+        return match ($document->source) {
+            KnowledgeSource::Archive => $this->archiveFile($document),
+            KnowledgeSource::Jira => $this->jiraIssue($document),
+            KnowledgeSource::Notion => $this->notionPage($document),
+            KnowledgeSource::Meeting => $this->meeting($document),
+            KnowledgeSource::Memory => $this->answer($document),
+        };
     }
 
     /**
@@ -288,8 +306,8 @@ class KnowledgeSync
     }
 
     /**
-     * Save what the listing says. A new version clears the content so the
-     * next read copies it again.
+     * Save what the listing says. A new version marks it to be indexed
+     * again on the next read.
      */
     private function remember(User $user, KnowledgeSource $source, string $ref, string $title, ?string $url, ?string $version, ?CarbonImmutable $updatedAt, CarbonImmutable $now): void
     {
@@ -312,8 +330,7 @@ class KnowledgeSync
     }
 
     /**
-     * Read the content of the documents that are new or changed, oldest
-     * listed first.
+     * Index the documents that are new or changed, oldest listed first.
      */
     private function fill(User $user, KnowledgeSource $source): void
     {

@@ -63,8 +63,9 @@ class WorkActivityCollector
     }
 
     /**
-     * Work archive files whose new version was copied since then, from the
-     * knowledge base the nightly full sync just refreshed.
+     * Work archive files indexed again since then (they changed), from the
+     * knowledge base the nightly full sync just refreshed. The index keeps no
+     * text: the summary when it has one.
      *
      * @return list<array{path: string, title: string, excerpt: string}>
      */
@@ -79,7 +80,7 @@ class WorkActivityCollector
             ->map(fn (KnowledgeDocument $document): array => [
                 'path' => $document->ref,
                 'title' => $document->title,
-                'excerpt' => Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $document->content)), 400),
+                'excerpt' => Str::limit(trim((string) $document->summary), 400),
             ])
             ->all();
     }

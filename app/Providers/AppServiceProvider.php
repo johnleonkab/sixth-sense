@@ -51,9 +51,12 @@ use App\Connectors\Wiki\Wiki;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\SendAlertPush;
+use App\Knowledge\DocumentSummarizer;
+use App\Knowledge\FakeDocumentSummarizer;
 use App\Knowledge\Gaps\FakeTermJudge;
 use App\Knowledge\Gaps\LlmTermJudge;
 use App\Knowledge\Gaps\TermJudge;
+use App\Knowledge\LlmDocumentSummarizer;
 use App\Scenes\DeepSeekSceneText;
 use App\Scenes\SceneText;
 use App\Scheduling\Assessors\FakeTaskAssessor;
@@ -156,6 +159,13 @@ class AppServiceProvider extends ServiceProvider
             $this->usesTextModel(config('agenda.assessor')) => new LlmTaskAssessor($this->textModel('capable')),
             config('agenda.assessor') === 'fake' => new FakeTaskAssessor,
             default => throw new InvalidArgumentException('Unsupported task assessor ['.config('agenda.assessor').'].'),
+        });
+
+        // A summary per much used document: the cheapest model is enough.
+        $this->app->bind(DocumentSummarizer::class, fn (): DocumentSummarizer => match (true) {
+            $this->usesTextModel(config('alerts.judge')) => new LlmDocumentSummarizer($this->textModel('light')),
+            config('alerts.judge') === 'fake' => new FakeDocumentSummarizer,
+            default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         $this->app->bind(TermJudge::class, fn (): TermJudge => match (true) {

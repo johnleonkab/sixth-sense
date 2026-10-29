@@ -218,7 +218,7 @@ class ActivityBrief
         $blocks = ['--- Archivo de trabajo, cambiado en el último día ---'];
 
         foreach ($activity->archive as $file) {
-            $blocks[] = "«{$file['title']}»\n  {$file['excerpt']}";
+            $blocks[] = "«{$file['title']}»".($file['excerpt'] !== '' ? "\n  {$file['excerpt']}" : '');
         }
 
         return implode("\n", $blocks);

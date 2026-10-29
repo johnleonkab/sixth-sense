@@ -2,6 +2,7 @@
 
 namespace App\Voice\Tools\Knowledge;
 
+use App\Knowledge\KnowledgeBase;
 use App\Knowledge\KnowledgeSync;
 use App\Models\User;
 use App\Voice\Tools\ToolContext;
@@ -9,12 +10,12 @@ use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
 
 /**
- * Reads one document found with search_knowledge, whole. One that was not
- * copied yet is read from its service now.
+ * Reads one document found with search_knowledge, whole and live from its
+ * service: the knowledge base keeps no copy of it.
  */
 class ReadKnowledge implements VoiceTool
 {
-    public function __construct(private KnowledgeSync $sync) {}
+    public function __construct(private KnowledgeSync $sync, private KnowledgeBase $knowledge) {}
 
     public function name(): string
     {
@@ -52,16 +53,22 @@ class ReadKnowledge implements VoiceTool
             return ToolResult::error('Ese resultado ya no está. Busca otra vez.');
         }
 
-        if ($document->indexed_at === null && ! $this->sync->refresh($document)) {
+        $text = $this->sync->text($document);
+
+        if ($text === null) {
+            $document->delete();
+
             return ToolResult::error('Ya no está en su servicio.');
         }
+
+        $this->knowledge->viewed($document);
 
         return new ToolResult([
             'source' => $document->source->label(),
             'title' => $document->title,
             'url' => $document->url,
             'ref' => $document->ref,
-            'content' => mb_substr((string) $document->content, 0, 12000),
+            'content' => mb_substr($text, 0, 12000),
         ]);
     }
 }

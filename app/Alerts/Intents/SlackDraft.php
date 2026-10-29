@@ -118,7 +118,7 @@ class SlackDraft
         $hit = $this->knowledge->search($user, implode(' ', $words), [], 1)[0] ?? null;
 
         if ($hit !== null) {
-            return ['kind' => 'archive', 'who' => "{$hit['source']}, {$hit['title']}", 'text' => Str::limit($hit['excerpt'], 160)];
+            return ['kind' => 'archive', 'who' => "{$hit['source']}, {$hit['title']}", 'text' => Str::limit($hit['summary'] ?? $hit['title'], 160)];
         }
 
         $work = $user->workContext;

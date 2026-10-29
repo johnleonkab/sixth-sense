@@ -7,7 +7,9 @@ use App\Connectors\Wiki\Wiki;
 use App\Jobs\SyncKnowledge;
 use App\Knowledge\KnowledgeBase;
 use App\Knowledge\KnowledgeSource;
+use App\Knowledge\KnowledgeSummaries;
 use App\Knowledge\KnowledgeSync;
+use App\Knowledge\KnowledgeTerms;
 use App\Models\GithubRepository;
 use App\Models\KnowledgeDocument;
 use App\Models\SenseAgent;
@@ -58,7 +60,7 @@ function fakeArchive(array &$files): void
     });
 }
 
-test('a sync copies the archive, the Jira issues and the Notion pages', function () {
+test('a sync indexes the archive, the Jira issues and the Notion pages without keeping their text', function () {
     $files = [
         'projects/prepago/decisions.md' => ['sha' => 'a1', 'content' => "---\ntitle: Decisiones del prepago\n---\n\nEl reembolso parcial se devuelve en 48 horas.\n"],
         'images/logo.png' => ['sha' => 'b1', 'content' => 'binario'],
@@ -73,11 +75,12 @@ test('a sync copies the archive, the Jira issues and the Notion pages', function
 
     expect($counts['archive'])->toBe(1)
         ->and($decisions->title)->toBe('Decisiones del prepago (projects/prepago/decisions.md)')
-        ->and($decisions->content)->toContain('48 horas')
+        ->and($decisions->terms)->toContain('reembolso')->toContain('horas')->not->toContain('se devuelve en')
+        ->and($decisions->getAttributes())->not->toHaveKey('content')
         ->and($decisions->url)->toBe('https://github.com/jhon/sense/blob/main/projects/prepago/decisions.md')
-        ->and($issue->content)->toContain('Comentarios:')->toContain('reembolso parcial')
+        ->and($issue->terms)->toContain('comentarios')->toContain('reembolso')
         ->and($page->title)->toBe('Plan de lanzamiento: prepago')
-        ->and($page->content)->not->toBeEmpty();
+        ->and($page->terms)->not->toBeEmpty();
 });
 
 test('an archive file is read again only when its sha changes, and dropped when it disappears', function () {
@@ -95,79 +98,99 @@ test('an archive file is read again only when its sha changes, and dropped when 
     $archive = $this->user->knowledgeDocuments()->where('source', KnowledgeSource::Archive)->get();
 
     expect($archive->pluck('ref')->all())->toBe(['now.md'])
-        ->and($archive->first()->content)->toContain('Lanzando el prepago.')
+        ->and($archive->first()->terms)->toContain('lanzando')->not->toContain('cerrando')
         ->and($archive->first()->version)->toBe('v2');
 
     // Two listings, both files once, and only the changed one again.
     Http::assertSentCount(5);
 });
 
-test('the search finds by content across sources and ranks the title higher', function () {
+test('the search finds by the indexed words across sources and ranks the title higher', function () {
     KnowledgeDocument::factory()->for($this->user)->create([
         'source' => KnowledgeSource::Notion,
         'ref' => 'demo:reembolsos',
         'title' => 'Política de reembolsos',
-        'content' => 'Un reembolso parcial se devuelve en 48 horas.',
+        'terms' => KnowledgeTerms::of('Un reembolso parcial se devuelve en 48 horas.'),
     ]);
     KnowledgeDocument::factory()->for($this->user)->create([
         'source' => KnowledgeSource::Jira,
         'ref' => 'demo:CPD-412',
         'title' => 'CPD-412 Ver el total antes de elegir mesa',
-        'content' => 'Marta pregunta si el reembolso entra en este sprint.',
+        'terms' => KnowledgeTerms::of('Marta pregunta si el reembolso entra en este sprint.'),
     ]);
-    KnowledgeDocument::factory()->for($this->user)->create(['title' => 'Otra cosa', 'content' => 'Nada que ver.']);
-    KnowledgeDocument::factory()->create(['title' => 'Reembolsos de otra persona', 'content' => 'reembolso']);
+    KnowledgeDocument::factory()->for($this->user)->create(['title' => 'Otra cosa', 'terms' => KnowledgeTerms::of('Nada que ver.')]);
+    KnowledgeDocument::factory()->create(['title' => 'Reembolsos de otra persona', 'terms' => KnowledgeTerms::of('reembolso')]);
 
     $hits = app(KnowledgeBase::class)->search($this->user, '¿Cómo funciona el reembolso?');
 
     expect($hits)->toHaveCount(2)
         ->and($hits[0]['title'])->toBe('Política de reembolsos')
         ->and($hits[0]['source'])->toBe('Notion')
-        ->and($hits[1]['excerpt'])->toContain('reembolso')
+        ->and($hits[1]['title'])->toBe('CPD-412 Ver el total antes de elegir mesa')
+        ->and($hits[1])->not->toHaveKey('excerpt')
         ->and(app(KnowledgeBase::class)->search($this->user, 'reembolso', [KnowledgeSource::Jira]))->toHaveCount(1)
         ->and(app(KnowledgeBase::class)->search($this->user, 'cpd-412')[0]['ref'])->toBe('demo:CPD-412');
 });
 
-test('the voice searches the knowledge and reads one result whole', function () {
-    $document = KnowledgeDocument::factory()->for($this->user)->create([
-        'source' => KnowledgeSource::Archive,
-        'ref' => 'projects/prepago/decisions.md',
-        'title' => 'Decisiones del prepago',
-        'content' => 'El reembolso parcial se devuelve en 48 horas.',
+test('the voice searches the index and reads one result live, counting the view', function () {
+    $document = KnowledgeDocument::factory()->for($this->user)->text('Plan de lanzamiento del prepago y sus fases.')->create([
+        'source' => KnowledgeSource::Notion,
+        'ref' => FakeWiki::LAUNCH,
+        'title' => 'Plan de lanzamiento: prepago',
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('voice.tools.run', 'search_knowledge'), ['arguments' => ['query' => 'reembolso parcial']])
+        ->postJson(route('voice.tools.run', 'search_knowledge'), ['arguments' => ['query' => 'lanzamiento prepago']])
         ->assertOk()
         ->assertJsonPath('output.results.0.id', $document->id)
-        ->assertJsonPath('output.results.0.source', 'Archivo');
+        ->assertJsonPath('output.results.0.source', 'Notion')
+        ->assertJsonPath('output.results.0.summary', null);
+
+    $live = app(Wiki::class)->page($this->user, FakeWiki::LAUNCH)->markdown;
 
     $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'read_knowledge'), ['arguments' => ['id' => $document->id]])
         ->assertOk()
-        ->assertJsonPath('output.content', 'El reembolso parcial se devuelve en 48 horas.');
+        ->assertJsonPath('output.content', mb_substr($live, 0, 12000));
+
+    expect($document->fresh()->views)->toBe(1)
+        ->and($document->fresh()->last_viewed_at)->not->toBeNull();
 
     $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'search_knowledge'), ['arguments' => ['query' => 'vacaciones']])
         ->assertJsonPath('output.results', []);
 });
 
-test('a result that was not copied yet is read from its service when opened', function () {
+test('a result its service no longer has is dropped when opened', function () {
     $document = KnowledgeDocument::factory()->for($this->user)->create([
         'source' => KnowledgeSource::Notion,
-        'ref' => FakeWiki::LAUNCH,
-        'title' => 'Plan de lanzamiento: prepago',
-        'content' => null,
-        'indexed_at' => null,
+        'ref' => 'demo:gone',
     ]);
 
     $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'read_knowledge'), ['arguments' => ['id' => $document->id]])
-        ->assertOk()
-        ->assertJsonPath('output.title', 'Plan de lanzamiento: prepago');
+        ->assertJsonPath('output.error', 'Ya no está en su servicio.');
 
-    expect($document->fresh()->indexed_at)->not->toBeNull()
-        ->and($document->fresh()->content)->not->toBeEmpty();
+    expect($document->fresh())->toBeNull();
+});
+
+test('only the most opened and most recent documents keep a summary', function () {
+    $opened = KnowledgeDocument::factory()->for($this->user)->create([
+        'source' => KnowledgeSource::Notion, 'ref' => FakeWiki::LAUNCH, 'views' => 4, 'last_viewed_at' => now()->subDay(), 'source_updated_at' => now()->subMonths(3),
+    ]);
+    $recent = KnowledgeDocument::factory()->for($this->user)->create([
+        'source' => KnowledgeSource::Notion, 'ref' => FakeWiki::ONE_ON_ONE, 'source_updated_at' => now()->subDays(2),
+    ]);
+    $forgotten = KnowledgeDocument::factory()->for($this->user)->create([
+        'source' => KnowledgeSource::Notion, 'ref' => 'demo:old', 'source_updated_at' => now()->subMonths(6), 'summary' => 'Antiguo.', 'summarized_version' => 'x',
+    ]);
+
+    expect(app(KnowledgeSummaries::class)->refresh($this->user))->toBe(2)
+        ->and($opened->fresh()->summary)->not->toBeEmpty()
+        ->and($opened->fresh()->summarized_version)->toBe($opened->version)
+        ->and($recent->fresh()->summary)->not->toBeEmpty()
+        ->and($forgotten->fresh()->summary)->toBeNull()
+        ->and(app(KnowledgeSummaries::class)->refresh($this->user))->toBe(0);
 });
 
 test('another persons knowledge cannot be read', function () {
@@ -191,9 +214,9 @@ test('asking an agent sends the knowledge that matches the question', function (
     $text = new RecordingSceneText(capableAnswers: [['answer' => 'En 48 horas.']]);
     $this->app->instance(SceneText::class, $text);
     SenseAgent::factory()->for($this->user)->create(['slug' => 'prepago', 'instructions' => 'Habla corto.']);
-    KnowledgeDocument::factory()->for($this->user)->create([
+    KnowledgeDocument::factory()->for($this->user)->text('El reembolso parcial se devuelve en 48 horas.')->create([
         'title' => 'Decisiones del prepago',
-        'content' => 'El reembolso parcial se devuelve en 48 horas.',
+        'summary' => 'El reembolso parcial se devuelve en 48 horas.',
     ]);
 
     app(OpenScene::class)->open($this->user, 'ask_agent', [

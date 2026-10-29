@@ -10,11 +10,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One file of the work archive, one Jira issue or one Notion page, copied
- * so every agent can search it without calling the service. The listing
- * fills the title and version; the content follows when it is read.
+ * One file of the work archive, one Jira issue, one Notion page or one
+ * meeting's notes, indexed so every agent can find it without calling the
+ * service. It keeps no text: the title, the link, the distinct words, and a
+ * short summary only while it is among the most used.
  */
-#[Fillable(['source', 'ref', 'title', 'url', 'version', 'source_updated_at', 'content', 'indexed_at', 'seen_at'])]
+#[Fillable(['source', 'ref', 'title', 'url', 'version', 'source_updated_at', 'terms', 'summary', 'summarized_version', 'views', 'last_viewed_at', 'indexed_at', 'seen_at'])]
 class KnowledgeDocument extends Model
 {
     /** @use HasFactory<KnowledgeDocumentFactory> */
@@ -30,6 +31,8 @@ class KnowledgeDocument extends Model
             'source_updated_at' => 'immutable_datetime',
             'indexed_at' => 'immutable_datetime',
             'seen_at' => 'immutable_datetime',
+            'last_viewed_at' => 'immutable_datetime',
+            'views' => 'integer',
         ];
     }
 

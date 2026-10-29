@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Knowledge\KnowledgeSource;
+use App\Knowledge\KnowledgeTerms;
 use App\Models\KnowledgeDocument;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,9 +25,17 @@ class KnowledgeDocumentFactory extends Factory
             'title' => fake()->sentence(4),
             'url' => fake()->url(),
             'version' => fake()->sha1(),
-            'content' => fake()->paragraphs(3, true),
+            'terms' => KnowledgeTerms::of(fake()->paragraphs(3, true)),
             'indexed_at' => now(),
             'seen_at' => now(),
         ];
+    }
+
+    /**
+     * Indexed from this text, as the sync would index it.
+     */
+    public function text(string $text): self
+    {
+        return $this->state(fn (): array => ['terms' => KnowledgeTerms::of($text)]);
     }
 }

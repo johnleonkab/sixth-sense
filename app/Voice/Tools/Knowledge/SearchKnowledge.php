@@ -10,9 +10,9 @@ use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
 
 /**
- * One search over the local copy of the work archive, the Jira issues the
- * person takes part in and the Notion pages they shared. It reads the
- * database, not the services, so it answers fast.
+ * One search over the index of the work archive, the Jira issues the person
+ * takes part in, the Notion pages they shared, their meetings and their
+ * answers. It reads the database, not the services, so it answers fast.
  */
 class SearchKnowledge implements VoiceTool
 {
@@ -27,7 +27,7 @@ class SearchKnowledge implements VoiceTool
     {
         return 'Busca por contenido a la vez en el archivo de trabajo, en los issues de Jira en los que participa y en las páginas de Notion compartidas. '
             .'Úsalo antes de responder sobre un proyecto, una decisión, un proceso, una persona o cualquier contexto del trabajo. '
-            .'Devuelve fragmentos con su fuente; para leer uno entero, read_knowledge con su id. '
+            .'Devuelve títulos con su fuente (y un resumen en los documentos más usados); para leer uno, read_knowledge con su id, que lo lee en vivo. '
             .'Lo editado en los últimos minutos puede no estar todavía: entonces usa search_jira o search_notion.';
     }
 

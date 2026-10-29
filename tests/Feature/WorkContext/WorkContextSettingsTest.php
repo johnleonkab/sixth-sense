@@ -39,7 +39,7 @@ test('the context page shows what the assistant knows', function () {
 
 test('the context page shows how much of each knowledge source is copied', function () {
     KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'indexed_at' => '2026-10-29 21:24:08']);
-    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'indexed_at' => null, 'content' => null]);
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'indexed_at' => null, 'terms' => null]);
     KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Archive]);
     KnowledgeDocument::factory()->create(['source' => KnowledgeSource::Notion]);
 

@@ -23,6 +23,7 @@ use App\Knowledge\Gaps\TermGaps;
 use App\Knowledge\KnowledgeBase;
 use App\Knowledge\KnowledgeSource;
 use App\Knowledge\KnowledgeSync;
+use App\Knowledge\KnowledgeTerms;
 use App\Models\ConnectedAccount;
 use App\Models\KnowledgeDocument;
 use App\Models\KnowledgeGap;
@@ -193,9 +194,9 @@ test('the meeting advisor reads what the person explained about the meeting', fu
 
 test('repeated acronyms the archive does not explain become questions', function () {
     foreach (['CPD-412 lanza KYB para Pagos', 'El KYB bloquea el alta', 'Revisar KYB con legal, y la API', 'Pagar con ABC'] as $i => $content) {
-        KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'ref' => "demo:CPD-{$i}", 'title' => "CPD-{$i}", 'content' => "{$content}. ABC y CPD otra vez."]);
+        KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'ref' => "demo:CPD-{$i}", 'title' => "CPD-{$i}", 'terms' => KnowledgeTerms::of("{$content}. ABC y CPD otra vez.")]);
     }
-    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Archive, 'content' => 'ABC es el proveedor de pagos.']);
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Archive, 'terms' => KnowledgeTerms::of('ABC es el proveedor de pagos.')]);
 
     expect(TermGaps::terms('CPD-412 y el KYB, la API y 2026'))->toBe(['KYB'])
         ->and(app(TermGaps::class)->find($this->user))->toBe(2)
@@ -203,7 +204,7 @@ test('repeated acronyms the archive does not explain become questions', function
         ->and(app(TermGaps::class)->find($this->user))->toBe(0);
 });
 
-test('meeting notes from Drive, with every tab, and Wingman notes are copied as meetings', function () {
+test('meeting notes from Drive, with every tab, and Wingman notes are indexed as meetings', function () {
     $this->app->instance(IssueTracker::class, new FakeIssueTracker);
     $this->app->instance(Wiki::class, new FakeWiki);
     $notes = new DocumentSummary('1.notes', 'jhon@work.com', 'Sync Ops - 2026/10/30 10:00 CET - Notas de Gemini', null, CarbonImmutable::parse('2026-10-30 10:00'), CarbonImmutable::parse('2026-10-30 11:00'), url: 'https://docs.google.com/document/d/notes/edit');
@@ -223,8 +224,8 @@ test('meeting notes from Drive, with every tab, and Wingman notes are copied as 
     $meetings = $this->user->knowledgeDocuments()->where('source', KnowledgeSource::Meeting)->orderBy('ref')->get();
 
     expect($meetings->pluck('ref')->all())->toHaveCount(2)
-        ->and($meetings->firstWhere('ref', '1.notes')->content)->toContain('Marta Ruiz: lo congelamos.')
-        ->and($meetings->first(fn (KnowledgeDocument $document): bool => str_starts_with($document->ref, 'wingman:'))->content)->toContain('Reembolso en 48 horas')
+        ->and($meetings->firstWhere('ref', '1.notes')->terms)->toContain('congelamos')->toContain('transcripción')
+        ->and($meetings->first(fn (KnowledgeDocument $document): bool => str_starts_with($document->ref, 'wingman:'))->terms)->toContain('reembolso')
         ->and(app(KnowledgeBase::class)->search($this->user, 'congelar KYB', [KnowledgeSource::Meeting])[0]['ref'])->toBe('1.notes');
 });
 

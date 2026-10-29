@@ -63,6 +63,8 @@ class LlmTermJudge implements TermJudge
             clientes o siglas internas cuyo significado no es evidente. Deja fuera siglas de uso general (API, KPI, PDF, MVP,
             SLA, Q3…), nombres de personas y palabras en mayúsculas que solo son énfasis.
 
+            De cada término solo ves los títulos de los documentos donde aparece, no su texto.
+
             Para cada uno, "question" es una pregunta corta en español, de tú, que cite dónde aparece. Por ejemplo:
             "¿Qué es «KYB»? Sale en 5 issues de Jira y en la reunión con Pagos."
 

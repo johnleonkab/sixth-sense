@@ -41,6 +41,7 @@ type KnowledgeSource = {
     label: string;
     total: number;
     copied: number;
+    summarized: number;
     last_copied_at: string | null;
 };
 
@@ -134,7 +135,7 @@ function Knowledge({ sources }: { sources: KnowledgeSource[] }) {
                     Base de conocimiento
                 </h2>
                 <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
-                    Copia del archivo de trabajo, de los issues de Jira en los que participas, de las páginas de Notion compartidas, de las notas y transcripciones de tus reuniones y de lo que has respondido cuando te pregunté. Todos los agentes buscan aquí. Cada 15 minutos copia lo que cambió y cada noche repasa todo.
+                    Índice del archivo de trabajo, de los issues de Jira en los que participas, de las páginas de Notion compartidas, de las notas y transcripciones de tus reuniones y de lo que has respondido cuando te pregunté. No guarda el texto: solo título, enlace y palabras para encontrarlo, y un resumen corto de los más consultados y recientes. Lo que se necesita se lee en vivo. Cada 15 minutos indexa lo que cambió y cada noche repasa todo.
                 </p>
             </header>
 
@@ -149,18 +150,19 @@ function Knowledge({ sources }: { sources: KnowledgeSource[] }) {
                                 <span className="font-medium">{item.label}</span>
                                 <span className="text-muted">
                                     {item.total === 0
-                                        ? 'Nada copiado todavía'
+                                        ? 'Nada indexado todavía'
                                         : done
-                                          ? `${item.total} ${knowledgeUnits[item.source]}, todo copiado`
-                                          : `${item.copied} de ${item.total} ${knowledgeUnits[item.source]} copiados`}
+                                          ? `${item.total} ${knowledgeUnits[item.source]}, todo indexado`
+                                          : `${item.copied} de ${item.total} ${knowledgeUnits[item.source]} indexados`}
+                                    {item.summarized > 0 && item.source !== 'memory' ? ` · ${item.summarized} con resumen` : ''}
                                 </span>
                             </div>
                             {item.total > 0 && (
-                                <div className="mt-2 h-1 overflow-hidden rounded-full bg-soft" role="progressbar" aria-label={`${item.label} copiado`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
+                                <div className="mt-2 h-1 overflow-hidden rounded-full bg-soft" role="progressbar" aria-label={`${item.label} indexado`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
                                     <div className={`h-full rounded-full ${done ? 'bg-ok' : 'bg-accent'}`} style={{ width: `${share}%` }} />
                                 </div>
                             )}
-                            <p className="mt-1.5 text-[12.5px] text-faint">{item.last_copied_at ? `Última copia: ${formatMoment(item.last_copied_at)}` : 'Sin copias todavía'}</p>
+                            <p className="mt-1.5 text-[12.5px] text-faint">{item.last_copied_at ? `Último indexado: ${formatMoment(item.last_copied_at)}` : 'Sin indexar todavía'}</p>
                         </li>
                     );
                 })}
