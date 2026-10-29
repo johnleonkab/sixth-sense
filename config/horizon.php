@@ -260,9 +260,11 @@ return [
     ],
 
     'environments' => [
+        // The server is shared with other sites: eight workers at most in
+        // all, so a backlog drains slower instead of running out of memory.
         'production' => [
             'supervisor-1' => [
-                'maxProcesses' => 10,
+                'maxProcesses' => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
