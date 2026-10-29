@@ -51,6 +51,9 @@ use App\Connectors\Wiki\Wiki;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\SendAlertPush;
+use App\Knowledge\Gaps\FakeTermJudge;
+use App\Knowledge\Gaps\LlmTermJudge;
+use App\Knowledge\Gaps\TermJudge;
 use App\Scenes\DeepSeekSceneText;
 use App\Scenes\SceneText;
 use App\Scheduling\Assessors\FakeTaskAssessor;
@@ -153,6 +156,12 @@ class AppServiceProvider extends ServiceProvider
             $this->usesTextModel(config('agenda.assessor')) => new LlmTaskAssessor($this->textModel('capable')),
             config('agenda.assessor') === 'fake' => new FakeTaskAssessor,
             default => throw new InvalidArgumentException('Unsupported task assessor ['.config('agenda.assessor').'].'),
+        });
+
+        $this->app->bind(TermJudge::class, fn (): TermJudge => match (true) {
+            $this->usesTextModel(config('alerts.judge')) => new LlmTermJudge($this->textModel('light')),
+            config('alerts.judge') === 'fake' => new FakeTermJudge,
+            default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (true) {

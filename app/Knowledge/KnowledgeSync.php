@@ -2,22 +2,30 @@
 
 namespace App\Knowledge;
 
+use App\Connectors\Docs\Documents;
+use App\Connectors\Docs\DocumentSearch;
 use App\Connectors\GitHub\GithubApi;
 use App\Connectors\GitHub\GithubContents;
 use App\Connectors\Issues\Issue;
 use App\Connectors\Issues\IssueComment;
 use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Wiki\Wiki;
+use App\Knowledge\Gaps\GapStatus;
 use App\Models\GithubRepository;
 use App\Models\KnowledgeDocument;
+use App\Models\KnowledgeGap;
 use App\Models\User;
+use App\Models\WingmanMeeting;
 use App\Sense\DocumentRules;
+use App\Wingman\Notes\MeetingNotes;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * Keeps the local copy of the work archive, the Jira issues the person takes
- * part in and the Notion pages they shared. Only read methods: it never
+ * part in, the Notion pages they shared, the notes and transcripts of their
+ * meetings, and what they answered when asked. Only read methods: it never
  * changes those services.
  *
  * Each run lists what changed (cheap) and then reads the content of a few
@@ -32,6 +40,15 @@ class KnowledgeSync
     /** What is kept of one document; enough to answer from it. */
     private const MAX_CHARACTERS = 60000;
 
+    /** How far back meeting notes and transcripts are looked for at first. */
+    private const MEETING_DAYS = 30;
+
+    /**
+     * Google Meet saves Gemini's notes and the transcript as Docs with these
+     * words in the title, in English or Spanish depending on the account.
+     */
+    private const MEETING_TITLES = ['Notes by Gemini', 'Notas de Gemini', 'Transcript', 'Transcripción'];
+
     /** Archive files worth reading as text. */
     private const TEXT_EXTENSIONS = ['md', 'markdown', 'txt', 'yml', 'yaml', 'csv'];
 
@@ -40,6 +57,7 @@ class KnowledgeSync
         private GithubContents $contents,
         private IssueTracker $issues,
         private Wiki $wiki,
+        private Documents $documents,
     ) {}
 
     /**
@@ -53,6 +71,8 @@ class KnowledgeSync
             KnowledgeSource::Archive->value => fn () => $this->archive($user),
             KnowledgeSource::Jira->value => fn () => $this->jira($user, $full),
             KnowledgeSource::Notion->value => fn () => $this->notion($user, $full),
+            KnowledgeSource::Meeting->value => fn () => $this->meetings($user),
+            KnowledgeSource::Memory->value => fn () => $this->syncMemory($user),
         ] as $source => $run) {
             try {
                 $run();
@@ -76,6 +96,8 @@ class KnowledgeSync
             KnowledgeSource::Archive => $this->archiveFile($document),
             KnowledgeSource::Jira => $this->jiraIssue($document),
             KnowledgeSource::Notion => $this->notionPage($document),
+            KnowledgeSource::Meeting => $this->meeting($document),
+            KnowledgeSource::Memory => $this->answer($document),
         };
 
         if ($read === null) {
@@ -194,6 +216,78 @@ class KnowledgeSync
     }
 
     /**
+     * Gemini's notes and the transcripts in Drive, and the notes Wingman took,
+     * changed since the newest one already copied.
+     */
+    private function meetings(User $user): void
+    {
+        $documents = $user->knowledgeDocuments()->where('source', KnowledgeSource::Meeting);
+        $newest = $documents->clone()->max('source_updated_at');
+        $since = $newest === null ? CarbonImmutable::now()->subDays(self::MEETING_DAYS) : CarbonImmutable::parse($newest)->subHour();
+        $now = CarbonImmutable::now();
+
+        foreach (self::MEETING_TITLES as $title) {
+            try {
+                $found = $this->documents->search($user, new DocumentSearch(name: $title, modifiedAfter: $since, limit: 50))->documents;
+            } catch (Throwable $exception) {
+                report($exception);
+
+                continue;
+            }
+
+            foreach ($found as $document) {
+                if (preg_match('/notes by gemini|notas de gemini|transcript|transcripci[oó]n/iu', $document->title) !== 1) {
+                    continue;
+                }
+
+                $this->remember($user, KnowledgeSource::Meeting, $document->ref, $document->title, $document->url, $document->modifiedAt->toIso8601String(), $document->modifiedAt, $now);
+            }
+        }
+
+        $user->wingmanMeetings()
+            ->whereNotNull('notes')
+            ->where('notes_updated_at', '>=', $since)
+            ->get()
+            ->each(fn (WingmanMeeting $meeting) => $this->remember(
+                $user,
+                KnowledgeSource::Meeting,
+                "wingman:{$meeting->id}",
+                "{$meeting->title} · {$meeting->starts_at?->toDateString()} (notas de Wingman)",
+                $meeting->meeting_url,
+                $meeting->notes_updated_at?->toIso8601String(),
+                $meeting->notes_updated_at === null ? null : CarbonImmutable::parse($meeting->notes_updated_at),
+                $now,
+            ));
+
+        $this->fill($user, KnowledgeSource::Meeting);
+    }
+
+    /**
+     * What the person answered when asked, copied straight from the questions:
+     * nothing to read from a service. Called right after an answer too.
+     */
+    public function syncMemory(User $user): void
+    {
+        $answered = $user->knowledgeGaps()->where('status', GapStatus::Answered)->get();
+        $now = CarbonImmutable::now();
+
+        foreach ($answered as $gap) {
+            $this->remember($user, KnowledgeSource::Memory, "gap:{$gap->id}", "{$gap->kind->label()}: {$gap->subject}", null, $gap->answered_at?->toIso8601String(), $gap->answered_at, $now);
+        }
+
+        $stale = $user->knowledgeDocuments()->where('source', KnowledgeSource::Memory);
+        $kept = $answered->map(fn (KnowledgeGap $gap): string => "gap:{$gap->id}")->all();
+
+        if ($kept === []) {
+            $stale->delete();
+        } else {
+            $stale->whereNotIn('ref', $kept)->delete();
+        }
+
+        $this->fill($user, KnowledgeSource::Memory);
+    }
+
+    /**
      * Save what the listing says. A new version clears the content so the
      * next read copies it again.
      */
@@ -272,6 +366,56 @@ class KnowledgeSync
         $page = $this->wiki->page($document->user, $document->ref);
 
         return $page === null ? null : ['title' => $page->title, 'content' => $page->markdown];
+    }
+
+    /**
+     * @return array{title?: string, content: string}|null
+     */
+    private function meeting(KnowledgeDocument $document): ?array
+    {
+        if (str_starts_with($document->ref, 'wingman:')) {
+            $meeting = $document->user->wingmanMeetings()->find((int) Str::after($document->ref, 'wingman:'));
+
+            return $meeting === null ? null : ['content' => $this->wingmanText(MeetingNotes::fromArray($meeting->notes))];
+        }
+
+        $text = $this->documents->fullText($document->user, $document->ref);
+
+        return $text === null ? null : ['content' => $text];
+    }
+
+    /**
+     * @return array{title?: string, content: string}|null
+     */
+    private function answer(KnowledgeDocument $document): ?array
+    {
+        $gap = $document->user->knowledgeGaps()->where('status', GapStatus::Answered)->find((int) Str::after($document->ref, 'gap:'));
+
+        return $gap === null ? null : ['content' => "Pregunta: {$gap->question}\nRespuesta: {$gap->answer}"];
+    }
+
+    private function wingmanText(MeetingNotes $notes): string
+    {
+        $lines = [$notes->summary];
+
+        foreach ($notes->topics as $topic) {
+            $lines[] = "\n{$topic['title']}:\n- ".implode("\n- ", $topic['points']);
+        }
+
+        foreach (['Decisiones' => $notes->decisions, 'Preguntas abiertas' => $notes->questions] as $label => $items) {
+            if ($items !== []) {
+                $lines[] = "\n{$label}:\n- ".implode("\n- ", $items);
+            }
+        }
+
+        if ($notes->commitments !== []) {
+            $lines[] = "\nCompromisos:\n- ".implode("\n- ", array_map(
+                fn (array $commitment): string => "{$commitment['who']}: {$commitment['what']}".($commitment['when'] ? " ({$commitment['when']})" : ''),
+                $notes->commitments,
+            ));
+        }
+
+        return trim(implode("\n", $lines));
     }
 
     private function issueText(Issue $issue): string

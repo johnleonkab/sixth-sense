@@ -14,6 +14,7 @@ enum AlertSource: string
     case Slack = 'slack';
     case Agenda = 'agenda';
     case Jira = 'jira';
+    case Questions = 'questions';
 
     public function label(): string
     {
@@ -23,6 +24,7 @@ enum AlertSource: string
             self::Slack => 'Slack',
             self::Agenda => 'Agendador',
             self::Jira => 'Jira',
+            self::Questions => 'Preguntas',
         };
     }
 
@@ -34,6 +36,7 @@ enum AlertSource: string
             self::Jira => 'Te aviso cuando alguien te mencione en un comentario de Jira pidiendo tu ayuda, en los proyectos de tus reglas de Jira. Una IA decide cuáles lo merecen y te propone la respuesta.',
             self::Agenda => 'Cuando un aviso te pide hacer algo (revisar, escribir, hablar con alguien), busco un hueco en tu calendario y lo agendo. Si es una reunión con más gente, te la propongo; si no hay hueco a tiempo, te aviso.',
             self::Slack => 'Te aviso con un sonido cuando un mensaje directo o una mención en Slack espere tu respuesta. Una IA decide cuáles lo merecen y te propone cómo responder.',
+            self::Questions => 'Te pregunto lo que no sé: reuniones sin un propósito claro y siglas o proyectos que se repiten y no están en el archivo. Como mucho 3 al día, sin sonido. Lo que respondas queda guardado y no te lo vuelvo a preguntar.',
         };
     }
 
@@ -48,6 +51,7 @@ enum AlertSource: string
             self::Slack => Capability::SlackSearch,
             self::Agenda => Capability::CalendarWrite,
             self::Jira => Capability::JiraRead,
+            self::Questions => Capability::CalendarRead,
         };
     }
 

@@ -45,7 +45,7 @@ test('the context page shows how much of each knowledge source is copied', funct
 
     $this->actingAs($this->user)->get(route('settings.context.index'))
         ->assertInertia(fn ($page) => $page
-            ->has('knowledge', 3)
+            ->has('knowledge', 5)
             ->where('knowledge.0.source', 'archive')
             ->where('knowledge.0.total', 1)
             ->where('knowledge.0.copied', 1)

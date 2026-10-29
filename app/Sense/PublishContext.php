@@ -3,6 +3,9 @@
 namespace App\Sense;
 
 use App\Connectors\GitHub\GithubContents;
+use App\Knowledge\Gaps\GapKind;
+use App\Knowledge\Gaps\GapStatus;
+use App\Models\KnowledgeGap;
 use App\Models\User;
 use App\WorkContext\WorkDigest;
 use Throwable;
@@ -11,7 +14,8 @@ use Throwable;
  * Writes the nightly context into the work archive: how the person writes,
  * who they talk to, what is hot, and a review of the work. The services
  * themselves stay read-only; only this repository is updated, and only when
- * they allowed code updates on it.
+ * they allowed code updates on it. What the person answered when asked goes
+ * to memory/.
  */
 class PublishContext
 {
@@ -45,6 +49,7 @@ class PublishContext
                 'Slack',
             ),
             ClaudeLayout::agentPath('review') => $this->review($digest),
+            ...$this->memory($user),
         ];
 
         foreach ($files as $path => $contents) {
@@ -56,6 +61,36 @@ class PublishContext
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    /**
+     * What the person answered when the system asked, one file per kind, so
+     * the archive (and Claude Code reading it) knows it too.
+     *
+     * @return array<string, string>
+     */
+    private function memory(User $user): array
+    {
+        $files = [];
+        $answers = $user->knowledgeGaps()->where('status', GapStatus::Answered)->orderBy('subject')->get()->groupBy(fn (KnowledgeGap $gap): string => $gap->kind->value);
+
+        foreach ([GapKind::Meeting->value => ['memory/meetings.md', 'Reuniones'], GapKind::Term->value => ['memory/terms.md', 'Siglas y proyectos']] as $kind => [$path, $title]) {
+            $gaps = $answers->get($kind);
+
+            if ($gaps === null || $gaps->isEmpty()) {
+                continue;
+            }
+
+            $lines = ["# {$title}\n", 'Lo que se ha explicado cuando sixth-sense lo preguntó. Se reescribe cada noche desde sixth-sense.', ''];
+
+            foreach ($gaps as $gap) {
+                $lines[] = "## {$gap->subject}\n\n".trim((string) $gap->answer)."\n";
+            }
+
+            $files[$path] = implode("\n", $lines);
+        }
+
+        return $files;
     }
 
     private function now(WorkDigest $digest): string

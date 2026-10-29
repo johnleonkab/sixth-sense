@@ -2,11 +2,15 @@
 
 namespace App\Voice;
 
+use App\Alerts\AlertSource;
+use App\Alerts\AlertStatus;
 use App\Connectors\Chat\ChatConversation;
 use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Jira\JiraRules;
+use App\Knowledge\Gaps\GapStatus;
+use App\Models\KnowledgeGap;
 use App\Models\User;
 use App\Voice\Tools\Toolbox;
 use App\WorkContext\WorkDigest;
@@ -60,11 +64,25 @@ final readonly class AssistantProfile
      */
     private static function knowledge(User $user): string
     {
-        if (! $user->knowledgeDocuments()->exists()) {
-            return '';
+        $lines = [];
+
+        if ($user->knowledgeDocuments()->exists()) {
+            $lines[] = 'Antes de responder sobre un proyecto, una decisión, un proceso, una reunión, una persona o cualquier contexto del trabajo, llama a search_knowledge: busca a la vez en el archivo de trabajo, Jira, Notion, las notas y transcripciones de reuniones y lo que el usuario te ha explicado. Responde con lo que encuentres y di de dónde sale. Si no hay nada, dilo; no lo inventes.';
         }
 
-        return 'Antes de responder sobre un proyecto, una decisión, un proceso, una persona o cualquier contexto del trabajo, llama a search_knowledge: busca a la vez en el archivo de trabajo, en Jira y en Notion. Responde con lo que encuentres y di de dónde sale. Si no hay nada, dilo; no lo inventes.';
+        $answers = $user->knowledgeGaps()->where('status', GapStatus::Answered)->latest('answered_at')->limit(30)->get();
+
+        if ($answers->isNotEmpty()) {
+            $lines[] = "Lo que el usuario te ha explicado cuando preguntaste:\n".$answers->map(fn (KnowledgeGap $gap): string => '- '.$gap->memory())->implode("\n");
+        }
+
+        $open = $user->inboxItems()->where('source', AlertSource::Questions)->where('status', AlertStatus::Pending)->count();
+
+        if ($open > 0) {
+            $lines[] = "Tienes {$open} ".($open === 1 ? 'pregunta' : 'preguntas').' sin responder (avisos de tipo Pregunta). Ofrécelas cuando el usuario tenga un momento, de una en una, y guarda su respuesta con answer_question.';
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

@@ -31,6 +31,7 @@ use App\Voice\Tools\Jira\ProposeJiraDependency;
 use App\Voice\Tools\Jira\ProposeJiraIssue;
 use App\Voice\Tools\Jira\ProposeJiraUpdate;
 use App\Voice\Tools\Jira\SearchJira;
+use App\Voice\Tools\Knowledge\AnswerQuestion;
 use App\Voice\Tools\Knowledge\ReadKnowledge;
 use App\Voice\Tools\Knowledge\SearchKnowledge;
 use App\Voice\Tools\Mail\OpenEmail;
@@ -141,6 +142,7 @@ class Toolbox
         DismissMeetingActions::class,
         SearchKnowledge::class,
         ReadKnowledge::class,
+        AnswerQuestion::class,
         ListSenseFiles::class,
         ReadSenseFile::class,
         ProposeSenseFile::class,

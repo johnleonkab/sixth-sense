@@ -166,7 +166,7 @@ class InboxItem extends Model
     /**
      * Where it stands, as the screen shows it: judging, important, planning
      * (a proposal is being prepared), ready (proposal ready), routine,
-     * resolved, dismissed or meeting.
+     * resolved, dismissed, meeting or question (something the system asks).
      */
     public function state(): string
     {
@@ -175,6 +175,7 @@ class InboxItem extends Model
             $this->status === AlertStatus::Resolved => 'resolved',
             $this->status === AlertStatus::Dismissed => 'dismissed',
             $this->source === AlertSource::Calendar => 'meeting',
+            $this->source === AlertSource::Questions => 'question',
             $this->triage === Triage::Judging => 'judging',
             $this->triage === Triage::Routine => 'routine',
             $this->planning => 'planning',
@@ -190,6 +191,7 @@ class InboxItem extends Model
     {
         return match ($this->state()) {
             'meeting' => 'Reunión',
+            'question' => 'Pregunta',
             'judging' => 'Analizando',
             'routine' => 'Sin importancia',
             'resolved' => 'Resuelta',

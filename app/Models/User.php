@@ -106,7 +106,10 @@ class User extends Authenticatable
      */
     public function wantsAlertsFrom(AlertSource $source): bool
     {
-        return (bool) $this->alertSettings()->where('source', $source)->value('enabled');
+        $enabled = $this->alertSettings()->where('source', $source)->value('enabled');
+
+        // Questions are on until the person turns them off.
+        return $enabled === null ? $source === AlertSource::Questions : (bool) $enabled;
     }
 
     /**
@@ -137,6 +140,16 @@ class User extends Authenticatable
     public function senseAgents(): HasMany
     {
         return $this->hasMany(SenseAgent::class);
+    }
+
+    /**
+     * What the system noticed it does not know, and the answers.
+     *
+     * @return HasMany<KnowledgeGap, $this>
+     */
+    public function knowledgeGaps(): HasMany
+    {
+        return $this->hasMany(KnowledgeGap::class);
     }
 
     /**

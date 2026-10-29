@@ -116,6 +116,27 @@ class GoogleDocs implements Documents
         );
     }
 
+    public function fullText(User $user, string $reference): ?string
+    {
+        $accounts = $user->accountsWith(Capability::DocsRead);
+
+        if (preg_match('~^(\d+)\.([A-Za-z0-9_-]+)$~', $reference, $match)) {
+            $account = $accounts->firstWhere('id', (int) $match[1]);
+
+            return $account ? $this->tabsText($account, $match[2]) : null;
+        }
+
+        $id = DocumentLinks::idFrom($reference);
+
+        foreach ($id === null ? [] : $accounts as $account) {
+            if (($text = $this->tabsText($account, $id)) !== null) {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
     public function find(User $user, string $reference): ?Document
     {
         $accounts = $user->accountsWith(Capability::DocsRead);
@@ -313,6 +334,67 @@ class GoogleDocs implements Documents
             lastModifiedBy: $person($file['lastModifyingUser'] ?? null),
             url: $file['webViewLink'] ?? null,
         );
+    }
+
+    /**
+     * Every tab, nested ones included, as plain text under its title. A
+     * document Google cannot open as a Doc (a Word file) is read as one text.
+     */
+    private function tabsText(ConnectedAccount $account, string $id): ?string
+    {
+        try {
+            $response = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(20)
+                ->get(self::DOCUMENTS_URL.'/'.rawurlencode($id), ['includeTabsContent' => 'true']);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+
+        if ($response->status() === 400) {
+            return $this->fetchWordFile($account, $id)?->plainText();
+        }
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $data = $response->json();
+        $tabs = $this->flattenTabs($data['tabs'] ?? []);
+        $parts = [];
+
+        foreach ($tabs as $tab) {
+            $body = $tab['documentTab'] ?? [];
+            $text = trim((new GoogleDocParser)->parse([
+                'documentId' => $data['documentId'] ?? $id,
+                'title' => $data['title'] ?? '',
+                'body' => $body['body'] ?? [],
+                'lists' => $body['lists'] ?? [],
+                'inlineObjects' => $body['inlineObjects'] ?? [],
+            ], "{$account->id}.{$id}", (string) $account->email)->plainText());
+
+            if ($text !== '') {
+                $parts[] = count($tabs) > 1 ? '## '.($tab['tabProperties']['title'] ?? 'Pestaña')."\n\n".$text : $text;
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $tabs
+     * @return list<array<string, mixed>>
+     */
+    private function flattenTabs(array $tabs): array
+    {
+        $flat = [];
+
+        foreach ($tabs as $tab) {
+            $flat[] = $tab;
+            array_push($flat, ...$this->flattenTabs($tab['childTabs'] ?? []));
+        }
+
+        return $flat;
     }
 
     private function fetch(ConnectedAccount $account, string $id): ?Document

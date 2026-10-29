@@ -19,6 +19,13 @@ interface Documents
     public function find(User $user, string $reference): ?Document;
 
     /**
+     * The text of every tab of a document, each under its tab's title, to
+     * read it whole (Meet keeps the transcript in a tab next to the notes).
+     * Not for editing: positions differ per tab.
+     */
+    public function fullText(User $user, string $reference): ?string;
+
+    /**
      * Whether the account behind this document may use the capability.
      */
     public function allows(User $user, string $ref, Capability $capability): bool;

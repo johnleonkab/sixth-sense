@@ -7,6 +7,9 @@ use App\Ai\TextModel;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\MeetingBriefing;
 use App\Connectors\Calendar\CalendarEvent;
+use App\Knowledge\Gaps\GapKind;
+use App\Knowledge\Gaps\GapStatus;
+use App\Knowledge\Gaps\MeetingGaps;
 use App\Models\User;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -21,7 +24,7 @@ class LlmMeetingAdvisor implements MeetingAdvisor
 
     public function advise(User $user, CalendarEvent $event): MeetingBriefing
     {
-        $answer = $this->model->json($this->instructions($user), $this->describe($event), [
+        $answer = $this->model->json($this->instructions($user), $this->describe($user, $event), [
             'type' => 'OBJECT',
             'properties' => [
                 'needs_preparation' => ['type' => 'BOOLEAN'],
@@ -61,8 +64,13 @@ class LlmMeetingAdvisor implements MeetingAdvisor
             TEXT;
     }
 
-    private function describe(CalendarEvent $event): string
+    private function describe(User $user, CalendarEvent $event): string
     {
+        $known = $user->knowledgeGaps()
+            ->where('kind', GapKind::Meeting)
+            ->where('subject_key', MeetingGaps::seriesKey($event))
+            ->where('status', GapStatus::Answered)
+            ->value('answer');
         $people = array_map(fn (array $attendee): string => $attendee['name'] ?: (string) $attendee['email'], $event->attendees);
 
         return implode("\n", [
@@ -71,6 +79,7 @@ class LlmMeetingAdvisor implements MeetingAdvisor
             'Organiza: '.($event->isOrganizer ? 'él mismo' : ($event->organizer ?? 'desconocido')),
             'Asistentes ('.count($people).'): '.(implode(', ', array_slice($people, 0, 15)) ?: '—'),
             'Documentos enlazados: '.(implode(', ', array_map(fn (array $document): string => $document['title'] ?? $document['url'], $event->documents)) ?: 'ninguno'),
+            'Lo que el usuario explicó de esta reunión: '.($known ?: 'nada'),
             '',
             '--- Descripción (datos) ---',
             Str::limit(strip_tags((string) $event->description), 2000) ?: '(sin descripción)',

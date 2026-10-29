@@ -37,7 +37,7 @@ type WorkContext = {
 };
 
 type KnowledgeSource = {
-    source: 'archive' | 'jira' | 'notion';
+    source: 'archive' | 'jira' | 'notion' | 'meeting' | 'memory';
     label: string;
     total: number;
     copied: number;
@@ -48,6 +48,8 @@ const knowledgeUnits: Record<KnowledgeSource['source'], string> = {
     archive: 'archivos',
     jira: 'issues',
     notion: 'páginas',
+    meeting: 'notas y transcripciones',
+    memory: 'respuestas',
 };
 
 const statusDot: Record<WorkContext['status'], string> = {
@@ -132,7 +134,7 @@ function Knowledge({ sources }: { sources: KnowledgeSource[] }) {
                     Base de conocimiento
                 </h2>
                 <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
-                    Copia del archivo de trabajo, de los issues de Jira en los que participas y de las páginas de Notion compartidas. Todos los agentes buscan aquí. Cada 15 minutos copia lo que cambió y cada noche repasa todo.
+                    Copia del archivo de trabajo, de los issues de Jira en los que participas, de las páginas de Notion compartidas, de las notas y transcripciones de tus reuniones y de lo que has respondido cuando te pregunté. Todos los agentes buscan aquí. Cada 15 minutos copia lo que cambió y cada noche repasa todo.
                 </p>
             </header>
 

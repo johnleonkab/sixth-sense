@@ -24,3 +24,4 @@ Schedule::command('slack:learn-attention')->weeklyOn(1, '6:00')->withoutOverlapp
 Schedule::command('slack:promote-unanswered')->everyThirtyMinutes()->withoutOverlapping(60);
 Schedule::command('knowledge:sync')->everyFifteenMinutes()->withoutOverlapping(30);
 Schedule::command('knowledge:sync --full')->dailyAt('03:30')->withoutOverlapping(120);
+Schedule::command('knowledge:ask')->hourlyAt(20)->withoutOverlapping(30);

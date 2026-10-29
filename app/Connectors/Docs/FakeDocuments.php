@@ -39,6 +39,11 @@ class FakeDocuments implements Documents
         return new DocumentSearchResult(array_slice($documents, 0, $search->limit), ['demo@sixth-sense.test']);
     }
 
+    public function fullText(User $user, string $reference): ?string
+    {
+        return $this->find($user, $reference)?->plainText();
+    }
+
     public function find(User $user, string $reference): ?Document
     {
         $id = str_starts_with($reference, 'demo.') ? substr($reference, 5) : DocumentLinks::idFrom($reference);

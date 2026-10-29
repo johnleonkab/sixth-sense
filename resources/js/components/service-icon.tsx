@@ -134,6 +134,8 @@ const prefixes: [string, Service][] = [
     ['github', 'github'],
     ['agenda', 'agenda'],
     ['agendador', 'agenda'],
+    ['questions', 'agenda'],
+    ['preguntas', 'agenda'],
     ['wingman', 'wingman'],
 ];
 

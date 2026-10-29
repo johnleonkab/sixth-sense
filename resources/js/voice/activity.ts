@@ -47,6 +47,7 @@ const ACTIONS: Record<string, string> = {
     sync_sense_agents: 'Sincronizando los agentes…',
     search_knowledge: 'Buscando en el archivo, Jira y Notion…',
     read_knowledge: 'Leyendo…',
+    answer_question: 'Apuntando…',
     open_scene: 'Abriendo la escena…',
     review_alert: 'Abriendo el aviso…',
     list_alerts: 'Abriendo los avisos…',

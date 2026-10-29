@@ -9,7 +9,7 @@ import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
 type AlertSource = {
-    key: 'gmail' | 'slack' | 'calendar' | 'agenda' | 'jira';
+    key: 'gmail' | 'slack' | 'calendar' | 'agenda' | 'jira' | 'questions';
     name: string;
     description: string;
     enabled: boolean;
