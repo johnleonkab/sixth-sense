@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'included',
     'writes_code',
     'is_work',
+    'memory',
 ])]
 class GithubRepository extends Model
 {

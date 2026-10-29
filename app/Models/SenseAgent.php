@@ -9,28 +9,47 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An agent copied from the work repository. The voice reads this table,
- * not GitHub, when it decides who should take the turn.
+ * An agent copied from .claude/agents/ in the work repository, read as
+ * Claude Code reads a subagent. The voice reads this table, not GitHub,
+ * when it decides who should take the turn.
  */
-#[Fillable(['slug', 'name', 'purpose', 'cue', 'instructions', 'references', 'source_path', 'source_sha'])]
+#[Fillable(['slug', 'name', 'description', 'instructions', 'skills', 'source_path', 'source_sha'])]
 class SenseAgent extends Model
 {
     /** @use HasFactory<SenseAgentFactory> */
     use HasFactory;
 
     /**
-     * Instructions plus the markdown in agents/{slug}/references/.
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'skills' => 'array',
+        ];
+    }
+
+    /**
+     * The system prompt plus the skills listed in `skills:`, preloaded in
+     * full as Claude Code does. Skills that are not synced are skipped.
      */
     public function briefing(): string
     {
-        $instructions = $this->instructions !== '' ? $this->instructions : $this->purpose;
-        $references = trim((string) $this->references);
+        $instructions = $this->instructions !== '' ? $this->instructions : $this->description;
+        $names = array_values(array_filter($this->skills ?? [], 'is_string'));
 
-        if ($references === '') {
+        if ($names === []) {
             return $instructions;
         }
 
-        return trim($instructions."\n\nReferencias del agente:\n\n".$references);
+        $skills = $this->user->senseSkills()
+            ->whereIn('name', $names)
+            ->get()
+            ->sortBy(fn (SenseSkill $skill): int|false => array_search($skill->name, $names, true));
+
+        $blocks = $skills->map(fn (SenseSkill $skill): string => "# Skill {$skill->name}\n\n".$skill->briefing())->all();
+
+        return $blocks === [] ? $instructions : trim($instructions."\n\n".implode("\n\n", $blocks));
     }
 
     /**

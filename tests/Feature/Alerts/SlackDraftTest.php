@@ -96,12 +96,12 @@ test('a matching agent briefing is used once', function () {
     [$user, $item, $recording] = draftedAlert('¿cómo va el despliegue?');
     SenseAgent::factory()->for($user)->create([
         'name' => 'Despliegue',
-        'cue' => 'cuando hablen del despliegue',
+        'description' => 'Úsalo cuando hablen del despliegue',
         'instructions' => 'Sale el jueves por la noche.',
     ]);
     SenseAgent::factory()->for($user)->create([
         'name' => 'Contrato',
-        'cue' => 'cuando hablen del contrato',
+        'description' => 'Úsalo cuando hablen del contrato',
         'instructions' => 'clausula-secreta-del-contrato',
     ]);
     $chats = mock(Chats::class);

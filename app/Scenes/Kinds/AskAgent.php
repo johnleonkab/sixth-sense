@@ -85,9 +85,9 @@ class AskAgent implements SceneKind
             return null;
         }
 
-        $list = $agents->map(fn (SenseAgent $agent): string => "- {$agent->slug}: {$agent->cue}")->implode("\n");
+        $list = $agents->map(fn (SenseAgent $agent): string => "- {$agent->slug}: {$agent->description}")->implode("\n");
         $picked = $this->text->light(
-            'Elige el slug del agente cuyo cuándo encaja con la pregunta. Si ninguno encaja, devuelve slug vacío. Devuelve json.',
+            'Elige el slug del agente cuya descripción encaja con la pregunta. Si ninguno encaja, devuelve slug vacío. Devuelve json.',
             "Pregunta:\n{$question}\n\nAgentes:\n{$list}",
             [
                 'type' => 'object',

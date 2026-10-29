@@ -7,7 +7,8 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Checks a file against the rules of its type. The rules live in the
- * repository as types/{type}.yml; this class only applies them.
+ * repository as types/{type}.yml; this class only applies them. Agents in
+ * .claude/agents/ follow Claude Code's rules instead.
  */
 class DocumentRules
 {
@@ -149,10 +150,12 @@ class DocumentRules
 
         $document = self::document($contents);
 
+        if (ClaudeLayout::isAgent($path)) {
+            return self::agentFile($document);
+        }
+
         if ($document === null) {
-            return str_starts_with($path, 'agents/') && str_ends_with($path, '/agent.md')
-                ? 'Un agente necesita cabecera con name, purpose y when.'
-                : null;
+            return null;
         }
 
         if (isset($document['_invalid'])) {
@@ -225,6 +228,35 @@ class DocumentRules
         $parsed['_body'] = $matches[2];
 
         return $parsed;
+    }
+
+    /**
+     * A Claude Code subagent: `name` and `description` are required, and the
+     * name cannot contain a colon.
+     *
+     * @param  array<string, mixed>|null  $document
+     */
+    private static function agentFile(?array $document): ?string
+    {
+        if ($document === null) {
+            return 'Un agente necesita cabecera YAML con name y description.';
+        }
+
+        if (isset($document['_invalid'])) {
+            return 'La cabecera YAML no se puede leer.';
+        }
+
+        foreach (['name', 'description'] as $key) {
+            if (! is_string($document[$key] ?? null) || trim($document[$key]) === '') {
+                return "Un agente necesita {$key} en la cabecera.";
+            }
+        }
+
+        if (str_contains($document['name'], ':')) {
+            return 'El name de un agente no puede llevar dos puntos.';
+        }
+
+        return null;
     }
 
     private static function typeFile(string $path, string $contents): ?string

@@ -236,9 +236,9 @@ class StoriesFromNotes implements SceneKind
             return null;
         }
 
-        $list = $agents->map(fn (SenseAgent $agent): string => "- {$agent->slug}: {$agent->cue}")->implode("\n");
+        $list = $agents->map(fn (SenseAgent $agent): string => "- {$agent->slug}: {$agent->description}")->implode("\n");
         $picked = $this->text->light(
-            'Elige el slug del agente cuyo cuándo encaja con estas notas. Si ninguno encaja, devuelve slug vacío. Devuelve json.',
+            'Elige el slug del agente cuya descripción encaja con estas notas. Si ninguno encaja, devuelve slug vacío. Devuelve json.',
             "Notas:\n{$notes}\n\nAgentes:\n{$list}",
             [
                 'type' => 'object',

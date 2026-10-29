@@ -49,20 +49,20 @@ test('the nightly context updates the archive and its agents', function () {
 
     expect(array_keys($stored))->toEqualCanonicalizing([
         'now.md',
-        'agents/gmail-writer/agent.md',
-        'agents/slack-writer/agent.md',
-        'agents/review/agent.md',
+        '.claude/agents/gmail-writer.md',
+        '.claude/agents/slack-writer.md',
+        '.claude/agents/review.md',
     ])
         ->and($stored['now.md'])->toContain('Cerrando el prepago.')
-        ->and($stored['agents/slack-writer/agent.md'])->toContain('Corto y directo.')
-        ->and($stored['agents/slack-writer/agent.md'])->toStartWith("---\n")
+        ->and($stored['.claude/agents/slack-writer.md'])->toContain('Corto y directo.')
+        ->and($stored['.claude/agents/slack-writer.md'])->toStartWith("---\n")
         ->and($repository->account->user->senseAgents()->orderBy('slug')->pluck('name', 'slug')->all())
-        ->toBe(['gmail-writer' => 'Gmail', 'review' => 'Revisión', 'slack-writer' => 'Slack']);
+        ->toBe(['gmail-writer' => 'gmail-writer', 'review' => 'review', 'slack-writer' => 'slack-writer']);
 });
 
 function archivePath(string $url): ?string
 {
-    foreach (['now.md', 'agents/gmail-writer/agent.md', 'agents/slack-writer/agent.md', 'agents/review/agent.md'] as $path) {
+    foreach (['now.md', '.claude/agents/gmail-writer.md', '.claude/agents/slack-writer.md', '.claude/agents/review.md'] as $path) {
         $encoded = implode('/', array_map(rawurlencode(...), explode('/', $path)));
 
         if (str_contains($url, "/contents/{$encoded}")) {

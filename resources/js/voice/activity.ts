@@ -51,6 +51,7 @@ const ACTIONS: Record<string, string> = {
     show_alert_history: 'Abriendo el historial…',
     resolve_alert: 'Cerrando el aviso…',
     focus_sense_agent: 'Cambiando de agente…',
+    use_sense_skill: 'Cargando la skill…',
     review_meeting: 'Abriendo la reunión…',
     propose_meeting_action: 'Preparando la acción de la reunión…',
     dismiss_meeting_actions: 'Descartando las acciones…',

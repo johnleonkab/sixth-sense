@@ -19,7 +19,7 @@ use Throwable;
  * Before a Slack reply or redirect is drafted, writes what it would need and
  * looks only until that is answered: the thread, links, the person and the
  * project, recent documents, the work archive, then her own past replies.
- * One agent is asked when its cue matches. A more private source is not
+ * One agent is asked when its description matches. A more private source is not
  * copied into a more open channel.
  */
 class SlackDraft
@@ -197,7 +197,7 @@ class SlackDraft
         $score = 0;
 
         foreach ($user->senseAgents()->orderBy('id')->get() as $agent) {
-            $hits = count(array_intersect($this->words($agent->cue), $words));
+            $hits = count(array_intersect($this->words($agent->description), $words));
 
             if ($hits > $score) {
                 $best = $agent;

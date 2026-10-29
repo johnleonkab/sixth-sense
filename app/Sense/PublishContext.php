@@ -30,23 +30,21 @@ class PublishContext
 
         $files = [
             'now.md' => $this->now($digest),
-            'agents/gmail-writer/agent.md' => $this->writer(
-                'Gmail',
-                'Escribe correos con la voz de la persona.',
-                'Cuando haya que redactar, contestar o reenviar un email.',
+            ClaudeLayout::agentPath('gmail-writer') => $this->writer(
+                'gmail-writer',
+                'Escribe correos con la voz de la persona. Úsalo cuando haya que redactar, contestar o reenviar un email.',
                 $digest->writingGmail,
                 $digest->contacts,
                 'Gmail',
             ),
-            'agents/slack-writer/agent.md' => $this->writer(
-                'Slack',
-                'Escribe mensajes de Slack con la voz de la persona.',
-                'Cuando haya que escribir en un canal, un hilo o un mensaje directo.',
+            ClaudeLayout::agentPath('slack-writer') => $this->writer(
+                'slack-writer',
+                'Escribe mensajes de Slack con la voz de la persona. Úsalo cuando haya que escribir en un canal, un hilo o un mensaje directo.',
                 $digest->writingSlack,
                 $digest->contacts,
                 'Slack',
             ),
-            'agents/review/agent.md' => $this->review($digest),
+            ClaudeLayout::agentPath('review') => $this->review($digest),
         ];
 
         foreach ($files as $path => $contents) {
@@ -110,7 +108,7 @@ class PublishContext
     /**
      * @param  list<array{name: string, language: string, where: string, note: string}>  $contacts
      */
-    private function writer(string $name, string $purpose, string $when, string $writing, array $contacts, string $where): string
+    private function writer(string $name, string $description, string $writing, array $contacts, string $where): string
     {
         $theirs = array_values(array_filter($contacts, fn (array $contact): bool => $contact['where'] === '' || str_contains(mb_strtolower($contact['where']), mb_strtolower($where))));
         $list = $theirs === [] ? 'No hay contactos frecuentes todavía.' : implode("\n", array_map(
@@ -120,10 +118,8 @@ class PublishContext
 
         return <<<MD
             ---
-            type: agent
             name: {$name}
-            purpose: {$purpose}
-            when: {$when}
+            description: {$description}
             ---
 
             Escribe como la persona, no como un asistente. No inventes datos que no estén en el hilo.
@@ -147,10 +143,8 @@ class PublishContext
 
         return <<<MD
             ---
-            type: agent
-            name: Revisión
-            purpose: Repasa en qué está la persona y qué conviene mirar ahora.
-            when: Cuando pida una revisión del trabajo, un resumen del día o qué tiene abierto.
+            name: review
+            description: Repasa en qué está la persona y qué conviene mirar ahora. Úsalo cuando pida una revisión del trabajo, un resumen del día o qué tiene abierto.
             ---
 
             Parte de esto, y dilo corto. El detalle ya está en now.md.

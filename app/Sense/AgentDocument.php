@@ -8,95 +8,69 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Reads and writes one agents/{slug}/agent.md using the fields declared
- * in the repository's types/agent.yml, plus the markdown that follows.
+ * Reads and writes one Claude Code subagent in .claude/agents/: the name,
+ * the description, the skills it preloads, and the system prompt below.
+ * Any other front matter key (tools, model, color…) is kept as it was.
  */
 class AgentDocument
 {
-    /** @var array<int, list<array{key: string, label: string}>> */
-    private array $definitions = [];
-
     public function __construct(
         private GithubContents $contents,
         private FileRules $rules,
     ) {}
 
     /**
-     * The fields an agent must have, in the order the type file lists them.
+     * The fields the form edits, in the order Claude Code documents them.
      *
-     * @return list<array{key: string, label: string}>
+     * @return list<array{key: string, label: string, required: bool}>
      */
-    public function definition(GithubRepository $repository): array
+    public function definition(): array
     {
-        return $this->definitions[$repository->id] ??= $this->load($repository);
+        return [
+            ['key' => 'description', 'label' => 'Cuándo usarlo', 'required' => true],
+            ['key' => 'skills', 'label' => 'Skills que precarga, separadas por comas', 'required' => false],
+        ];
     }
 
     /**
-     * The agent file as the form shows it, or null when the folder has none.
+     * The agent file as the form shows it, or null when the path has none.
      *
-     * @return array{fields: array<string, string>, body: string, extra: array<string, string>, readable: bool}|null
+     * @return array{fields: array<string, string>, body: string, readable: bool}|null
      */
-    public function open(GithubRepository $repository, string $slug): ?array
+    public function open(GithubRepository $repository, string $path): ?array
     {
-        $file = $this->contents->read($repository, $this->path($slug));
+        $file = $this->contents->read($repository, $path);
 
         if ($file === null) {
             return null;
         }
 
-        $definition = $this->definition($repository);
         $document = DocumentRules::document($file['content']);
-        $fields = [];
-
-        foreach ($definition as $field) {
-            $fields[$field['key']] = '';
-        }
+        $fields = array_fill_keys(array_column($this->definition(), 'key'), '');
 
         if ($document === null || isset($document['_invalid'])) {
-            return [
-                'fields' => $fields,
-                'body' => $file['content'],
-                'extra' => [],
-                'readable' => false,
-            ];
+            return ['fields' => $fields, 'body' => $file['content'], 'readable' => false];
         }
 
-        $extra = [];
-
-        foreach ($document as $key => $value) {
-            if (! is_string($key) || $key === 'type' || str_starts_with($key, '_')) {
-                continue;
-            }
-
-            if (! is_string($value) && ! is_numeric($value)) {
-                continue;
-            }
-
-            $text = trim((string) $value);
-
-            if (array_key_exists($key, $fields)) {
-                $fields[$key] = $text;
-            } elseif (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) === 1) {
-                $extra[$key] = $text;
-            }
-        }
+        $fields['description'] = is_string($document['description'] ?? null) ? trim($document['description']) : '';
+        $fields['skills'] = implode(', ', ClaudeLayout::names($document['skills'] ?? null));
 
         return [
             'fields' => $fields,
             'body' => trim((string) ($document['_body'] ?? '')),
-            'extra' => $extra,
             'readable' => true,
         ];
     }
 
     /**
-     * Commit the agent and return the markdown that was written.
+     * Commit the agent and return the markdown that was written. A new agent
+     * goes to .claude/agents/{name}.md; an existing one stays where it is.
      *
      * @param  array<string, mixed>  $values
      *
      * @throws ValidationException
      */
-    public function write(GithubRepository $repository, string $slug, array $values, string $body, bool $creating): string
+    public function write(GithubRepository $repository, string $name, ?string $path, array $values, string $body): string
     {
         if (! $repository->mayUpdateCode()) {
             throw ValidationException::withMessages([
@@ -104,109 +78,55 @@ class AgentDocument
             ]);
         }
 
-        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
-            throw ValidationException::withMessages([
-                'slug' => 'La carpeta solo puede llevar minúsculas, números y guiones.',
-            ]);
-        }
-
-        $definition = $this->definition($repository);
-
-        if ($definition === []) {
-            throw ValidationException::withMessages([
-                'agent' => 'El archivo no tiene types/agent.yml con los campos del agente.',
-            ]);
-        }
-
-        $current = $this->open($repository, $slug);
+        $creating = $path === null;
+        $path ??= ClaudeLayout::agentPath($name);
+        $current = $this->contents->read($repository, $path);
 
         if ($creating && $current !== null) {
-            throw ValidationException::withMessages([
-                'slug' => 'Ya hay un agente en esa carpeta.',
-            ]);
+            throw ValidationException::withMessages(['slug' => 'Ya hay un agente con ese nombre.']);
         }
 
         if (! $creating && $current === null) {
-            throw ValidationException::withMessages([
-                'agent' => 'Ese agente ya no está en el archivo.',
-            ]);
+            throw ValidationException::withMessages(['agent' => 'Ese agente ya no está en el archivo.']);
         }
 
-        $markdown = $this->markdown($definition, $values, $current['extra'] ?? [], $body);
-        $problem = $this->rules->violation($repository, $this->path($slug), $markdown);
+        $document = $current === null ? null : DocumentRules::document($current['content']);
+        $front = is_array($document) && ! isset($document['_invalid']) ? $document : [];
+        unset($front['_body']);
+
+        $markdown = $this->markdown($front, $name, $values, $body);
+        $problem = $this->rules->violation($repository, $path, $markdown);
 
         if ($problem !== null) {
             throw ValidationException::withMessages(['agent' => $problem]);
         }
 
-        $name = trim((string) ($values['name'] ?? $slug));
-
-        $this->contents->update(
-            $repository,
-            $this->path($slug),
-            $markdown,
-            $creating ? "Crea el agente {$name}" : "Actualiza el agente {$name}",
-        );
+        $this->contents->update($repository, $path, $markdown, $creating ? "Crea el agente {$name}" : "Actualiza el agente {$name}");
 
         return $markdown;
     }
 
-    public function path(string $slug): string
-    {
-        return "agents/{$slug}/agent.md";
-    }
-
     /**
-     * @return list<array{key: string, label: string}>
-     */
-    private function load(GithubRepository $repository): array
-    {
-        $file = $this->contents->read($repository, 'types/agent.yml');
-        $spec = is_array($file) ? DocumentRules::parse($file['content']) : null;
-        $required = is_array($spec) ? ($spec['required'] ?? null) : null;
-
-        if (! is_array($required) || array_is_list($required)) {
-            return [];
-        }
-
-        $fields = [];
-
-        foreach ($required as $key => $label) {
-            if (! is_string($key) || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1) {
-                continue;
-            }
-
-            $fields[] = [
-                'key' => $key,
-                'label' => is_string($label) && trim($label) !== '' ? trim($label) : $key,
-            ];
-        }
-
-        return $fields;
-    }
-
-    /**
-     * @param  list<array{key: string, label: string}>  $definition
+     * @param  array<string, mixed>  $front
      * @param  array<string, mixed>  $values
-     * @param  array<string, string>  $extra
      */
-    private function markdown(array $definition, array $values, array $extra, string $body): string
+    private function markdown(array $front, string $name, array $values, string $body): string
     {
-        $front = ['type' => 'agent'];
+        $skills = ClaudeLayout::names((string) ($values['skills'] ?? ''));
+        $edited = [
+            'name' => $name,
+            'description' => trim((string) ($values['description'] ?? '')),
+        ];
 
-        foreach ($definition as $field) {
-            $front[$field['key']] = trim((string) ($values[$field['key']] ?? ''));
+        if ($skills !== []) {
+            $edited['skills'] = $skills;
         }
 
-        foreach ($extra as $key => $value) {
-            if (! array_key_exists($key, $front)) {
-                $front[$key] = $value;
-            }
-        }
+        unset($front['name'], $front['description'], $front['skills']);
 
-        $yaml = rtrim(Yaml::dump($front, 2, 2));
+        $yaml = rtrim(Yaml::dump([...$edited, ...$front], 2, 2));
         $markdown = rtrim($body);
 
-        return "---\n{$yaml}\n---\n".($markdown === '' ? "\n" : "\n\n{$markdown}\n");
+        return "---\n{$yaml}\n---\n".($markdown === '' ? "\n" : "\n{$markdown}\n");
     }
 }

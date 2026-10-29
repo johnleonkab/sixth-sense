@@ -4,7 +4,6 @@ use App\Models\GithubRepository;
 use App\Models\SenseAgent;
 use App\Models\User;
 use App\Sense\DocumentRules;
-use App\Sense\Scaffold;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -37,11 +36,12 @@ test('the agents already copied from the archive are listed', function () {
     SenseAgent::factory()->create([
         'user_id' => $user->id,
         'slug' => 'cobros',
-        'name' => 'Cobros',
-        'purpose' => 'Lleva el prepago.',
-        'cue' => 'Cuando hablen de cobros.',
+        'name' => 'cobros',
+        'description' => 'Lleva el prepago. Úsalo cuando hablen de cobros.',
+        'skills' => ['prepago-reglas'],
+        'source_path' => '.claude/agents/cobros.md',
     ]);
-    SenseAgent::factory()->create(['name' => 'De otra persona']);
+    SenseAgent::factory()->create(['name' => 'de-otra-persona']);
 
     $this->actingAs($user)
         ->get(route('settings.archive.agents.index'))
@@ -52,18 +52,13 @@ test('the agents already copied from the archive are listed', function () {
             ->where('repository.writable', true)
             ->has('agents', 1)
             ->where('agents.0.slug', 'cobros')
-            ->where('agents.0.name', 'Cobros'));
+            ->where('agents.0.description', 'Lleva el prepago. Úsalo cuando hablen de cobros.')
+            ->where('agents.0.skills', ['prepago-reglas'])
+            ->where('agents.0.path', '.claude/agents/cobros.md'));
 });
 
-test('the form offers the fields declared by the agent type', function () {
+test('the form offers the fields of a Claude Code subagent', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
-
-    Http::fake([
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
-    ]);
 
     $this->actingAs($repository->account->user)
         ->get(route('settings.archive.agents.create'))
@@ -71,15 +66,13 @@ test('the form offers the fields declared by the agent type', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/archive-agent')
             ->where('slug', null)
-            ->where('fields.0.key', 'name')
-            ->where('fields.0.label', 'Cómo se llama')
-            ->where('fields.1.key', 'purpose')
-            ->where('fields.1.label', 'Para qué existe')
-            ->where('fields.2.key', 'when')
-            ->where('fields.2.label', 'Cuándo usarlo'));
+            ->where('fields.0.key', 'description')
+            ->where('fields.0.required', true)
+            ->where('fields.1.key', 'skills')
+            ->where('fields.1.required', false));
 });
 
-test('creating an agent commits the yaml fields and the markdown', function () {
+test('creating an agent commits a Claude Code subagent', function () {
     $repository = GithubRepository::factory()->writable()->create([
         'owner' => 'jhon',
         'name' => 'sense',
@@ -89,20 +82,16 @@ test('creating an agent commits the yaml fields and the markdown', function () {
     $saved = null;
 
     Http::fake(function (Request $request) use (&$saved) {
-        if (str_contains($request->url(), '/contents/types/agent.yml')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['types/agent.yml']), 'sha' => 't']);
-        }
-
         if (str_contains($request->url(), '/git/trees/')) {
-            return Http::response(['tree' => [['path' => 'agents/cobros/agent.md', 'type' => 'blob']]]);
+            return Http::response(['tree' => [['path' => '.claude/agents/cobros.md', 'type' => 'blob']]]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/cobros/agent.md')) {
+        if (str_contains($request->url(), '/contents/.claude/agents/cobros.md')) {
             if ($request->method() === 'PUT') {
                 $saved = base64_decode((string) $request['content']);
 
                 return Http::response([
-                    'content' => ['path' => 'agents/cobros/agent.md', 'sha' => 'new'],
+                    'content' => ['path' => '.claude/agents/cobros.md', 'sha' => 'new'],
                     'commit' => ['sha' => 'c', 'html_url' => 'https://github.com/jhon/sense/commit/c'],
                 ]);
             }
@@ -121,9 +110,8 @@ test('creating an agent commits the yaml fields and the markdown', function () {
         ->post(route('settings.archive.agents.store'), [
             'slug' => 'cobros',
             'fields' => [
-                'name' => 'Cobros',
-                'purpose' => 'Lleva: el prepago.',
-                'when' => 'Cuando hablen de cobros.',
+                'description' => 'Lleva: el prepago.',
+                'skills' => 'prepago-reglas, tono',
             ],
             'body' => "# Cobros\n\nHabla corto.",
         ])
@@ -133,91 +121,74 @@ test('creating an agent commits the yaml fields and the markdown', function () {
     $document = DocumentRules::document((string) $saved);
 
     expect($document)->not->toBeNull()
-        ->and($document['name'])->toBe('Cobros')
-        ->and($document['purpose'])->toBe('Lleva: el prepago.')
-        ->and($document['when'])->toBe('Cuando hablen de cobros.')
-        ->and($document['_body'])->toContain('# Cobros')
+        ->and($document['name'])->toBe('cobros')
+        ->and($document['description'])->toBe('Lleva: el prepago.')
+        ->and($document['skills'])->toBe(['prepago-reglas', 'tono'])
+        ->and($document)->not->toHaveKey('type')
         ->and($document['_body'])->toContain('Habla corto.');
 
     $agent = $repository->account->user->senseAgents()->where('slug', 'cobros')->first();
 
     expect($agent)->not->toBeNull()
-        ->and($agent->name)->toBe('Cobros')
-        ->and($agent->cue)->toBe('Cuando hablen de cobros.')
+        ->and($agent->description)->toBe('Lleva: el prepago.')
+        ->and($agent->skills)->toBe(['prepago-reglas', 'tono'])
         ->and($agent->instructions)->toContain('Habla corto.');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
-        && str_contains($request->url(), '/repos/jhon/sense/contents/agents/cobros/agent.md')
-        && $request['message'] === 'Crea el agente Cobros'
+        && str_contains($request->url(), '/repos/jhon/sense/contents/.claude/agents/cobros.md')
+        && $request['message'] === 'Crea el agente cobros'
         && ! array_key_exists('sha', $request->data()));
 });
 
-test('a new agent without the fields its type requires is not written', function () {
+test('a new agent without a description is not written', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
-
-    Http::fake([
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
-    ]);
 
     $this->actingAs($repository->account->user)
         ->post(route('settings.archive.agents.store'), [
             'slug' => 'cobros',
-            'fields' => ['name' => 'Cobros', 'when' => 'Cuando hablen de cobros.'],
+            'fields' => ['skills' => ''],
             'body' => 'Habla corto.',
         ])
-        ->assertSessionHasErrors(['fields.purpose' => 'Falta Para qué existe.']);
+        ->assertSessionHasErrors(['fields.description' => 'Falta Cuándo usarlo.']);
 
     Http::assertNotSent(fn (Request $request) => $request->method() === 'PUT');
     expect($repository->account->user->senseAgents()->count())->toBe(0);
 });
 
-test('the folder name only accepts lowercase letters, numbers and dashes', function () {
+test('the name only accepts lowercase letters, numbers and dashes', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
-
-    Http::fake([
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
-    ]);
 
     $this->actingAs($repository->account->user)
         ->post(route('settings.archive.agents.store'), [
             'slug' => 'Cobros',
-            'fields' => [
-                'name' => 'Cobros',
-                'purpose' => 'Lleva el prepago.',
-                'when' => 'Cuando hablen de cobros.',
-            ],
+            'fields' => ['description' => 'Lleva el prepago.'],
             'body' => 'Habla corto.',
         ])
-        ->assertSessionHasErrors(['slug' => 'La carpeta solo puede llevar minúsculas, números y guiones.']);
+        ->assertSessionHasErrors(['slug' => 'El nombre solo puede llevar minúsculas, números y guiones.']);
 
     Http::assertNotSent(fn (Request $request) => $request->method() === 'PUT');
 });
 
-test('an agent opens with the fields from its file and its markdown', function () {
+test('an agent opens from the file it was synced from', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
+    SenseAgent::factory()->create([
+        'user_id' => $repository->account->user->id,
+        'slug' => 'cobros',
+        'name' => 'cobros',
+        'source_path' => '.claude/agents/finanzas/cobros.md',
+    ]);
     $markdown = <<<'MD'
         ---
-        type: agent
-        name: Cobros
-        purpose: Lleva el prepago.
-        when: Cuando hablen de cobros.
+        name: cobros
+        description: Lleva el prepago.
+        skills: [prepago-reglas]
         ---
 
         Habla corto.
         MD;
 
     Http::fake([
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
-        'api.github.com/*/contents/agents/cobros/agent.md*' => Http::response([
+        'api.github.com/*/contents/.claude/agents/finanzas/cobros.md*' => Http::response([
             'content' => base64_encode($markdown),
             'sha' => 'old',
         ]),
@@ -229,27 +200,32 @@ test('an agent opens with the fields from its file and its markdown', function (
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/archive-agent')
             ->where('slug', 'cobros')
-            ->where('fields.0.value', 'Cobros')
-            ->where('fields.1.value', 'Lleva el prepago.')
-            ->where('fields.2.value', 'Cuando hablen de cobros.')
+            ->where('path', '.claude/agents/finanzas/cobros.md')
+            ->where('fields.0.value', 'Lleva el prepago.')
+            ->where('fields.1.value', 'prepago-reglas')
             ->where('body', 'Habla corto.')
             ->where('readable', true));
 });
 
-test('updating an agent keeps fields the form does not edit', function () {
+test('updating an agent keeps the front matter the form does not edit', function () {
     $repository = GithubRepository::factory()->writable()->create([
         'owner' => 'jhon',
         'name' => 'sense',
         'full_name' => 'jhon/sense',
         'is_work' => true,
     ]);
+    SenseAgent::factory()->create([
+        'user_id' => $repository->account->user->id,
+        'slug' => 'cobros',
+        'name' => 'cobros',
+        'source_path' => '.claude/agents/cobros.md',
+    ]);
     $original = <<<'MD'
         ---
-        type: agent
-        name: Cobros
-        purpose: Lleva el prepago.
-        when: Cuando hablen de cobros.
-        tone: cercano
+        name: cobros
+        description: Lleva el prepago.
+        tools: Read, Grep
+        model: sonnet
         ---
 
         Habla corto.
@@ -257,20 +233,16 @@ test('updating an agent keeps fields the form does not edit', function () {
     $saved = null;
 
     Http::fake(function (Request $request) use (&$saved, $original) {
-        if (str_contains($request->url(), '/contents/types/agent.yml')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['types/agent.yml']), 'sha' => 't']);
-        }
-
         if (str_contains($request->url(), '/git/trees/')) {
-            return Http::response(['tree' => [['path' => 'agents/cobros/agent.md', 'type' => 'blob']]]);
+            return Http::response(['tree' => [['path' => '.claude/agents/cobros.md', 'type' => 'blob']]]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/cobros/agent.md')) {
+        if (str_contains($request->url(), '/contents/.claude/agents/cobros.md')) {
             if ($request->method() === 'PUT') {
                 $saved = base64_decode((string) $request['content']);
 
                 return Http::response([
-                    'content' => ['path' => 'agents/cobros/agent.md', 'sha' => 'new'],
+                    'content' => ['path' => '.claude/agents/cobros.md', 'sha' => 'new'],
                     'commit' => ['sha' => 'c', 'html_url' => 'https://github.com/jhon/sense/commit/c'],
                 ]);
             }
@@ -285,18 +257,15 @@ test('updating an agent keeps fields the form does not edit', function () {
 
     $this->actingAs($repository->account->user)
         ->put(route('settings.archive.agents.update', 'cobros'), [
-            'fields' => [
-                'name' => 'Cobros',
-                'purpose' => 'Lleva el prepago.',
-                'when' => 'Cuando hablen de cobros.',
-            ],
+            'fields' => ['description' => 'Lleva el prepago.', 'skills' => ''],
             'body' => "Habla corto.\n\nY cita el importe.",
         ])
         ->assertRedirect(route('settings.archive.agents.edit', 'cobros'));
 
     $document = DocumentRules::document((string) $saved);
 
-    expect($document['tone'])->toBe('cercano')
+    expect($document['tools'])->toBe('Read, Grep')
+        ->and($document['model'])->toBe('sonnet')
         ->and($document['_body'])->toContain('Y cita el importe.');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request['sha'] === 'old');
@@ -305,21 +274,10 @@ test('updating an agent keeps fields the form does not edit', function () {
 test('a read only archive refuses to create an agent', function () {
     $repository = GithubRepository::factory()->create(['is_work' => true]);
 
-    Http::fake([
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
-    ]);
-
     $this->actingAs($repository->account->user)
         ->post(route('settings.archive.agents.store'), [
             'slug' => 'cobros',
-            'fields' => [
-                'name' => 'Cobros',
-                'purpose' => 'Lleva el prepago.',
-                'when' => 'Cuando hablen de cobros.',
-            ],
+            'fields' => ['description' => 'Lleva el prepago.'],
             'body' => 'Habla corto.',
         ])
         ->assertSessionHasErrors(['agent' => 'Este archivo es de solo lectura. Permite actualizar su código para guardar agentes.']);
@@ -333,15 +291,7 @@ test('another persons agent is not readable from this archive', function () {
     SenseAgent::factory()->create([
         'user_id' => $other->account->user->id,
         'slug' => 'cobros',
-        'name' => 'Cobros',
-    ]);
-
-    Http::fake([
-        'api.github.com/*/contents/agents/cobros/agent.md*' => Http::response([], 404),
-        'api.github.com/*/contents/types/agent.yml*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['types/agent.yml']),
-            'sha' => 't',
-        ]),
+        'name' => 'cobros',
     ]);
 
     $this->actingAs($repository->account->user)

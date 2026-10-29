@@ -14,16 +14,16 @@ class Scaffold
     public static function files(): array
     {
         return [
-            'AGENTS.md' => <<<'MD'
+            'CLAUDE.md' => <<<'MD'
                 # Cómo se trabaja en este archivo
 
-                Cada documento con tipo lleva una cabecera YAML entre `---` y obedece `types/{tipo}.yml`: las claves de `required`, la carpeta de `where` y el nombre de `name`.
+                Este repositorio sigue la estructura de Claude Code: funciona igual abierto en Claude Code que en sixth-sense.
 
-                - `{project}` es la carpeta del proyecto.
-                - `{date}` es AAAA-MM-DD.
-                - `{slug}` es el nombre en minúsculas y guiones.
+                - `.claude/agents/{nombre}.md` es un agente: cabecera con `name` y `description` (cuándo usarlo), y debajo sus instrucciones. Con `skills:` precarga skills.
+                - `.claude/skills/{nombre}/SKILL.md` es una skill: `description` dice cuándo usarla. Los demás archivos de su carpeta se leen solo cuando hacen falta.
+                - Cada documento con tipo lleva una cabecera YAML entre `---` y obedece `types/{tipo}.yml`.
 
-                Un proyecto nuevo copia `projects/_template`. Un agente nuevo copia `agents/_template` y se sincroniza con sixth-sense. Sus referencias viven en `agents/{slug}/references/` y se cargan cuando se usa el agente. El agente `keeper` mantiene este archivo: crea, actualiza y borra. Nada se escribe sin que la persona diga que sí.
+                El agente `keeper` mantiene este archivo: crea, actualiza y borra. Nada se escribe sin que la persona diga que sí.
 
                 `now.md` es el estado vivo. `map.md` dice dónde está cada cosa. `vertical` en el proyecto dice si es finance, product, delivery u operations.
                 MD,
@@ -33,9 +33,11 @@ class Scaffold
             'map.md' => <<<'MD'
                 # Mapa
 
+                - `CLAUDE.md` cómo se trabaja aquí. Se carga siempre.
+                - `.claude/agents/` agentes. `keeper` mantiene el archivo.
+                - `.claude/skills/` skills que usan los agentes.
                 - `types/` reglas de cada tipo de documento.
                 - `projects/` un proyecto por carpeta.
-                - `agents/` agentes. `keeper` mantiene el archivo.
                 - `inbox/` notas que todavía no tienen sitio.
                 - `archive/` lo que ya no está vivo.
                 MD,
@@ -92,15 +94,6 @@ class Scaffold
                 required:
                   author: Quién lo anota
                 YML,
-            'types/agent.yml' => <<<'YML'
-                type: agent
-                where: agents/{slug}
-                name: agent.md
-                required:
-                  name: Cómo se llama
-                  purpose: Para qué existe
-                  when: Cuándo usarlo
-                YML,
             'projects/_template/project.md' => <<<'MD'
                 ---
                 type: project
@@ -151,29 +144,32 @@ class Scaffold
 
                 # Diario
                 MD,
-            'agents/_template/agent.md' => <<<'MD'
+            '.claude/agents/keeper.md' => <<<'MD'
                 ---
-                type: agent
-                name: Nombre
-                purpose: Para qué existe este agente.
-                when: Cuándo debe usarlo el orquestador.
+                name: keeper
+                description: Mantiene el archivo de trabajo. Úsalo cuando haya que guardar, cambiar o borrar algo del archivo, o crear un agente o una skill.
+                skills:
+                  - archive-documents
                 ---
 
-                Instrucciones que sigue cuando está en uso.
+                Mantienes el archivo de trabajo. Para escribir o actualizar usa propose_sense_file. Para borrar, propose_sense_delete.
+
+                Un agente nuevo es `.claude/agents/{nombre}.md` con `name` y `description`, y sus instrucciones debajo. Si necesita material de consulta, crea una skill en `.claude/skills/{nombre}/SKILL.md` y añádela a su `skills:`.
+                Después de crear o cambiar un agente, una skill o CLAUDE.md, llama a sync_sense_agents.
                 MD,
-            'agents/keeper/agent.md' => <<<'MD'
+            '.claude/skills/archive-documents/SKILL.md' => <<<'MD'
                 ---
-                type: agent
-                name: Archivo
-                purpose: Mantiene el archivo de trabajo. Crea documentos que cumplen las reglas, y crea otros agentes.
-                when: Cuando haya que guardar, cambiar o borrar algo del archivo, o crear un agente.
+                name: archive-documents
+                description: Reglas para crear documentos con tipo en el archivo. Úsala antes de crear o mover un documento de projects/ o inbox/.
                 ---
 
                 Lee `types/` antes de crear un documento y cumple `where`, `name` y `required`.
-                Para escribir o actualizar usa propose_sense_file. Para borrar, propose_sense_delete.
-                Un agente nuevo es `agents/{slug}/agent.md` copiado de `agents/_template/agent.md`, con name, purpose y when.
-                Sus referencias son markdown en `agents/{slug}/references/{nombre}.md`, sin tipo. Se cargan al usar el agente.
-                Después de crearlo o cambiarlo, o de cambiar una referencia, llama a sync_sense_agents.
+
+                - `{project}` es la carpeta del proyecto.
+                - `{date}` es AAAA-MM-DD.
+                - `{slug}` es el nombre en minúsculas y guiones.
+
+                Un proyecto nuevo copia `projects/_template`.
                 No inventes un tipo: si no existe en `types/`, proponlo primero como `types/{tipo}.yml` con type, where, name y required.
                 MD,
             'inbox/.gitkeep' => '',

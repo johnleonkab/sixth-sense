@@ -15,7 +15,8 @@ use Throwable;
 
 /**
  * Reads, creates and commits the archive's markdown on main. A new document
- * follows types/{type}.yml. A new folder copies a project or agent template.
+ * follows types/{type}.yml. A new folder copies the project template or starts
+ * an agent in .claude/agents/; a skill file goes in .claude/skills/{skill}/.
  * There is no other branch.
  */
 class ArchiveFileController extends Controller
@@ -78,8 +79,8 @@ class ArchiveFileController extends Controller
             return $this->storeFolder($request, $repository);
         }
 
-        if ($request->string('kind')->toString() === 'reference') {
-            return $this->storeReference($request, $repository);
+        if ($request->string('kind')->toString() === 'skill') {
+            return $this->storeSkillFile($request, $repository);
         }
 
         $validated = $request->validate([
@@ -214,28 +215,28 @@ class ArchiveFileController extends Controller
         return back();
     }
 
-    private function storeReference(Request $request, GithubRepository $repository): RedirectResponse
+    private function storeSkillFile(Request $request, GithubRepository $repository): RedirectResponse
     {
         $validated = $request->validate([
-            'kind' => ['required', 'in:reference'],
-            'agent' => ['required', 'string', 'max:80'],
+            'kind' => ['required', 'in:skill'],
+            'skill' => ['required', 'string', 'max:80'],
             'name' => ['required', 'string', 'max:80'],
             'body' => ['required', 'string', 'max:100000'],
         ], [
-            'agent.required' => 'Elige el agente.',
+            'skill.required' => 'Escribe la skill.',
             'name.required' => 'Falta el nombre.',
             'body.required' => 'Falta el documento.',
             'body.max' => 'El documento es demasiado largo.',
         ]);
 
         try {
-            $path = $this->files->createReference($request->user(), $repository, $validated['agent'], $validated['name'], $validated['body']);
+            $path = $this->files->createSkillFile($request->user(), $repository, $validated['skill'], $validated['name'], $validated['body']);
         } catch (ValidationException $exception) {
             return back()->withErrors($exception->errors())->withInput();
         } catch (Throwable $exception) {
             report($exception);
 
-            return back()->withErrors(['body' => 'No he podido crear la referencia en main.'])->withInput();
+            return back()->withErrors(['body' => 'No he podido crear el archivo de la skill en main.'])->withInput();
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Creado en main.']);

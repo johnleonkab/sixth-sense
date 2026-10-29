@@ -5,13 +5,15 @@ namespace App\Actions\Handlers;
 use App\Actions\ActionHandler;
 use App\Connectors\GitHub\GithubContents;
 use App\Models\PendingAction;
+use App\Sense\ClaudeLayout;
 use App\Sense\SyncAgents;
 use RuntimeException;
 use Throwable;
 
 /**
  * Writes or deletes one file in the work repository after the person confirms.
- * A change under agents/ is copied into sixth-sense straight away.
+ * A change to an agent, a skill or CLAUDE.md is copied into sixth-sense
+ * straight away.
  */
 class ChangeSense implements ActionHandler
 {
@@ -37,7 +39,7 @@ class ChangeSense implements ActionHandler
             default => throw new RuntimeException("No sé aplicar {$action->type}."),
         };
 
-        if (str_starts_with($path, 'agents/')) {
+        if (ClaudeLayout::touchesRuntime($path)) {
             try {
                 $this->agents->sync($action->user);
             } catch (Throwable $exception) {

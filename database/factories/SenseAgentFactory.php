@@ -21,11 +21,11 @@ class SenseAgentFactory extends Factory
         return [
             'user_id' => User::factory(),
             'slug' => $slug,
-            'name' => fake()->words(2, true),
-            'purpose' => fake()->sentence(),
-            'cue' => fake()->sentence(),
+            'name' => $slug,
+            'description' => fake()->sentence(),
             'instructions' => fake()->paragraph(),
-            'source_path' => "agents/{$slug}/agent.md",
+            'skills' => [],
+            'source_path' => ".claude/agents/{$slug}.md",
             'source_sha' => fake()->sha1(),
         ];
     }

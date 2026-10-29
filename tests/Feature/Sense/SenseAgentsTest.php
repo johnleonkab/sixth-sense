@@ -5,6 +5,7 @@ use App\Actions\ActionStatus;
 use App\Models\GithubRepository;
 use App\Models\PendingAction;
 use App\Models\SenseAgent;
+use App\Models\SenseSkill;
 use App\Sense\Scaffold;
 use App\Voice\AssistantProfile;
 use Carbon\CarbonImmutable;
@@ -61,10 +62,8 @@ test('a document in the wrong folder is refused', function () {
 test('a confirmed file is committed, and a new agent is copied into sixth-sense', function () {
     $markdown = <<<'MD'
         ---
-        type: agent
-        name: Prepago
-        purpose: Lleva el prepago.
-        when: Cuando hablen de cobros.
+        name: prepago
+        description: Lleva el prepago. Úsalo cuando hablen de cobros.
         ---
 
         Habla corto.
@@ -72,15 +71,11 @@ test('a confirmed file is committed, and a new agent is copied into sixth-sense'
     $reads = 0;
 
     Http::fake(function (Request $request) use (&$reads, $markdown) {
-        if (str_contains($request->url(), '/contents/types/agent.yml')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['types/agent.yml']), 'sha' => 't']);
-        }
-
         if (str_contains($request->url(), '/git/trees/')) {
-            return Http::response(['tree' => [['path' => 'agents/prepago/agent.md', 'type' => 'blob']]]);
+            return Http::response(['tree' => [['path' => '.claude/agents/prepago.md', 'type' => 'blob']]]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/prepago/agent.md')) {
+        if (str_contains($request->url(), '/contents/.claude/agents/prepago.md')) {
             if ($request->method() === 'GET' && $reads++ === 0) {
                 return Http::response([], 404);
             }
@@ -90,7 +85,7 @@ test('a confirmed file is committed, and a new agent is copied into sixth-sense'
             }
 
             return Http::response([
-                'content' => ['path' => 'agents/prepago/agent.md', 'sha' => 'new'],
+                'content' => ['path' => '.claude/agents/prepago.md', 'sha' => 'new'],
                 'commit' => ['sha' => 'cafebabe', 'html_url' => 'https://github.com/jhon/sense/commit/cafebabe'],
             ]);
         }
@@ -100,7 +95,7 @@ test('a confirmed file is committed, and a new agent is copied into sixth-sense'
 
     $proposal = $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'propose_sense_file'), ['arguments' => [
-            'path' => 'agents/prepago/agent.md',
+            'path' => '.claude/agents/prepago.md',
             'contents' => $markdown,
             'message' => 'Añade el agente de prepago',
         ]])
@@ -112,13 +107,25 @@ test('a confirmed file is committed, and a new agent is copied into sixth-sense'
     $agent = SenseAgent::query()->where('user_id', $this->user->id)->where('slug', 'prepago')->first();
 
     expect($agent)->not->toBeNull()
-        ->and($agent->name)->toBe('Prepago')
-        ->and($agent->cue)->toBe('Cuando hablen de cobros.')
+        ->and($agent->name)->toBe('prepago')
+        ->and($agent->description)->toBe('Lleva el prepago. Úsalo cuando hablen de cobros.')
         ->and($agent->instructions)->toBe('Habla corto.');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
         && $request['message'] === 'Añade el agente de prepago'
         && ! array_key_exists('sha', $request->data()));
+});
+
+test('an agent without a description is refused, as Claude Code requires one', function () {
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'propose_sense_file'), ['arguments' => [
+            'path' => '.claude/agents/prepago.md',
+            'contents' => "---\nname: prepago\n---\n\nHabla corto.\n",
+            'message' => 'Añade el agente de prepago',
+        ]])
+        ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'description'));
+
+    expect(PendingAction::query()->count())->toBe(0);
 });
 
 test('deleting a file is proposed and then removed', function () {
@@ -141,42 +148,52 @@ test('deleting a file is proposed and then removed', function () {
     Http::assertSent(fn (Request $request) => $request->method() === 'DELETE' && $request['sha'] === 'abc');
 });
 
-test('focusing an agent returns its references with the instructions', function () {
+test('focusing an agent preloads the skills it lists', function () {
+    SenseSkill::factory()->create([
+        'user_id' => $this->user->id,
+        'name' => 'jira-template',
+        'instructions' => 'Pilares.',
+        'files' => ['.claude/skills/jira-template/plantilla.md'],
+    ]);
     SenseAgent::factory()->create([
         'user_id' => $this->user->id,
         'slug' => 'jira-writer',
-        'name' => 'Jira',
+        'name' => 'jira-writer',
         'instructions' => 'Sigue la plantilla.',
-        'references' => "# references/contexto.md\n\nPilares.",
+        'skills' => ['jira-template', 'missing'],
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['slug' => 'jira-writer']])
+        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['name' => 'jira-writer']])
         ->assertJsonPath('output.instructions', fn (string $text): bool => str_contains($text, 'Sigue la plantilla.')
-            && str_contains($text, 'references/contexto.md')
-            && str_contains($text, 'Pilares.'));
+            && str_contains($text, '# Skill jira-template')
+            && str_contains($text, 'Pilares.')
+            && str_contains($text, '.claude/skills/jira-template/plantilla.md'));
 });
 
-test('syncing an agent copies the markdown in its references folder', function () {
-    $agent = "---\ntype: agent\nname: Jira\npurpose: Escribe historias.\nwhen: Cuando pidan una historia.\n---\n\nSigue la plantilla.\n";
+test('syncing reads agents, skills and CLAUDE.md as Claude Code does', function () {
+    $agent = "---\nname: jira-writer\ndescription: Escribe historias. Úsalo cuando pidan una historia.\nskills: jira-template, otra\ntools: Read, Grep\n---\n\nSigue la plantilla.\n";
 
     Http::fake([
         'api.github.com/*/git/trees/*' => Http::response(['tree' => [
-            ['path' => 'agents/jira-writer/agent.md', 'type' => 'blob'],
-            ['path' => 'agents/jira-writer/references/plantilla.md', 'type' => 'blob'],
-            ['path' => 'agents/jira-writer/references/contexto.md', 'type' => 'blob'],
+            ['path' => 'CLAUDE.md', 'type' => 'blob'],
+            ['path' => '.claude/agents/writers/jira.md', 'type' => 'blob'],
+            ['path' => '.claude/agents/broken.md', 'type' => 'blob'],
+            ['path' => '.claude/skills/jira-template/SKILL.md', 'type' => 'blob'],
+            ['path' => '.claude/skills/jira-template/plantilla.md', 'type' => 'blob'],
+            ['path' => '.claude/skills/manual/SKILL.md', 'type' => 'blob'],
+            ['path' => 'agents/old/agent.md', 'type' => 'blob'],
         ]]),
-        'api.github.com/*/contents/agents/jira-writer/agent.md*' => Http::response([
-            'content' => base64_encode($agent),
-            'sha' => 'a',
+        'api.github.com/*/contents/CLAUDE.md*' => Http::response(['content' => base64_encode("# Archivo\n\nTodo en español.\n"), 'sha' => 'm']),
+        'api.github.com/*/contents/.claude/agents/writers/jira.md*' => Http::response(['content' => base64_encode($agent), 'sha' => 'a']),
+        'api.github.com/*/contents/.claude/agents/broken.md*' => Http::response(['content' => base64_encode("---\nname: broken\n---\n\nSin description.\n"), 'sha' => 'b']),
+        'api.github.com/*/contents/.claude/skills/jira-template/SKILL.md*' => Http::response([
+            'content' => base64_encode("# Plantilla de Jira\n\nCómo se escribe una historia.\n\nComo rol, quiero…\n"),
+            'sha' => 's',
         ]),
-        'api.github.com/*/contents/agents/jira-writer/references/contexto.md*' => Http::response([
-            'content' => base64_encode("# Contexto\n\nPilares.\n"),
-            'sha' => 'c',
-        ]),
-        'api.github.com/*/contents/agents/jira-writer/references/plantilla.md*' => Http::response([
-            'content' => base64_encode("# Plantilla\n\nComo rol.\n"),
-            'sha' => 'p',
+        'api.github.com/*/contents/.claude/skills/manual/SKILL.md*' => Http::response([
+            'content' => base64_encode("---\nname: deploy\ndescription: Despliega.\ndisable-model-invocation: true\n---\n\nPasos.\n"),
+            'sha' => 'd',
         ]),
     ]);
 
@@ -184,14 +201,40 @@ test('syncing an agent copies the markdown in its references folder', function (
         ->post(route('settings.connections.sense.sync', [$this->repository->account, $this->repository]))
         ->assertRedirect();
 
-    $stored = $this->user->senseAgents()->where('slug', 'jira-writer')->first();
+    $stored = $this->user->senseAgents()->get();
+    $jira = $stored->firstWhere('slug', 'jira-writer');
+    $template = $this->user->senseSkills()->where('name', 'jira-template')->first();
+    $manual = $this->user->senseSkills()->where('name', 'deploy')->first();
 
-    expect($stored)->not->toBeNull()
-        ->and($stored->instructions)->toBe('Sigue la plantilla.')
-        ->and($stored->references)->toBe("# references/contexto.md\n\n# Contexto\n\nPilares.\n\n# references/plantilla.md\n\n# Plantilla\n\nComo rol.")
-        ->and($stored->briefing())->toContain('Sigue la plantilla.')
-        ->and($stored->briefing())->toContain('Pilares.')
-        ->and($stored->briefing())->toContain('Como rol.');
+    expect($stored->pluck('slug')->all())->toBe(['jira-writer'])
+        ->and($jira->source_path)->toBe('.claude/agents/writers/jira.md')
+        ->and($jira->description)->toBe('Escribe historias. Úsalo cuando pidan una historia.')
+        ->and($jira->skills)->toBe(['jira-template', 'otra'])
+        ->and($template->description)->toBe('Plantilla de Jira')
+        ->and($template->files)->toBe(['.claude/skills/jira-template/plantilla.md'])
+        ->and($manual->model_invocable)->toBeFalse()
+        ->and($this->repository->fresh()->memory)->toBe("# Archivo\n\nTodo en español.")
+        ->and($jira->briefing())->toContain('Sigue la plantilla.')
+        ->and($jira->briefing())->toContain('Como rol, quiero…');
+});
+
+test('using a skill returns its SKILL.md and where its other files are', function () {
+    SenseSkill::factory()->create([
+        'user_id' => $this->user->id,
+        'name' => 'jira-template',
+        'instructions' => 'Como rol, quiero…',
+        'files' => ['.claude/skills/jira-template/plantilla.md'],
+    ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'use_sense_skill'), ['arguments' => ['name' => 'jira-template']])
+        ->assertJsonPath('output.skill', 'jira-template')
+        ->assertJsonPath('output.instructions', fn (string $text): bool => str_contains($text, 'Como rol, quiero…')
+            && str_contains($text, '.claude/skills/jira-template/plantilla.md'));
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'use_sense_skill'), ['arguments' => ['name' => 'otra']])
+        ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'otra'));
 });
 
 test('focusing an agent puts its name on screen and returns its instructions', function () {
@@ -203,41 +246,48 @@ test('focusing an agent puts its name on screen and returns its instructions', f
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['slug' => 'prepago']])
+        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['name' => 'prepago']])
         ->assertJsonPath('canvas.view', 'sense.agent')
         ->assertJsonPath('canvas.props.name', 'Prepago')
         ->assertJsonPath('output.instructions', 'Habla corto.');
 
     $this->actingAs($this->user)
-        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['slug' => '']])
+        ->postJson(route('voice.tools.run', 'focus_sense_agent'), ['arguments' => ['name' => '']])
         ->assertJsonPath('canvas.props.name', null);
 });
 
-test('the assistant is told which agents it can hand the turn to', function () {
+test('the assistant is told which agents and skills it can use, and carries CLAUDE.md', function () {
+    $this->repository->update(['memory' => 'Todo en español.']);
     SenseAgent::factory()->create([
         'user_id' => $this->user->id,
         'slug' => 'prepago',
-        'name' => 'Prepago',
-        'purpose' => 'Lleva el prepago.',
-        'cue' => 'Cuando hablen de cobros.',
+        'name' => 'prepago',
+        'description' => 'Lleva el prepago. Úsalo cuando hablen de cobros.',
     ]);
+    SenseSkill::factory()->create(['user_id' => $this->user->id, 'name' => 'jira-template', 'description' => 'Plantilla de Jira.']);
+    SenseSkill::factory()->create(['user_id' => $this->user->id, 'name' => 'deploy', 'model_invocable' => false]);
 
     $profile = AssistantProfile::for($this->user, CarbonImmutable::parse('2026-10-23 12:00', 'UTC'));
 
     expect($profile->instructions)->toContain('jhon/sense')
-        ->and($profile->instructions)->toContain('prepago: Prepago')
-        ->and($profile->instructions)->toContain('focus_sense_agent');
+        ->and($profile->instructions)->toContain('Todo en español.')
+        ->and($profile->instructions)->toContain('prepago: Lleva el prepago. Úsalo cuando hablen de cobros.')
+        ->and($profile->instructions)->toContain('jira-template: Plantilla de Jira.')
+        ->and($profile->instructions)->not->toContain('deploy:')
+        ->and($profile->instructions)->toContain('focus_sense_agent')
+        ->and($profile->instructions)->toContain('use_sense_skill');
 });
 
 test('an agent that disappeared from the repository is dropped on sync', function () {
     SenseAgent::factory()->create(['user_id' => $this->user->id, 'slug' => 'viejo']);
+    SenseSkill::factory()->create(['user_id' => $this->user->id, 'name' => 'vieja']);
 
     Http::fake([
         'api.github.com/*/git/trees/*' => Http::response(['tree' => [
-            ['path' => 'agents/keeper/agent.md', 'type' => 'blob'],
+            ['path' => '.claude/agents/keeper.md', 'type' => 'blob'],
         ]]),
-        'api.github.com/*/contents/agents/keeper/agent.md*' => Http::response([
-            'content' => base64_encode(Scaffold::files()['agents/keeper/agent.md']),
+        'api.github.com/*/contents/.claude/agents/keeper.md*' => Http::response([
+            'content' => base64_encode(Scaffold::files()['.claude/agents/keeper.md']),
             'sha' => 'k',
         ]),
     ]);
@@ -246,7 +296,8 @@ test('an agent that disappeared from the repository is dropped on sync', functio
         ->post(route('settings.connections.sense.sync', [$this->repository->account, $this->repository]))
         ->assertRedirect();
 
-    expect($this->user->senseAgents()->pluck('slug')->all())->toBe(['keeper']);
+    expect($this->user->senseAgents()->pluck('slug')->all())->toBe(['keeper'])
+        ->and($this->user->senseSkills()->count())->toBe(0);
 });
 
 test('rewriting a markdown proposal commits that text instead of the original', function () {

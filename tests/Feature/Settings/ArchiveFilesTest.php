@@ -224,10 +224,8 @@ test('saving an agent file copies it into sixth-sense', function () {
     $user = $repository->account->user;
     $markdown = <<<'MD'
         ---
-        type: agent
-        name: Archivo
-        purpose: Mantiene el archivo.
-        when: Cuando haya que guardar algo.
+        name: keeper
+        description: Mantiene el archivo. Úsalo cuando haya que guardar algo.
         ---
 
         Nueva instrucción.
@@ -239,25 +237,21 @@ test('saving an agent file copies it into sixth-sense', function () {
             return null;
         }
 
-        if (str_contains($request->url(), '/contents/types/agent.yml')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['types/agent.yml']), 'sha' => 't']);
-        }
-
         if (str_contains($request->url(), '/git/trees/main')) {
-            return Http::response(['tree' => [['path' => 'agents/keeper/agent.md', 'type' => 'blob']]]);
+            return Http::response(['tree' => [['path' => '.claude/agents/keeper.md', 'type' => 'blob']]]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/keeper/agent.md')) {
+        if (str_contains($request->url(), '/contents/.claude/agents/keeper.md')) {
             if ($request->method() === 'PUT') {
                 $saved = base64_decode((string) $request['content']);
 
                 return Http::response([
-                    'content' => ['path' => 'agents/keeper/agent.md', 'sha' => 'new'],
+                    'content' => ['path' => '.claude/agents/keeper.md', 'sha' => 'new'],
                     'commit' => ['sha' => 'c', 'html_url' => 'https://github.com/jhon/sense/commit/c'],
                 ]);
             }
 
-            $content = is_string($saved) ? $saved : "---\ntype: agent\nname: Archivo\npurpose: Antes.\nwhen: Antes.\n---\n\nViejo.\n";
+            $content = is_string($saved) ? $saved : "---\nname: keeper\ndescription: Antes.\n---\n\nViejo.\n";
 
             return Http::response(['content' => base64_encode($content), 'sha' => 'old']);
         }
@@ -266,14 +260,14 @@ test('saving an agent file copies it into sixth-sense', function () {
     });
 
     $this->actingAs($user)
-        ->put('/settings/archive/files/agents/keeper/agent.md', ['contents' => $markdown])
+        ->put('/settings/archive/files/.claude/agents/keeper.md', ['contents' => $markdown])
         ->assertRedirect()
         ->assertInertiaFlash('toast.message', 'Guardado en main.');
 
     $agent = SenseAgent::query()->where('user_id', $user->id)->where('slug', 'keeper')->first();
 
     expect($agent)->not->toBeNull()
-        ->and($agent->name)->toBe('Archivo')
+        ->and($agent->description)->toBe('Mantiene el archivo. Úsalo cuando haya que guardar algo.')
         ->and($agent->instructions)->toBe('Nueva instrucción.');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request['branch'] === 'main');
@@ -500,49 +494,31 @@ test('a project folder copies the template markdown onto main', function () {
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/pulls') || str_contains($request->url(), '/git/refs'));
 });
 
-test('an agent folder copies the template and becomes an agent', function () {
+test('a new agent is a Claude Code subagent in .claude/agents', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
     $user = $repository->account->user;
-    $created = false;
+    $saved = null;
 
-    Http::fake(function (Request $request) use (&$created) {
+    Http::fake(function (Request $request) use (&$saved) {
         if (! str_contains($request->url(), 'api.github.com')) {
             return null;
         }
 
         if (str_contains($request->url(), '/git/trees/main')) {
-            $tree = [['path' => 'agents/_template/agent.md', 'type' => 'blob']];
-
-            if ($created) {
-                $tree[] = ['path' => 'agents/cobros/agent.md', 'type' => 'blob'];
-            }
-
-            return Http::response(['tree' => $tree]);
+            return Http::response(['tree' => is_string($saved) ? [['path' => '.claude/agents/cobros.md', 'type' => 'blob']] : []]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/_template/agent.md')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['agents/_template/agent.md']), 'sha' => 't']);
-        }
-
-        if (str_contains($request->url(), '/contents/types/agent.yml')) {
-            return Http::response(['content' => base64_encode(Scaffold::files()['types/agent.yml']), 'sha' => 't']);
-        }
-
-        if (str_contains($request->url(), '/contents/agents/cobros/agent.md')) {
+        if (str_contains($request->url(), '/contents/.claude/agents/cobros.md')) {
             if ($request->method() === 'PUT') {
-                $created = true;
+                $saved = base64_decode((string) $request['content']);
 
                 return Http::response([
-                    'content' => ['path' => 'agents/cobros/agent.md', 'sha' => 'new'],
+                    'content' => ['path' => '.claude/agents/cobros.md', 'sha' => 'new'],
                     'commit' => ['sha' => 'c', 'html_url' => 'https://github.com/jhon/sense/commit/c'],
                 ]);
             }
 
-            if ($created) {
-                return Http::response(['content' => base64_encode(Scaffold::files()['agents/_template/agent.md']), 'sha' => 'new']);
-            }
-
-            return Http::response([], 404);
+            return is_string($saved) ? Http::response(['content' => base64_encode($saved), 'sha' => 'new']) : Http::response([], 404);
         }
 
         return Http::response('unexpected '.$request->url(), 500);
@@ -554,12 +530,13 @@ test('an agent folder copies the template and becomes an agent', function () {
             'folder' => 'agent',
             'name' => 'cobros',
         ])
-        ->assertRedirect('/settings/archive/files/agents/cobros/agent.md');
+        ->assertRedirect('/settings/archive/files/.claude/agents/cobros.md');
 
     $agent = SenseAgent::query()->where('user_id', $user->id)->where('slug', 'cobros')->first();
 
     expect($agent)->not->toBeNull()
-        ->and($agent->name)->toBe('Nombre');
+        ->and($agent->source_path)->toBe('.claude/agents/cobros.md')
+        ->and(DocumentRules::document((string) $saved)['name'])->toBe('cobros');
 });
 
 test('a folder name outside the archive rules is refused', function () {
@@ -582,48 +559,42 @@ test('a folder name outside the archive rules is refused', function () {
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'api.github.com'));
 });
 
-test('a reference is committed under the agent and loaded with it', function () {
+test('a skill file is committed and the skill is loaded with it', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
     $user = $repository->account->user;
-    $agent = "---\ntype: agent\nname: Jira\npurpose: Escribe historias.\nwhen: Cuando pidan una historia.\n---\n\nSigue la plantilla.\n";
-    $created = false;
+    $skill = "---\nname: jira-template\ndescription: Plantilla de historias.\n---\n\nSigue la plantilla.\n";
     $saved = null;
 
-    Http::fake(function (Request $request) use (&$created, &$saved, $agent) {
+    Http::fake(function (Request $request) use (&$saved, $skill) {
         if (! str_contains($request->url(), 'api.github.com')) {
             return null;
         }
 
         if (str_contains($request->url(), '/git/trees/main')) {
-            $tree = [['path' => 'agents/jira-writer/agent.md', 'type' => 'blob']];
+            $tree = [['path' => '.claude/skills/jira-template/SKILL.md', 'type' => 'blob']];
 
-            if ($created) {
-                $tree[] = ['path' => 'agents/jira-writer/references/contexto.md', 'type' => 'blob'];
+            if (is_string($saved)) {
+                $tree[] = ['path' => '.claude/skills/jira-template/contexto.md', 'type' => 'blob'];
             }
 
             return Http::response(['tree' => $tree]);
         }
 
-        if (str_contains($request->url(), '/contents/agents/jira-writer/agent.md')) {
-            return Http::response(['content' => base64_encode($agent), 'sha' => 'a']);
+        if (str_contains($request->url(), '/contents/.claude/skills/jira-template/SKILL.md')) {
+            return Http::response(['content' => base64_encode($skill), 'sha' => 'a']);
         }
 
-        if (str_contains($request->url(), '/contents/agents/jira-writer/references/contexto.md')) {
+        if (str_contains($request->url(), '/contents/.claude/skills/jira-template/contexto.md')) {
             if ($request->method() === 'PUT') {
-                $created = true;
                 $saved = base64_decode((string) $request['content']);
 
                 return Http::response([
-                    'content' => ['path' => 'agents/jira-writer/references/contexto.md', 'sha' => 'new'],
+                    'content' => ['path' => '.claude/skills/jira-template/contexto.md', 'sha' => 'new'],
                     'commit' => ['sha' => 'c', 'html_url' => 'https://github.com/jhon/sense/commit/c'],
                 ]);
             }
 
-            if ($created) {
-                return Http::response(['content' => base64_encode((string) $saved), 'sha' => 'new']);
-            }
-
-            return Http::response([], 404);
+            return is_string($saved) ? Http::response(['content' => base64_encode($saved), 'sha' => 'new']) : Http::response([], 404);
         }
 
         return Http::response('unexpected '.$request->url(), 500);
@@ -631,41 +602,41 @@ test('a reference is committed under the agent and loaded with it', function () 
 
     $this->actingAs($user)
         ->post(route('settings.archive.files.store'), [
-            'kind' => 'reference',
-            'agent' => 'jira-writer',
+            'kind' => 'skill',
+            'skill' => 'jira-template',
             'name' => 'contexto',
             'body' => "# Contexto\n\nPilares.\n",
         ])
-        ->assertRedirect('/settings/archive/files/agents/jira-writer/references/contexto.md')
+        ->assertRedirect('/settings/archive/files/.claude/skills/jira-template/contexto.md')
         ->assertInertiaFlash('toast.message', 'Creado en main.');
 
-    $stored = $user->senseAgents()->where('slug', 'jira-writer')->first();
+    $stored = $user->senseSkills()->where('name', 'jira-template')->first();
 
     expect($saved)->toBe("# Contexto\n\nPilares.")
         ->and($stored)->not->toBeNull()
         ->and($stored->instructions)->toBe('Sigue la plantilla.')
-        ->and($stored->briefing())->toContain('Pilares.');
+        ->and($stored->files)->toBe(['.claude/skills/jira-template/contexto.md']);
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
         && $request['branch'] === 'main'
-        && $request['message'] === 'Crea agents/jira-writer/references/contexto.md');
+        && $request['message'] === 'Crea .claude/skills/jira-template/contexto.md');
 });
 
-test('a reference for an agent that is not on main is refused', function () {
+test('a skill starts with its SKILL.md', function () {
     $repository = GithubRepository::factory()->writable()->create(['is_work' => true]);
 
     Http::fake([
-        'api.github.com/*/contents/agents/jira-writer/agent.md*' => Http::response([], 404),
+        'api.github.com/*/contents/.claude/skills/jira-template/SKILL.md*' => Http::response([], 404),
     ]);
 
     $this->actingAs($repository->account->user)
         ->post(route('settings.archive.files.store'), [
-            'kind' => 'reference',
-            'agent' => 'jira-writer',
+            'kind' => 'skill',
+            'skill' => 'jira-template',
             'name' => 'contexto',
             'body' => "# Contexto\n",
         ])
-        ->assertSessionHasErrors(['agent' => 'No hay un agente con esa carpeta.']);
+        ->assertSessionHasErrors(['name' => 'Esta skill todavía no tiene SKILL.md. Créalo primero.']);
 
     Http::assertNotSent(fn (Request $request) => $request->method() === 'PUT');
 });

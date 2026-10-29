@@ -26,7 +26,7 @@ test('the scaffold obeys its own type rules', function () {
         expect(DocumentRules::violation($path, $contents, $spec))->toBeNull("{$path} broke its rules");
     }
 
-    expect($files['AGENTS.md'])->toStartWith('# Cómo se trabaja');
+    expect($files['CLAUDE.md'])->toStartWith('# Cómo se trabaja');
 });
 
 test('a repository without the scaffold is not adopted', function () {
@@ -46,7 +46,7 @@ test('a repository without the scaffold is not adopted', function () {
         ->assertSessionHasErrors('workspace');
 
     expect($repository->fresh()->is_work)->toBeFalse()
-        ->and(session('errors')->get('workspace')[0])->toContain('Falta AGENTS.md');
+        ->and(session('errors')->get('workspace')[0])->toContain('Falta CLAUDE.md');
 });
 
 test('a complete repository becomes the only work archive and its keeper is copied', function () {
@@ -74,7 +74,7 @@ test('a complete repository becomes the only work archive and its keeper is copi
     expect($repository->fresh()->is_work)->toBeTrue()
         ->and($previous->fresh()->is_work)->toBeFalse()
         ->and(SenseAgent::query()->where('user_id', $account->user_id)->pluck('name', 'slug')->all())
-        ->toBe(['keeper' => 'Archivo']);
+        ->toBe(['keeper' => 'keeper']);
 });
 
 test('creating the archive opens a private repository and commits the scaffold', function () {

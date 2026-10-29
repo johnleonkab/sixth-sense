@@ -6,8 +6,9 @@ import ArchiveNav from '@/pages/settings/archive-nav';
 type Agent = {
     slug: string;
     name: string;
-    purpose: string;
-    cue: string;
+    description: string;
+    skills: string[];
+    path: string;
 };
 
 type Repository = {
@@ -21,7 +22,7 @@ type Props = {
 };
 
 /**
- * Agents copied from the work archive. Each one is agents/{slug}/agent.md.
+ * Agents copied from the work archive. Each one is a Claude Code subagent in .claude/agents/.
  */
 export default function ArchiveAgents({ repository, agents }: Props) {
     const agentError = (usePage().props as { errors?: Record<string, string> }).errors?.agent;
@@ -29,7 +30,7 @@ export default function ArchiveAgents({ repository, agents }: Props) {
     return (
         <SettingsLayout
             title="Archivo"
-            description={`Agentes de ${repository.full_name}. La cabecera sigue types/agent.yml y el resto del archivo es markdown.`}
+            description={`Agentes de ${repository.full_name}. Como en Claude Code: cada uno es un .md en .claude/agents/ con name y description.`}
         >
             <ArchiveNav />
 
@@ -61,13 +62,13 @@ export default function ArchiveAgents({ repository, agents }: Props) {
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
                     {agents.map((agent) => (
                         <li key={agent.slug}>
-                            <Link href={`/settings/archive/agents/${agent.slug}`} className="block px-[22px] py-4 hover:bg-soft">
+                            <Link href={`/settings/archive/agents/${encodeURIComponent(agent.slug)}`} className="block px-[22px] py-4 hover:bg-soft">
                                 <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                                     <span className="font-medium">{agent.name}</span>
-                                    <span className="font-mono text-[12px] text-faint">agents/{agent.slug}/agent.md</span>
+                                    <span className="font-mono text-[12px] text-faint">{agent.path}</span>
                                 </span>
-                                <span className="mt-1 block text-[13.5px] text-muted">{agent.purpose}</span>
-                                <span className="mt-0.5 block text-[12.5px] text-faint">{agent.cue}</span>
+                                <span className="mt-1 block text-[13.5px] text-muted">{agent.description}</span>
+                                {agent.skills.length > 0 && <span className="mt-0.5 block text-[12.5px] text-faint">Skills: {agent.skills.join(', ')}</span>}
                             </Link>
                         </li>
                     ))}

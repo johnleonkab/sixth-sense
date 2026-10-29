@@ -32,7 +32,7 @@ type TypeSpec = {
 };
 
 type Draft = {
-    kind: 'file' | 'folder' | 'reference';
+    kind: 'file' | 'folder' | 'skill';
     type: string;
     project: string;
     slug: string;
@@ -41,7 +41,7 @@ type Draft = {
     body: string;
     folder: 'project' | 'agent';
     name: string;
-    agent: string;
+    skill: string;
 };
 
 type Props = {
@@ -158,7 +158,8 @@ const slotCopy: Record<'project' | 'slug' | 'date', { label: string; hint: strin
 
 /**
  * A new document follows one type from types/*.yml. A new folder copies the
- * project or agent template. A reference is markdown in agents/{slug}/references/.
+ * project template, or starts an agent in .claude/agents/. A skill file is
+ * SKILL.md or a supporting file in .claude/skills/{skill}/, as in Claude Code.
  * The path is not typed by hand.
  */
 function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec[]; files: string[]; repository: Repository; onDirty: (dirty: boolean) => void }) {
@@ -173,14 +174,14 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
         fields: blankFields(first),
         body: '',
         folder: 'project',
-        name: '',
-        agent: '',
+        name: 'SKILL',
+        skill: '',
     });
     const spec = types.find((type) => type.type === form.data.type) ?? null;
     const path = spec ? located(spec, form.data) : null;
-    const agents = agentSlugs(files);
-    const title = form.data.kind === 'folder' ? 'Nueva carpeta' : form.data.kind === 'reference' ? 'Nueva referencia' : 'Nuevo documento';
-    const subtitle = form.data.kind === 'file' ? (path ?? 'La ruta la marcan el tipo y el nombre.') : form.data.kind === 'reference' ? referencePath(form.data.agent, form.data.name) : folderPath(form.data.folder, form.data.name);
+    const skills = skillFolders(files);
+    const title = form.data.kind === 'folder' ? 'Nueva carpeta' : form.data.kind === 'skill' ? 'Nuevo archivo de skill' : 'Nuevo documento';
+    const subtitle = form.data.kind === 'file' ? (path ?? 'La ruta la marcan el tipo y el nombre.') : form.data.kind === 'skill' ? skillFilePath(form.data.skill, form.data.name) : folderPath(form.data.folder, form.data.name);
 
     useEffect(() => {
         onDirty(form.isDirty);
@@ -218,7 +219,7 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
                 </div>
                 <button
                     type="submit"
-                    disabled={form.processing || !repository.writable || (form.data.kind === 'file' && spec === null) || (form.data.kind === 'reference' && agents.length === 0)}
+                    disabled={form.processing || !repository.writable || (form.data.kind === 'file' && spec === null)}
                     className="shrink-0 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40"
                 >
                     {form.processing ? 'Creando…' : 'Crear en main'}
@@ -233,8 +234,8 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
                     <ModeButton current={form.data.kind === 'folder'} onClick={() => form.setData('kind', 'folder')}>
                         Carpeta
                     </ModeButton>
-                    <ModeButton current={form.data.kind === 'reference'} onClick={() => form.setData('kind', 'reference')}>
-                        Referencia
+                    <ModeButton current={form.data.kind === 'skill'} onClick={() => form.setData('kind', 'skill')}>
+                        Skill
                     </ModeButton>
                 </div>
                 {form.data.kind === 'file' ? (
@@ -290,7 +291,7 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
                             <span className="text-[13px] font-medium">Qué carpeta</span>
                             <select value={form.data.folder} onChange={(event) => form.setData('folder', event.target.value === 'agent' ? 'agent' : 'project')} className={fieldClass}>
                                 <option value="project">Proyecto, desde projects/_template</option>
-                                <option value="agent">Agente, desde agents/_template</option>
+                                <option value="agent">Agente, en .claude/agents/</option>
                             </select>
                         </label>
                         <label className="grid gap-1.5">
@@ -310,52 +311,56 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
                         <p className="text-[13px] text-muted">
                             {form.data.folder === 'project'
                                 ? 'Se copian los markdown de projects/_template. Cada uno sigue su tipo.'
-                                : 'Se copia agents/_template/agent.md. Después puedes editar name, purpose y when.'}
+                                : 'Se crea .claude/agents/nombre.md con name y description. Después puedes editarlo en Agentes.'}
                         </p>
                     </>
-                ) : form.data.kind === 'reference' ? (
-                    agents.length === 0 ? (
-                        <p className="text-[13px] text-muted">Primero crea un agente. Las referencias viven en agents/&#123;agente&#125;/references/.</p>
-                    ) : (
-                        <>
-                            <label className="grid gap-1.5">
-                                <span className="text-[13px] font-medium">Agente</span>
-                                <select value={form.data.agent} onChange={(event) => form.setData('agent', event.target.value)} className={fieldClass} required>
-                                    <option value="">Elige un agente</option>
-                                    {agents.map((agent) => (
-                                        <option key={agent} value={agent}>
-                                            {agent}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.agent && <span className="text-[12.5px] text-crit">{errors.agent}</span>}
-                            </label>
-                            <label className="grid gap-1.5">
-                                <span className="text-[13px] font-medium">Nombre</span>
-                                <span className="text-[12.5px] text-muted">Minúsculas, números y guiones. Puedes añadir varios archivos en la misma carpeta.</span>
-                                <input
-                                    value={form.data.name}
-                                    onChange={(event) => form.setData('name', event.target.value)}
-                                    spellCheck={false}
-                                    autoCapitalize="none"
-                                    className={`${fieldClass} font-mono`}
-                                    placeholder="contexto"
-                                    required
-                                />
-                                {errors.name && <span className="text-[12.5px] text-crit">{errors.name}</span>}
-                            </label>
-                            {errors.body && <p className="text-[13px] text-crit">{errors.body}</p>}
-                        </>
-                    )
+                ) : form.data.kind === 'skill' ? (
+                    <>
+                        <label className="grid gap-1.5">
+                            <span className="text-[13px] font-medium">Skill</span>
+                            <span className="text-[12.5px] text-muted">Minúsculas, números y guiones. Una skill nueva empieza por su SKILL.md.</span>
+                            <input
+                                value={form.data.skill}
+                                onChange={(event) => form.setData('skill', event.target.value)}
+                                list="archive-skills"
+                                spellCheck={false}
+                                autoCapitalize="none"
+                                className={`${fieldClass} font-mono`}
+                                placeholder="cobros"
+                                required
+                            />
+                            <datalist id="archive-skills">
+                                {skills.map((skill) => (
+                                    <option key={skill} value={skill} />
+                                ))}
+                            </datalist>
+                            {errors.skill && <span className="text-[12.5px] text-crit">{errors.skill}</span>}
+                        </label>
+                        <label className="grid gap-1.5">
+                            <span className="text-[13px] font-medium">Archivo</span>
+                            <span className="text-[12.5px] text-muted">SKILL para el archivo principal. Otro nombre para material que la skill lee cuando hace falta.</span>
+                            <input
+                                value={form.data.name}
+                                onChange={(event) => form.setData('name', event.target.value)}
+                                spellCheck={false}
+                                autoCapitalize="none"
+                                className={`${fieldClass} font-mono`}
+                                placeholder="SKILL"
+                                required
+                            />
+                            {errors.name && <span className="text-[12.5px] text-crit">{errors.name}</span>}
+                        </label>
+                        {errors.body && <p className="text-[13px] text-crit">{errors.body}</p>}
+                    </>
                 ) : null}
             </div>
-            {((form.data.kind === 'file' && spec !== null) || (form.data.kind === 'reference' && agents.length > 0)) && (
+            {((form.data.kind === 'file' && spec !== null) || form.data.kind === 'skill') && (
                 <LiveMarkdown
                     value={form.data.body}
                     onChange={(body) => form.setData('body', body)}
                     readOnly={!repository.writable}
-                    resetKey={form.data.kind === 'reference' ? `reference:${form.data.agent}` : form.data.type}
-                    label={form.data.kind === 'reference' ? 'Escribir la referencia' : `Escribir un ${form.data.type}`}
+                    resetKey={form.data.kind === 'skill' ? `skill:${form.data.skill}` : form.data.type}
+                    label={form.data.kind === 'skill' ? 'Escribir el archivo de la skill' : `Escribir un ${form.data.type}`}
                 />
             )}
         </form>
@@ -421,31 +426,31 @@ function slotOk(slot: 'project' | 'slug' | 'date', value: string): boolean {
     return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 }
 
-function agentSlugs(files: string[]): string[] {
-    const slugs = new Set<string>();
+function skillFolders(files: string[]): string[] {
+    const folders = new Set<string>();
 
     for (const file of files) {
-        const match = /^agents\/([^/]+)\/agent\.md$/.exec(file);
+        const match = /^\.claude\/skills\/([^/]+)\//.exec(file);
 
-        if (match && match[1] !== '_template') {
-            slugs.add(match[1]);
+        if (match) {
+            folders.add(match[1]);
         }
     }
 
-    return [...slugs].sort();
+    return [...folders].sort();
 }
 
-function referencePath(agent: string, name: string): string {
-    const folder = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(agent) ? agent : '…';
-    const file = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) ? name : '…';
+function skillFilePath(skill: string, name: string): string {
+    const folder = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill) ? skill : '…';
+    const file = name === 'SKILL' || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) ? name : '…';
 
-    return `agents/${folder}/references/${file}.md`;
+    return `.claude/skills/${folder}/${file}.md`;
 }
 
 function folderPath(folder: 'project' | 'agent', name: string): string {
     const safe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) ? name : '…';
 
-    return folder === 'project' ? `projects/${safe}/` : `agents/${safe}/agent.md`;
+    return folder === 'project' ? `projects/${safe}/` : `.claude/agents/${safe}.md`;
 }
 
 function today(): string {

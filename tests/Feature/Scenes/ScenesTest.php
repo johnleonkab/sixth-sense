@@ -20,6 +20,7 @@ use App\Models\InboxItem;
 use App\Models\PendingAction;
 use App\Models\Scene;
 use App\Models\SenseAgent;
+use App\Models\SenseSkill;
 use App\Models\User;
 use App\Scenes\DeepSeekSceneText;
 use App\Scenes\Kinds\StoriesFromNotes;
@@ -68,14 +69,15 @@ test('a preview scene broadcasts once per card as each one fills', function () {
         ->and($events[1][0]->cards[1]['state'])->toBe('ready');
 });
 
-test('asking an agent sends its briefing and references and writes nothing', function () {
+test('asking an agent sends its briefing and preloaded skills and writes nothing', function () {
     $text = new RecordingSceneText(capableAnswers: [['answer' => 'No es una épica.']]);
     $this->app->instance(SceneText::class, $text);
 
+    SenseSkill::factory()->for($this->user)->create(['name' => 'contexto', 'instructions' => 'Pilares.']);
     SenseAgent::factory()->for($this->user)->create([
         'slug' => 'jira-writer',
         'instructions' => 'Habla corto.',
-        'references' => "# references/contexto.md\n\nPilares.",
+        'skills' => ['contexto'],
     ]);
 
     $scene = app(OpenScene::class)->open($this->user, 'ask_agent', [
@@ -127,10 +129,11 @@ test('stories_from_notes dispatches one job per title and a broken file is not p
     $this->app->instance(SceneText::class, $text);
     storyArchive($this->user);
 
+    SenseSkill::factory()->for($this->user)->create(['name' => 'contexto', 'instructions' => 'Pilares.']);
     SenseAgent::factory()->for($this->user)->create([
         'slug' => 'jira-writer',
         'instructions' => 'Escribe historias.',
-        'references' => 'Pilares.',
+        'skills' => ['contexto'],
     ]);
 
     Queue::fake([RunSceneStep::class]);
@@ -203,10 +206,11 @@ test('a jira comment opens a scene and reviewing it does not call a model again'
     $this->app->instance(SceneText::class, $text);
     storyArchive($this->user);
 
+    SenseSkill::factory()->for($this->user)->create(['name' => 'contexto', 'instructions' => 'Pilares del cobro.']);
     SenseAgent::factory()->for($this->user)->create([
         'slug' => 'jira-writer',
         'instructions' => 'Escribe historias.',
-        'references' => 'Pilares del cobro.',
+        'skills' => ['contexto'],
     ]);
 
     $item = InboxItem::factory()->for($this->user)->create([

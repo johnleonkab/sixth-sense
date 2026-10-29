@@ -200,7 +200,7 @@ class ArchiveFiles
 
     /**
      * Commit a folder the archive knows how to start: a project copied from
-     * projects/_template, or an agent copied from agents/_template.
+     * projects/_template, or a new Claude Code agent in .claude/agents/.
      * Returns the document to open afterwards.
      *
      * @throws ValidationException
@@ -215,41 +215,42 @@ class ArchiveFiles
 
         return match ($kind) {
             'project' => $this->projectFolder($repository, $name),
-            'agent' => $this->agentFolder($user, $repository, $name),
+            'agent' => $this->agentFile($user, $repository, $name),
             default => throw ValidationException::withMessages(['folder' => 'Esa carpeta no forma parte del archivo.']),
         };
     }
 
     /**
-     * Commit one markdown file in agents/{agent}/references/. The folder
-     * appears with the first file. Returns the path.
+     * Commit one markdown file of a skill: its SKILL.md, or a supporting file
+     * next to it. A skill starts with its SKILL.md, as in Claude Code.
+     * Returns the path.
      *
      * @throws ValidationException
      */
-    public function createReference(User $user, GithubRepository $repository, string $agent, string $name, string $contents): string
+    public function createSkillFile(User $user, GithubRepository $repository, string $skill, string $name, string $contents): string
     {
         $this->writable($repository);
 
-        if (! $this->slug($agent) || $agent === '_template') {
-            throw ValidationException::withMessages(['agent' => 'El agente va en minúsculas, números y guiones.']);
+        if (! $this->slug($skill)) {
+            throw ValidationException::withMessages(['skill' => 'La skill va en minúsculas, números y guiones.']);
         }
 
-        if (! $this->slug($name)) {
-            throw ValidationException::withMessages(['name' => 'El nombre va en minúsculas, números y guiones.']);
+        if ($name !== 'SKILL' && ! $this->slug($name)) {
+            throw ValidationException::withMessages(['name' => 'El archivo es SKILL, o un nombre en minúsculas, números y guiones.']);
         }
 
         if (trim($contents) === '') {
             throw ValidationException::withMessages(['body' => 'Falta el documento.']);
         }
 
-        if ($this->contents->read($repository, "agents/{$agent}/agent.md", self::BRANCH) === null) {
-            throw ValidationException::withMessages(['agent' => 'No hay un agente con esa carpeta.']);
+        if ($name !== 'SKILL' && $this->contents->read($repository, ClaudeLayout::skillPath($skill), self::BRANCH) === null) {
+            throw ValidationException::withMessages(['name' => 'Esta skill todavía no tiene SKILL.md. Créalo primero.']);
         }
 
-        $path = "agents/{$agent}/references/{$name}.md";
+        $path = ClaudeLayout::SKILLS."{$skill}/{$name}.md";
 
         if ($this->contents->read($repository, $path, self::BRANCH) !== null) {
-            throw ValidationException::withMessages(['name' => 'Esa referencia ya está en main.']);
+            throw ValidationException::withMessages(['name' => 'Ese archivo ya está en main.']);
         }
 
         $problem = $this->rules->violation($repository, $path, $contents, self::BRANCH);
@@ -297,7 +298,7 @@ class ArchiveFiles
 
     private function syncAgent(User $user, string $path): void
     {
-        if (preg_match('#^agents/(?!_template(?:/|$))[^/]+/#', $path) !== 1) {
+        if (! ClaudeLayout::touchesRuntime($path)) {
             return;
         }
 
@@ -390,26 +391,22 @@ class ArchiveFiles
     /**
      * @throws ValidationException
      */
-    private function agentFolder(User $user, GithubRepository $repository, string $name): string
+    private function agentFile(User $user, GithubRepository $repository, string $name): string
     {
-        $target = "agents/{$name}/agent.md";
-        $template = $this->contents->read($repository, 'agents/_template/agent.md', self::BRANCH);
-
-        if ($template === null) {
-            throw ValidationException::withMessages(['name' => 'No está la plantilla agents/_template/agent.md.']);
-        }
+        $target = ClaudeLayout::agentPath($name);
 
         if ($this->contents->read($repository, $target, self::BRANCH) !== null) {
             throw ValidationException::withMessages(['name' => 'Ese agente ya está en main.']);
         }
 
-        $problem = $this->rules->violation($repository, $target, $template['content'], self::BRANCH);
+        $contents = "---\nname: {$name}\ndescription: Pendiente. Di cuándo hay que usar este agente.\n---\n\nInstrucciones que sigue cuando está en uso.\n";
+        $problem = $this->rules->violation($repository, $target, $contents, self::BRANCH);
 
         if ($problem !== null) {
             throw ValidationException::withMessages(['name' => $problem]);
         }
 
-        $this->contents->update($repository, $target, $template['content'], "Crea {$target}", self::BRANCH);
+        $this->contents->update($repository, $target, $contents, "Crea {$target}", self::BRANCH);
         $this->syncAgent($user, $target);
 
         return $target;

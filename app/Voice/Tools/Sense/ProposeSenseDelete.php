@@ -30,7 +30,7 @@ class ProposeSenseDelete implements VoiceTool
     public function description(): string
     {
         return 'Propone borrar un archivo del archivo de trabajo en GitHub y lo muestra para que la persona confirme. NO lo borra hasta el sí. '
-            .'La ruta es relativa. No borres AGENTS.md, map.md ni types/.';
+            .'La ruta es relativa. No borres CLAUDE.md, map.md ni types/.';
     }
 
     public function parameters(): array

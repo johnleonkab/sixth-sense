@@ -16,8 +16,8 @@ use Inertia\Response;
 use Throwable;
 
 /**
- * The work archive's agents, edited by hand. The form follows types/agent.yml
- * and writes agents/{slug}/agent.md back to the repository.
+ * The work archive's agents, edited by hand. Each one is a Claude Code
+ * subagent in .claude/agents/, written back to the repository.
  */
 class ArchiveAgentController extends Controller
 {
@@ -47,8 +47,9 @@ class ArchiveAgentController extends Controller
             'agents' => $user->senseAgents()->orderBy('name')->get()->map(fn (SenseAgent $agent): array => [
                 'slug' => $agent->slug,
                 'name' => $agent->name,
-                'purpose' => $agent->purpose,
-                'cue' => $agent->cue,
+                'description' => $agent->description,
+                'skills' => $agent->skills ?? [],
+                'path' => $agent->source_path,
             ])->values(),
         ]);
     }
@@ -61,16 +62,11 @@ class ArchiveAgentController extends Controller
             return $repository;
         }
 
-        $definition = $this->definition($repository);
-
-        if ($definition instanceof RedirectResponse) {
-            return $definition;
-        }
-
         return Inertia::render('settings/archive-agent', [
             'repository' => $this->repository($repository),
             'slug' => null,
-            'fields' => array_map(fn (array $field): array => [...$field, 'value' => ''], $definition),
+            'path' => null,
+            'fields' => array_map(fn (array $field): array => [...$field, 'value' => ''], $this->documents->definition()),
             'body' => '',
             'readable' => true,
         ]);
@@ -84,15 +80,9 @@ class ArchiveAgentController extends Controller
             return $repository;
         }
 
-        $definition = $this->definition($repository);
+        $validated = $request->validate($this->rules(true), $this->messages());
 
-        if ($definition instanceof RedirectResponse) {
-            return $definition;
-        }
-
-        $validated = $request->validate($this->rules($definition, true), $this->messages($definition));
-
-        return $this->save($request->user(), $repository, $validated['slug'], $validated['fields'], (string) ($validated['body'] ?? ''), true);
+        return $this->save($request->user(), $repository, $validated['slug'], null, $validated['fields'], (string) ($validated['body'] ?? ''));
     }
 
     public function edit(Request $request, string $slug): Response|RedirectResponse
@@ -103,8 +93,10 @@ class ArchiveAgentController extends Controller
             return $repository;
         }
 
+        $stored = $this->stored($request->user(), $slug);
+
         try {
-            $agent = $this->documents->open($repository, $slug);
+            $agent = $this->documents->open($repository, $stored->source_path);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -117,19 +109,14 @@ class ArchiveAgentController extends Controller
             abort(404);
         }
 
-        $definition = $this->definition($repository);
-
-        if ($definition instanceof RedirectResponse) {
-            return $definition;
-        }
-
         return Inertia::render('settings/archive-agent', [
             'repository' => $this->repository($repository),
             'slug' => $slug,
+            'path' => $stored->source_path,
             'fields' => array_map(fn (array $field): array => [
                 ...$field,
                 'value' => $agent['fields'][$field['key']] ?? '',
-            ], $definition),
+            ], $this->documents->definition()),
             'body' => $agent['body'],
             'readable' => $agent['readable'],
         ]);
@@ -143,19 +130,14 @@ class ArchiveAgentController extends Controller
             return $repository;
         }
 
-        $definition = $this->definition($repository);
+        $stored = $this->stored($request->user(), $slug);
+        $validated = $request->validate($this->rules(false), $this->messages());
 
-        if ($definition instanceof RedirectResponse) {
-            return $definition;
-        }
-
-        $validated = $request->validate($this->rules($definition, false), $this->messages($definition));
-
-        return $this->save($request->user(), $repository, $slug, $validated['fields'], (string) ($validated['body'] ?? ''), false);
+        return $this->save($request->user(), $repository, $stored->name, $stored->source_path, $validated['fields'], (string) ($validated['body'] ?? ''));
     }
 
     /**
-     * Copy the repository's agents into sixth-sense again.
+     * Copy the repository's agents and skills into sixth-sense again.
      */
     public function sync(Request $request): RedirectResponse
     {
@@ -181,10 +163,12 @@ class ArchiveAgentController extends Controller
     /**
      * @param  array<string, mixed>  $fields
      */
-    private function save(User $user, GithubRepository $repository, string $slug, array $fields, string $body, bool $creating): RedirectResponse
+    private function save(User $user, GithubRepository $repository, string $name, ?string $path, array $fields, string $body): RedirectResponse
     {
+        $creating = $path === null;
+
         try {
-            $this->documents->write($repository, $slug, $fields, $body, $creating);
+            $this->documents->write($repository, $name, $path, $fields, $body);
         } catch (ValidationException $exception) {
             return back()->withErrors($exception->errors())->withInput();
         } catch (Throwable $exception) {
@@ -203,7 +187,7 @@ class ArchiveAgentController extends Controller
                 'message' => 'Guardado en el archivo, pero no he podido actualizar la lista.',
             ]);
 
-            return redirect()->route('settings.archive.agents.edit', $slug);
+            return redirect()->route('settings.archive.agents.index');
         }
 
         Inertia::flash('toast', [
@@ -211,46 +195,26 @@ class ArchiveAgentController extends Controller
             'message' => $creating ? 'Agente creado.' : 'Agente actualizado.',
         ]);
 
-        return redirect()->route('settings.archive.agents.edit', $slug);
+        return redirect()->route('settings.archive.agents.edit', $name);
     }
 
-    /**
-     * The type's fields, or a redirect when the type file cannot be used.
-     *
-     * @return list<array{key: string, label: string}>|RedirectResponse
-     */
-    private function definition(GithubRepository $repository): array|RedirectResponse
+    private function stored(User $user, string $slug): SenseAgent
     {
-        try {
-            $definition = $this->documents->definition($repository);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return redirect()
-                ->route('settings.archive.agents.index')
-                ->withErrors(['agent' => 'No he podido leer types/agent.yml.']);
-        }
-
-        if ($definition === []) {
-            return $this->missingType();
-        }
-
-        return $definition;
+        return $user->senseAgents()->where('slug', $slug)->firstOrFail();
     }
 
     /**
-     * @param  list<array{key: string, label: string}>  $definition
      * @return array<string, mixed>
      */
-    private function rules(array $definition, bool $creating): array
+    private function rules(bool $creating): array
     {
         $rules = [
             'body' => ['nullable', 'string', 'max:20000'],
             'fields' => ['required', 'array'],
         ];
 
-        foreach ($definition as $field) {
-            $rules['fields.'.$field['key']] = ['required', 'string', 'max:2000'];
+        foreach ($this->documents->definition() as $field) {
+            $rules['fields.'.$field['key']] = [$field['required'] ? 'required' : 'nullable', 'string', 'max:2000'];
         }
 
         if ($creating) {
@@ -261,19 +225,18 @@ class ArchiveAgentController extends Controller
     }
 
     /**
-     * @param  list<array{key: string, label: string}>  $definition
      * @return array<string, string>
      */
-    private function messages(array $definition): array
+    private function messages(): array
     {
         $messages = [
-            'slug.required' => 'Escribe la carpeta del agente.',
-            'slug.regex' => 'La carpeta solo puede llevar minúsculas, números y guiones.',
-            'slug.max' => 'La carpeta es demasiado larga.',
+            'slug.required' => 'Escribe el nombre del agente.',
+            'slug.regex' => 'El nombre solo puede llevar minúsculas, números y guiones.',
+            'slug.max' => 'El nombre es demasiado largo.',
             'body.max' => 'El markdown es demasiado largo.',
         ];
 
-        foreach ($definition as $field) {
+        foreach ($this->documents->definition() as $field) {
             $messages['fields.'.$field['key'].'.required'] = "Falta {$field['label']}.";
             $messages['fields.'.$field['key'].'.max'] = "{$field['label']} es demasiado largo.";
         }
@@ -295,12 +258,5 @@ class ArchiveAgentController extends Controller
     private function archive(User $user): GithubRepository|RedirectResponse
     {
         return $user->workRepository() ?? redirect()->route('settings.archive.agents.index');
-    }
-
-    private function missingType(): RedirectResponse
-    {
-        return redirect()
-            ->route('settings.archive.agents.index')
-            ->withErrors(['agent' => 'El archivo no tiene types/agent.yml con los campos del agente.']);
     }
 }

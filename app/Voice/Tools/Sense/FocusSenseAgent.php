@@ -9,8 +9,9 @@ use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
 
 /**
- * Hands the turn to one synced agent, or back to the general assistant.
- * The screen shows who is in use.
+ * Hands the turn to one synced agent, or back to the general assistant, as
+ * Claude Code delegates to a subagent by its description. The screen shows
+ * who is in use.
  */
 class FocusSenseAgent implements VoiceTool
 {
@@ -21,8 +22,8 @@ class FocusSenseAgent implements VoiceTool
 
     public function description(): string
     {
-        return 'Elige el agente del archivo que debe llevar este turno, cuando el tema encaja con su "cuándo". '
-            .'Devuelve sus instrucciones y las referencias de agents/{slug}/references/: síguelas a partir de aquí. Con slug vacío vuelves al asistente general y quitas el agente de la pantalla.';
+        return 'Elige el agente del archivo que debe llevar este turno, cuando el tema encaja con su description. '
+            .'Devuelve sus instrucciones y las skills que precarga: síguelas a partir de aquí. Con name vacío vuelves al asistente general y quitas el agente de la pantalla.';
     }
 
     public function parameters(): array
@@ -30,34 +31,34 @@ class FocusSenseAgent implements VoiceTool
         return [
             'type' => 'object',
             'properties' => [
-                'slug' => ['type' => 'string', 'description' => 'Slug del agente, o vacío para volver al asistente general.'],
+                'name' => ['type' => 'string', 'description' => 'name del agente, o vacío para volver al asistente general.'],
             ],
-            'required' => ['slug'],
+            'required' => ['name'],
         ];
     }
 
     public function rules(): array
     {
         return [
-            'slug' => ['present', 'nullable', 'string', 'max:100'],
+            'name' => ['present', 'nullable', 'string', 'max:255'],
         ];
     }
 
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult
     {
-        $slug = trim((string) ($arguments['slug'] ?? ''));
+        $name = trim((string) ($arguments['name'] ?? ''));
 
-        if ($slug === '') {
+        if ($name === '') {
             return new ToolResult(
                 output: ['agent' => null, 'instructions' => 'Vuelves al asistente general. No sigas las instrucciones de un agente.'],
                 canvas: new Canvas('sense.agent', ['name' => null]),
             );
         }
 
-        $agent = $user->senseAgents()->where('slug', $slug)->first();
+        $agent = $user->senseAgents()->where('slug', $name)->first();
 
         if ($agent === null) {
-            return ToolResult::error("No hay un agente «{$slug}». Sincroniza el archivo si acabas de crearlo.");
+            return ToolResult::error("No hay un agente «{$name}». Sincroniza el archivo si acabas de crearlo.");
         }
 
         return new ToolResult(
@@ -68,7 +69,7 @@ class FocusSenseAgent implements VoiceTool
             ],
             canvas: new Canvas('sense.agent', [
                 'name' => $agent->name,
-                'purpose' => $agent->purpose,
+                'purpose' => $agent->description,
             ]),
         );
     }

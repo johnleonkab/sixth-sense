@@ -116,15 +116,17 @@ final readonly class AssistantProfile
     }
 
     /**
-     * The work archive and the agents copied from it, so the assistant can
-     * hand a turn to one of them instead of reading GitHub.
+     * The work archive as Claude Code would load it: CLAUDE.md in full, and
+     * only the name and description of each agent and skill. Their bodies
+     * load when one is used.
      */
     private static function sense(User $user): string
     {
         $repository = $user->workRepository();
         $agents = $user->senseAgents()->orderBy('name')->get();
+        $skills = $user->senseSkills()->where('model_invocable', true)->orderBy('name')->get();
 
-        if ($repository === null && $agents->isEmpty()) {
+        if ($repository === null && $agents->isEmpty() && $skills->isEmpty()) {
             return '';
         }
 
@@ -132,13 +134,25 @@ final readonly class AssistantProfile
 
         if ($repository !== null) {
             $lines[] = "Archivo de trabajo en GitHub ({$repository->full_name}). Para ver qué hay: list_sense_files. Para leer un archivo: read_sense_file. Para crearlo o cambiarlo: propose_sense_file. Para borrarlo: propose_sense_delete. Nada se escribe hasta que la persona diga que sí. Un documento con tipo obedece types/{tipo}.yml: where, name y required.";
+
+            if (filled($repository->memory)) {
+                $lines[] = "CLAUDE.md del archivo:\n".mb_substr($repository->memory, 0, 6000);
+            }
         }
 
         if ($agents->isNotEmpty()) {
-            $lines[] = 'Agentes del archivo. Si el tema encaja con uno, llama a focus_sense_agent con su slug antes de responder y sigue las instrucciones que devuelva, referencias incluidas. Con slug vacío vuelves al asistente general. Después de crear o cambiar un agente o una referencia, llama a sync_sense_agents.';
+            $lines[] = 'Agentes del archivo. Si el tema encaja con la description de uno, llama a focus_sense_agent con su name antes de responder y sigue las instrucciones que devuelva. Con name vacío vuelves al asistente general. Después de crear o cambiar un agente, una skill o CLAUDE.md, llama a sync_sense_agents.';
 
             foreach ($agents as $agent) {
-                $lines[] = "- {$agent->slug}: {$agent->name}. {$agent->purpose} Úsalo cuando: {$agent->cue}";
+                $lines[] = "- {$agent->name}: {$agent->description}";
+            }
+        }
+
+        if ($skills->isNotEmpty()) {
+            $lines[] = 'Skills del archivo. Si el tema encaja con la description de una, llama a use_sense_skill con su name y sigue lo que devuelva.';
+
+            foreach ($skills as $skill) {
+                $lines[] = "- {$skill->name}: {$skill->description}";
             }
         }
 

@@ -7,12 +7,14 @@ import ArchiveNav from '@/pages/settings/archive-nav';
 type Field = {
     key: string;
     label: string;
+    required: boolean;
     value: string;
 };
 
 type Props = {
     repository: { full_name: string; writable: boolean };
     slug: string | null;
+    path: string | null;
     fields: Field[];
     body: string;
     readable: boolean;
@@ -21,9 +23,9 @@ type Props = {
 const fieldClass = 'w-full rounded-xl border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent';
 
 /**
- * Create or update one agent. Fields come from types/agent.yml; the body is markdown.
+ * Create or update one Claude Code subagent in .claude/agents/. The body is its system prompt.
  */
-export default function ArchiveAgent({ repository, slug, fields, body, readable }: Props) {
+export default function ArchiveAgent({ repository, slug, path, fields, body, readable }: Props) {
     const creating = slug === null;
     const agentError = (usePage().props as { errors?: Record<string, string> }).errors?.agent;
     const form = useForm({
@@ -42,13 +44,13 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
             return;
         }
 
-        form.put(`/settings/archive/agents/${slug}`);
+        form.put(`/settings/archive/agents/${encodeURIComponent(slug)}`);
     };
 
     return (
         <SettingsLayout
-            title={creating ? 'Nuevo agente' : (fields.find((field) => field.key === 'name')?.value ?? slug)}
-            description={creating ? `Se guardará en ${repository.full_name} como agents/carpeta/agent.md.` : `agents/${slug}/agent.md en ${repository.full_name}.`}
+            title={creating ? 'Nuevo agente' : slug}
+            description={creating ? `Se guardará en ${repository.full_name} como .claude/agents/nombre.md.` : `${path} en ${repository.full_name}.`}
         >
             <ArchiveNav />
 
@@ -57,7 +59,7 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
             </Link>
 
             {!readable && (
-                <p className="mb-4 text-[13px] text-warn">La cabecera no se puede leer. Al guardar se reescribe con los campos de types/agent.yml.</p>
+                <p className="mb-4 text-[13px] text-warn">La cabecera no se puede leer. Al guardar se reescribe con name, description y skills.</p>
             )}
 
             {!repository.writable && <p className="mb-4 text-[13px] text-warn">Este archivo es de solo lectura, así que no se puede guardar.</p>}
@@ -65,8 +67,8 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
             <form onSubmit={submit} className="grid gap-4">
                 {creating && (
                     <label className="grid gap-1.5">
-                        <span className="text-[13px] font-medium">Carpeta</span>
-                        <span className="text-[12.5px] text-muted">Minúsculas, números y guiones. Queda en la ruta y no se cambia después.</span>
+                        <span className="text-[13px] font-medium">Nombre</span>
+                        <span className="text-[12.5px] text-muted">Minúsculas, números y guiones. Es el name del agente y no se cambia después.</span>
                         <input
                             value={form.data.slug}
                             onChange={(event) => form.setData('slug', event.target.value)}
@@ -84,12 +86,15 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
                     <label key={field.key} className="grid gap-1.5">
                         <span className="text-[13px] font-medium">{field.label}</span>
                         <span className="font-mono text-[11px] text-faint">{field.key}</span>
-                        {field.key === 'name' ? (
+                        {field.key === 'skills' ? (
                             <input
                                 value={form.data.fields[field.key] ?? ''}
                                 onChange={(event) => form.setData('fields', { ...form.data.fields, [field.key]: event.target.value })}
-                                className={fieldClass}
-                                required
+                                spellCheck={false}
+                                autoCapitalize="none"
+                                className={`${fieldClass} font-mono`}
+                                placeholder="archive-documents"
+                                required={field.required}
                             />
                         ) : (
                             <textarea
@@ -97,7 +102,7 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
                                 onChange={(event) => form.setData('fields', { ...form.data.fields, [field.key]: event.target.value })}
                                 rows={3}
                                 className={`${fieldClass} resize-y`}
-                                required
+                                required={field.required}
                             />
                         )}
                         {form.errors[`fields.${field.key}`] && <span className="text-[12.5px] text-crit">{form.errors[`fields.${field.key}`]}</span>}
@@ -106,7 +111,7 @@ export default function ArchiveAgent({ repository, slug, fields, body, readable 
 
                 <label className="grid gap-1.5">
                     <span className="text-[13px] font-medium">Markdown</span>
-                    <span className="text-[12.5px] text-muted">Lo que el agente sigue cuando está en uso. Va debajo de la cabecera.</span>
+                    <span className="text-[12.5px] text-muted">Su system prompt: lo que sigue cuando está en uso. Va debajo de la cabecera.</span>
                     <textarea
                         value={form.data.body}
                         onChange={(event) => form.setData('body', event.target.value)}

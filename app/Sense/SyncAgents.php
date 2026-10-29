@@ -6,11 +6,15 @@ use App\Connectors\GitHub\GithubApi;
 use App\Connectors\GitHub\GithubContents;
 use App\Models\GithubRepository;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Copies agents/{slug}/agent.md from the work repository into sixth-sense,
- * and the markdown in agents/{slug}/references/ with it.
- * The template is an example, not an agent the voice can use.
+ * Copies the work repository's Claude Code setup into sixth-sense: the
+ * agents in .claude/agents/ (subfolders included), the skills in
+ * .claude/skills/{name}/SKILL.md, and CLAUDE.md as memory.
+ *
+ * As in Claude Code, an agent is known by its `name`, not its file, and
+ * needs a `description`. A skill's name defaults to its folder.
  */
 class SyncAgents
 {
@@ -20,8 +24,8 @@ class SyncAgents
     ) {}
 
     /**
-     * How many agents are stored after the copy. Agents whose file disappeared
-     * are removed.
+     * How many agents are stored after the copy. Agents and skills whose
+     * file disappeared are removed.
      */
     public function sync(User $user): int
     {
@@ -29,59 +33,92 @@ class SyncAgents
 
         if ($repository === null) {
             $user->senseAgents()->delete();
+            $user->senseSkills()->delete();
 
             return 0;
         }
 
-        $found = [];
         $paths = $this->api->paths($repository);
-        $references = [];
+        sort($paths);
+
+        $this->memory($repository, $paths);
+        $this->skills($user, $repository, $paths);
+
+        return $this->agents($user, $repository, $paths);
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function memory(GithubRepository $repository, array $paths): void
+    {
+        $file = in_array(ClaudeLayout::MEMORY, $paths, true) ? $this->contents->read($repository, ClaudeLayout::MEMORY) : null;
+        $memory = $file === null ? null : trim($file['content']);
+
+        $repository->update(['memory' => $memory === '' ? null : $memory]);
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function agents(User $user, GithubRepository $repository, array $paths): int
+    {
+        $found = [];
 
         foreach ($paths as $path) {
-            if (preg_match('#^agents/([^/]+)/references/(.+\.md)$#', $path, $matches) !== 1 || $matches[1] === '_template') {
-                continue;
-            }
-
-            $references[$matches[1]][] = $path;
-        }
-
-        foreach ($paths as $path) {
-            if (preg_match('#^agents/([^/]+)/agent\.md$#', $path, $matches) !== 1 || $matches[1] === '_template') {
+            if (! ClaudeLayout::isAgent($path)) {
                 continue;
             }
 
             $file = $this->contents->read($repository, $path);
-            $agent = $this->agent(
-                $matches[1],
-                $path,
-                $file['content'] ?? '',
-                $file['sha'] ?? null,
-                $this->references($repository, $matches[1], $references[$matches[1]] ?? []),
-            );
+            $agent = $this->agent($path, $file['content'] ?? '', $file['sha'] ?? null);
 
-            if ($agent === null) {
+            // The first file with a name keeps it, as one location wins in Claude Code.
+            if ($agent === null || isset($found[$agent['slug']])) {
                 continue;
             }
 
-            $user->senseAgents()->updateOrCreate(['slug' => $matches[1]], $agent);
-            $found[] = $matches[1];
+            $user->senseAgents()->updateOrCreate(['slug' => $agent['slug']], $agent);
+            $found[$agent['slug']] = true;
         }
 
-        $gone = $user->senseAgents();
-
-        if ($found === []) {
-            $gone->delete();
-        } else {
-            $gone->whereNotIn('slug', $found)->delete();
-        }
+        $this->prune($user->senseAgents(), 'slug', array_keys($found));
 
         return count($found);
     }
 
     /**
-     * @return array{name: string, purpose: string, cue: string, instructions: string, references: string, source_path: string, source_sha: ?string}|null
+     * @param  list<string>  $paths
      */
-    private function agent(string $slug, string $path, string $contents, ?string $sha, string $references): ?array
+    private function skills(User $user, GithubRepository $repository, array $paths): void
+    {
+        $found = [];
+
+        foreach ($paths as $path) {
+            $folder = ClaudeLayout::skillFolder($path);
+
+            if ($folder === null) {
+                continue;
+            }
+
+            $file = $this->contents->read($repository, $path);
+            $skill = $this->skill($folder, $path, $file['content'] ?? '', $file['sha'] ?? null, $paths);
+
+            if ($skill === null || isset($found[$skill['name']])) {
+                continue;
+            }
+
+            $user->senseSkills()->updateOrCreate(['name' => $skill['name']], $skill);
+            $found[$skill['name']] = true;
+        }
+
+        $this->prune($user->senseSkills(), 'name', array_keys($found));
+    }
+
+    /**
+     * @return array{slug: string, name: string, description: string, instructions: string, skills: list<string>, source_path: string, source_sha: ?string}|null
+     */
+    private function agent(string $path, string $contents, ?string $sha): ?array
     {
         $document = DocumentRules::document($contents);
 
@@ -89,20 +126,19 @@ class SyncAgents
             return null;
         }
 
-        $name = trim((string) ($document['name'] ?? ''));
-        $purpose = trim((string) ($document['purpose'] ?? ''));
-        $cue = trim((string) ($document['when'] ?? ''));
+        $name = is_string($document['name'] ?? null) ? trim($document['name']) : '';
+        $description = is_string($document['description'] ?? null) ? trim($document['description']) : '';
 
-        if ($name === '' || $purpose === '' || $cue === '') {
+        if ($name === '' || $description === '' || str_contains($name, ':') || mb_strlen($name) > 255) {
             return null;
         }
 
         return [
+            'slug' => $name,
             'name' => $name,
-            'purpose' => $purpose,
-            'cue' => $cue,
+            'description' => $description,
             'instructions' => trim((string) ($document['_body'] ?? '')),
-            'references' => $references,
+            'skills' => ClaudeLayout::names($document['skills'] ?? null),
             'source_path' => $path,
             'source_sha' => $sha,
         ];
@@ -110,23 +146,47 @@ class SyncAgents
 
     /**
      * @param  list<string>  $paths
+     * @return array{name: string, description: string, instructions: string, files: list<string>, model_invocable: bool, source_path: string, source_sha: ?string}|null
      */
-    private function references(GithubRepository $repository, string $slug, array $paths): string
+    private function skill(string $folder, string $path, string $contents, ?string $sha, array $paths): ?array
     {
-        sort($paths);
-        $blocks = [];
+        $document = DocumentRules::document($contents);
 
-        foreach ($paths as $path) {
-            $file = $this->contents->read($repository, $path);
-
-            if ($file === null) {
-                continue;
-            }
-
-            $relative = substr($path, strlen("agents/{$slug}/"));
-            $blocks[] = "# {$relative}\n\n".trim($file['content']);
+        if (isset($document['_invalid'])) {
+            return null;
         }
 
-        return implode("\n\n", $blocks);
+        $front = $document ?? [];
+        $body = trim((string) ($document['_body'] ?? $contents));
+        $name = is_string($front['name'] ?? null) && trim($front['name']) !== '' ? trim($front['name']) : $folder;
+        $prefix = ClaudeLayout::SKILLS."{$folder}/";
+
+        return [
+            'name' => mb_substr($name, 0, 255),
+            'description' => ClaudeLayout::skillDescription($front, $body),
+            'instructions' => $body,
+            'files' => array_values(array_filter(
+                $paths,
+                fn (string $candidate): bool => str_starts_with($candidate, $prefix) && $candidate !== $path,
+            )),
+            'model_invocable' => ($front['disable-model-invocation'] ?? false) !== true,
+            'source_path' => $path,
+            'source_sha' => $sha,
+        ];
+    }
+
+    /**
+     * @param  HasMany<*, *>  $relation
+     * @param  list<string>  $kept
+     */
+    private function prune(HasMany $relation, string $column, array $kept): void
+    {
+        if ($kept === []) {
+            $relation->delete();
+
+            return;
+        }
+
+        $relation->whereNotIn($column, $kept)->delete();
     }
 }

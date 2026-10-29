@@ -51,6 +51,7 @@ use App\Voice\Tools\Sense\ProposeSenseDelete;
 use App\Voice\Tools\Sense\ProposeSenseFile;
 use App\Voice\Tools\Sense\ReadSenseFile;
 use App\Voice\Tools\Sense\SyncSenseAgents;
+use App\Voice\Tools\Sense\UseSenseSkill;
 use App\Voice\Tools\Slack\AnswerSlackAttention;
 use App\Voice\Tools\Slack\CorrectSlackTriage;
 use App\Voice\Tools\Slack\FindSlackConversations;
@@ -142,6 +143,7 @@ class Toolbox
         ProposeSenseDelete::class,
         SyncSenseAgents::class,
         FocusSenseAgent::class,
+        UseSenseSkill::class,
         OpenSceneTool::class,
     ];
 

@@ -118,10 +118,10 @@ Route::middleware('auth')->group(function () {
         Route::get('archive/agents/create', [ArchiveAgentController::class, 'create'])->name('archive.agents.create');
         Route::post('archive/agents', [ArchiveAgentController::class, 'store'])->name('archive.agents.store');
         Route::get('archive/agents/{slug}', [ArchiveAgentController::class, 'edit'])
-            ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->where('slug', '[^/]+')
             ->name('archive.agents.edit');
         Route::put('archive/agents/{slug}', [ArchiveAgentController::class, 'update'])
-            ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->where('slug', '[^/]+')
             ->name('archive.agents.update');
         Route::get('archive/files', [ArchiveFileController::class, 'index'])->name('archive.files.index');
         Route::get('archive/files/create', [ArchiveFileController::class, 'create'])->name('archive.files.create');

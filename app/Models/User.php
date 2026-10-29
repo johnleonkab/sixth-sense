@@ -140,6 +140,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Skills copied from the work repository.
+     *
+     * @return HasMany<SenseSkill, $this>
+     */
+    public function senseSkills(): HasMany
+    {
+        return $this->hasMany(SenseSkill::class);
+    }
+
+    /**
      * The one GitHub repository this person uses as their work archive.
      */
     public function workRepository(): ?GithubRepository
