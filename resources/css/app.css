@@ -116,15 +116,36 @@
     body,
     #app {
         height: 100%;
+        height: 100dvh;
     }
 
     body {
         @apply bg-bg font-sans text-[14px] leading-normal text-ink antialiased;
+        overscroll-behavior: none;
     }
 
     :focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
+    }
+
+    /* A phone should not bounce the whole window, zoom a field, or flash a grey tap. */
+    @media (max-width: 767px) {
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
+        button,
+        a,
+        [role='button'] {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .chrome {
+            -webkit-user-select: none;
+            user-select: none;
+        }
     }
 }
 
@@ -323,5 +344,208 @@
     100% {
         opacity: 0;
         transform: scale(1.9);
+    }
+}
+
+/* Beats utility font sizes so iOS does not zoom a focused field. Checkboxes stay small. */
+@media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']),
+    textarea,
+    select {
+        font-size: 16px;
+    }
+}
+
+/* MDXEditor borrows the archive palette. Popups copy these classes onto a node outside the page. */
+.sense-markdown.mdxeditor {
+    --basePageBg: var(--surface);
+    --baseBase: var(--surface);
+    --baseBgSubtle: var(--soft);
+    --baseBg: var(--soft);
+    --baseBgHover: var(--soft);
+    --baseBgActive: var(--soft);
+    --baseLine: var(--line);
+    --baseBorder: var(--line);
+    --baseBorderHover: var(--faint);
+    --baseText: var(--muted);
+    --baseTextContrast: var(--ink);
+    --accentSolid: var(--accent);
+    --accentSolidHover: var(--accent);
+    --accentText: var(--accent);
+    border: 0;
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: inherit;
+}
+
+.sense-markdown .mdxeditor-toolbar {
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--surface);
+}
+
+.sense-markdown .mdxeditor-contenteditable-wrapper > div {
+    padding: 1.25rem 2rem;
+    font-size: 16.5px;
+    line-height: 1.65;
+    caret-color: var(--ink);
+}
+
+.sense-markdown .mdxeditor-root-contenteditable h1,
+.sense-markdown .mdxeditor-root-contenteditable h2,
+.sense-markdown .mdxeditor-root-contenteditable h3,
+.sense-markdown .mdxeditor-root-contenteditable h4 {
+    font-weight: 560;
+    line-height: 1.3;
+    color: var(--ink);
+}
+
+.sense-markdown .mdxeditor-root-contenteditable h1 {
+    margin: 0.2rem 0 0.75rem;
+    font-size: 1.75rem;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable h2 {
+    margin: 1.75rem 0 0.55rem;
+    font-size: 1.35rem;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable h3 {
+    margin: 1.35rem 0 0.4rem;
+    font-size: 1.12rem;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable h4 {
+    margin: 1.1rem 0 0.35rem;
+    font-size: 1rem;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable p {
+    margin: 0.45em 0;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable ul,
+.sense-markdown .mdxeditor-root-contenteditable ol {
+    margin: 0.45em 0;
+    padding-left: 1.4rem;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable ul {
+    list-style: disc;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable ol {
+    list-style: decimal;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable li {
+    margin: 0.2em 0;
+    display: list-item;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable li > ul,
+.sense-markdown .mdxeditor-root-contenteditable li > ol {
+    margin: 0.15em 0;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable [class*='_code_'] {
+    border-radius: 0.25rem;
+    background: var(--soft);
+    padding: 0.05em 0.35em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable pre,
+.sense-markdown .mdxeditor-root-contenteditable .cm-editor {
+    margin: 0.85rem 0;
+    border-radius: 0.5rem;
+    background: var(--soft);
+    line-height: 1.5;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable table {
+    width: 100%;
+    margin: 0.9rem 0;
+    border-collapse: collapse;
+    font-size: 0.95em;
+    line-height: 1.45;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable th,
+.sense-markdown .mdxeditor-root-contenteditable td {
+    border: 1px solid var(--line);
+    padding: 0.4rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable th {
+    background: var(--soft);
+    font-weight: 560;
+}
+
+.sense-markdown .mdxeditor-root-contenteditable hr {
+    margin: 1.4rem 0;
+    border-color: var(--line);
+}
+
+.sense-markdown .mdxeditor-root-contenteditable blockquote {
+    margin: 0.7rem 0;
+    border-left: 2px solid var(--line);
+    padding-left: 0.9rem;
+    color: var(--muted);
+}
+
+/* The editor copies its classes onto a node appended to the page. That node must not take layout height. */
+.mdxeditor-popup-container.mdxeditor-popup-container {
+    position: absolute;
+    height: auto;
+    min-height: 0;
+    flex: none;
+}
+
+/* Phone navigation between the assistant and settings: the page slides, like going back in an app. */
+@media (max-width: 767px) {
+    html[data-nav='forward']::view-transition-old(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-forward-out;
+    }
+
+    html[data-nav='forward']::view-transition-new(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-forward-in;
+    }
+
+    html[data-nav='back']::view-transition-old(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-back-out;
+    }
+
+    html[data-nav='back']::view-transition-new(root) {
+        animation: 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both nav-back-in;
+    }
+}
+
+@keyframes nav-forward-out {
+    to {
+        transform: translateX(-22%);
+    }
+}
+
+@keyframes nav-forward-in {
+    from {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes nav-back-out {
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes nav-back-in {
+    from {
+        transform: translateX(-22%);
     }
 }

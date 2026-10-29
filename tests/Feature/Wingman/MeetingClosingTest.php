@@ -23,7 +23,7 @@ use App\Models\WingmanAction;
 use App\Models\WingmanMeeting;
 use App\Models\WingmanSegment;
 use App\Wingman\Closing\FollowUp;
-use App\Wingman\Closing\GeminiFollowUpPlanner;
+use App\Wingman\Closing\LlmFollowUpPlanner;
 use App\Wingman\Closing\MeetingCloser;
 use App\Wingman\Copilot\Detector;
 use App\Wingman\Copilot\FakeDetector;
@@ -31,10 +31,9 @@ use App\Wingman\Copilot\WingmanAgent;
 use App\Wingman\MeetingStatus;
 use App\Wingman\Notes\MeetingNotes;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\RecordingTextModel;
 
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse('2026-10-14 10:00', 'Europe/Madrid'));
@@ -165,17 +164,17 @@ test('the meeting page lists what is left to do', function () {
         ->assertInertia(fn ($page) => $page->where('meeting.actions.0.type', 'chat.send')->where('meeting.actions.0.state', 'proposed')->whereNot('meeting.closed_at', null));
 });
 
-test('gemini plans the follow-ups from the final notes and what is already prepared', function () {
-    Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['followups' => [
+test('the planner writes the follow-ups from the final notes and what is already prepared', function () {
+    $model = new RecordingTextModel(['followups' => [
         ['kind' => 'message', 'title' => 'Escribir a Marta', 'to' => 'Marta', 'about' => 'el alcance', 'draft' => 'Hola Marta…'],
         ['kind' => 'nonsense', 'title' => 'x'],
-    ]])]]]]]])]);
-    $planner = new GeminiFollowUpPlanner(['api_key' => 'k', 'base_url' => 'https://generativelanguage.googleapis.com', 'model' => 'm', 'thinking_level' => null, 'timeout' => 5]);
+    ]]);
+    $planner = new LlmFollowUpPlanner($model);
 
     $followUps = $planner->plan($this->meeting, new MeetingNotes(summary: 'Demo', commitments: [['who' => 'Tú', 'what' => 'Escribir a Marta', 'when' => null]]), ['Convocar «Seguimiento»']);
 
     expect($followUps)->toHaveCount(1)
         ->and($followUps[0])->toBeInstanceOf(FollowUp::class)
-        ->and($followUps[0]->details)->toMatchArray(['to' => 'Marta', 'draft' => 'Hola Marta…']);
-    Http::assertSent(fn (Request $request) => str_contains($request['contents'][0]['parts'][0]['text'], "Ya preparado:\n- Convocar «Seguimiento»"));
+        ->and($followUps[0]->details)->toMatchArray(['to' => 'Marta', 'draft' => 'Hola Marta…'])
+        ->and($model->calls[0]['user'])->toContain("Ya preparado:\n- Convocar «Seguimiento»");
 });

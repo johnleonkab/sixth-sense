@@ -10,8 +10,9 @@ use Carbon\CarbonImmutable;
 
 /**
  * Finds the first free slot of a given length between two moments: within
- * working hours, outside lunch, clear of the person's events (with a short
- * margin) and, for meetings, of the other people's busy times.
+ * working hours, outside lunch, clear of meetings. A short task may sit in a
+ * tight gap, the day may stretch a little, and one of the person's own tasks
+ * may be shortened when nothing else fits.
  */
 class SlotFinder
 {
@@ -22,33 +23,32 @@ class SlotFinder
 
     /**
      * @param  list<string>  $others  Emails of other people who must be free too.
-     * @return ?array{CarbonImmutable, CarbonImmutable}
+     * @return ?array{0: CarbonImmutable, 1: CarbonImmutable, 2?: list<array{ref: string, start: string, end: string}>}
      */
     public function find(User $user, CarbonImmutable $from, CarbonImmutable $to, int $minutes, array $others = []): ?array
     {
-        $timezone = $from->getTimezone()->getName();
-        $busy = $this->busy($user, $from, $to, $others);
-        $step = (int) config('agenda.granularity_minutes');
+        $minutes = max(5, $minutes);
+        $map = $this->map($user, $from, $to, $others);
 
-        for ($day = $from->startOfDay(); $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
-            if (! in_array($day->dayOfWeekIso, config('agenda.working_days'), true) || $this->dayOff($busy['days_off'], $day)) {
-                continue;
-            }
+        $slot = $this->scan($from, $to, $minutes, $this->blocked($map, tight: false), stretch: false);
 
-            $opens = $day->setTimeFromTimeString(config('agenda.day_starts'));
-            $closes = $day->setTimeFromTimeString(config('agenda.day_ends'))->min($to);
-            $start = $this->roundUp($opens->max($from), $step);
-
-            for (; $start->addMinutes($minutes)->lessThanOrEqualTo($closes); $start = $start->addMinutes($step)) {
-                $end = $start->addMinutes($minutes);
-
-                if (! $this->overlapsLunch($start, $end) && ! $this->clashes($busy['periods'], $start, $end)) {
-                    return [$start->setTimezone($timezone), $end->setTimezone($timezone)];
-                }
-            }
+        if ($slot !== null) {
+            return $slot;
         }
 
-        return null;
+        $slot = $this->scan($from, $to, $minutes, $this->blocked($map, tight: true), stretch: false);
+
+        if ($slot !== null) {
+            return $slot;
+        }
+
+        $slot = $this->scan($from, $to, $minutes, $this->blocked($map, tight: true), stretch: true);
+
+        if ($slot !== null) {
+            return $slot;
+        }
+
+        return $this->squeeze($from, $to, $minutes, $map);
     }
 
     /**
@@ -76,14 +76,18 @@ class SlotFinder
     }
 
     /**
+     * Meetings, other people's busy time, and the person's own tasks.
+     *
      * @param  list<string>  $others
-     * @return array{periods: list<array{CarbonImmutable, CarbonImmutable}>, days_off: list<CarbonImmutable>}
+     * @return array{hard: list<array{CarbonImmutable, CarbonImmutable}>, raw: list<array{CarbonImmutable, CarbonImmutable}>, flexible: list<array{CarbonImmutable, CarbonImmutable, string}>, days_off: list<CarbonImmutable>}
      */
-    private function busy(User $user, CarbonImmutable $from, CarbonImmutable $to, array $others): array
+    private function map(User $user, CarbonImmutable $from, CarbonImmutable $to, array $others): array
     {
         $buffer = (int) config('agenda.buffer_minutes');
         $reading = $this->calendar->read($user, new EventQuery($from->startOfDay(), $to->endOfDay()));
-        $periods = [];
+        $hard = [];
+        $raw = [];
+        $flexible = [];
         $daysOff = [];
 
         foreach ($reading->events as $event) {
@@ -101,14 +105,167 @@ class SlotFinder
                 continue;
             }
 
-            $periods[] = [$event->start->subMinutes($buffer), $event->end->addMinutes($buffer)];
+            if ($event->flexible && $event->ref !== null) {
+                $flexible[] = [$event->start, $event->end, $event->ref];
+
+                continue;
+            }
+
+            $raw[] = [$event->start, $event->end];
+            $hard[] = [$event->start->subMinutes($buffer), $event->end->addMinutes($buffer)];
         }
 
         foreach ($this->calendar->busy($user, $others, $from, $to) as $times) {
-            array_push($periods, ...$times);
+            array_push($hard, ...$times);
+            array_push($raw, ...$times);
         }
 
-        return ['periods' => $periods, 'days_off' => $daysOff];
+        return ['hard' => $hard, 'raw' => $raw, 'flexible' => $flexible, 'days_off' => $daysOff];
+    }
+
+    /**
+     * Busy periods for a pass. A tight pass drops the margin, so a 15 minute
+     * task can sit in a 30 minute gap.
+     *
+     * @param  array{hard: list<array{CarbonImmutable, CarbonImmutable}>, raw: list<array{CarbonImmutable, CarbonImmutable}>, flexible: list<array{CarbonImmutable, CarbonImmutable, string}>, days_off: list<CarbonImmutable>}  $map
+     * @return array{periods: list<array{CarbonImmutable, CarbonImmutable}>, days_off: list<CarbonImmutable>}
+     */
+    private function blocked(array $map, bool $tight): array
+    {
+        $buffer = $tight ? 0 : (int) config('agenda.buffer_minutes');
+        $periods = $tight ? $map['raw'] : $map['hard'];
+
+        foreach ($map['flexible'] as [$start, $end]) {
+            $periods[] = [$start->subMinutes($buffer), $end->addMinutes($buffer)];
+        }
+
+        return ['periods' => $periods, 'days_off' => $map['days_off']];
+    }
+
+    /**
+     * @param  array{periods: list<array{CarbonImmutable, CarbonImmutable}>, days_off: list<CarbonImmutable>}  $busy
+     * @return ?array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function scan(CarbonImmutable $from, CarbonImmutable $to, int $minutes, array $busy, bool $stretch): ?array
+    {
+        $timezone = $from->getTimezone()->getName();
+        $step = (int) config('agenda.granularity_minutes');
+        $stretchBy = $stretch ? (int) config('agenda.stretch_minutes') : 0;
+
+        for ($day = $from->startOfDay(); $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
+            if (! in_array($day->dayOfWeekIso, config('agenda.working_days'), true) || $this->dayOff($busy['days_off'], $day)) {
+                continue;
+            }
+
+            $opens = $day->setTimeFromTimeString(config('agenda.day_starts'));
+            $closes = $day->setTimeFromTimeString(config('agenda.day_ends'));
+
+            if ($stretch) {
+                $opens = $opens->subMinutes($stretchBy)->max($day->setTimeFromTimeString(config('agenda.stretch_earliest')));
+                $closes = $closes->addMinutes($stretchBy)->min($day->setTimeFromTimeString(config('agenda.stretch_latest')));
+            }
+
+            $closes = $closes->min($to);
+            $start = $this->roundUp($opens->max($from), $step);
+
+            for (; $start->addMinutes($minutes)->lessThanOrEqualTo($closes); $start = $start->addMinutes($step)) {
+                $end = $start->addMinutes($minutes);
+
+                if (! $this->overlapsLunch($start, $end) && ! $this->clashes($busy['periods'], $start, $end)) {
+                    return [$start->setTimezone($timezone), $end->setTimezone($timezone)];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * No free gap even after stretching the day: shorten one of the person's
+     * own tasks so this one fits beside it.
+     *
+     * @param  array{hard: list<array{CarbonImmutable, CarbonImmutable}>, raw: list<array{CarbonImmutable, CarbonImmutable}>, flexible: list<array{CarbonImmutable, CarbonImmutable, string}>, days_off: list<CarbonImmutable>}  $map
+     * @return ?array{0: CarbonImmutable, 1: CarbonImmutable, 2: list<array{ref: string, start: string, end: string}>}
+     */
+    private function squeeze(CarbonImmutable $from, CarbonImmutable $to, int $minutes, array $map): ?array
+    {
+        if ($map['flexible'] === []) {
+            return null;
+        }
+
+        $minimum = (int) config('agenda.task_minimum_minutes');
+        $timezone = $from->getTimezone()->getName();
+        $step = (int) config('agenda.granularity_minutes');
+        $stretchBy = (int) config('agenda.stretch_minutes');
+
+        for ($day = $from->startOfDay(); $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
+            if (! in_array($day->dayOfWeekIso, config('agenda.working_days'), true) || $this->dayOff($map['days_off'], $day)) {
+                continue;
+            }
+
+            $opens = $day->setTimeFromTimeString(config('agenda.day_starts'))->subMinutes($stretchBy)->max($day->setTimeFromTimeString(config('agenda.stretch_earliest')));
+            $closes = $day->setTimeFromTimeString(config('agenda.day_ends'))->addMinutes($stretchBy)->min($day->setTimeFromTimeString(config('agenda.stretch_latest')))->min($to);
+            $start = $this->roundUp($opens->max($from), $step);
+
+            for (; $start->addMinutes($minutes)->lessThanOrEqualTo($closes); $start = $start->addMinutes($step)) {
+                $end = $start->addMinutes($minutes);
+
+                if ($this->overlapsLunch($start, $end) || $this->clashes($map['raw'], $start, $end)) {
+                    continue;
+                }
+
+                $adjustments = $this->shorten($map['flexible'], $start, $end, $minimum);
+
+                if ($adjustments === null) {
+                    continue;
+                }
+
+                return [$start->setTimezone($timezone), $end->setTimezone($timezone), $adjustments];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * How to shorten each task the slot overlaps, keeping at least the minimum.
+     * Null when one of them cannot give way.
+     *
+     * @param  list<array{CarbonImmutable, CarbonImmutable, string}>  $flexible
+     * @return ?list<array{ref: string, start: string, end: string}>
+     */
+    private function shorten(array $flexible, CarbonImmutable $slotStart, CarbonImmutable $slotEnd, int $minimum): ?array
+    {
+        $adjustments = [];
+
+        foreach ($flexible as [$start, $end, $ref]) {
+            if ($slotEnd->lessThanOrEqualTo($start) || $slotStart->greaterThanOrEqualTo($end)) {
+                continue;
+            }
+
+            if ($slotStart->lessThanOrEqualTo($start) && $slotEnd->greaterThanOrEqualTo($end)) {
+                return null;
+            }
+
+            $keepStart = $slotStart->greaterThan($start) ? (int) $start->diffInMinutes($slotStart) : 0;
+            $keepEnd = $slotEnd->lessThan($end) ? (int) $slotEnd->diffInMinutes($end) : 0;
+
+            if ($keepStart >= $minimum && $keepStart >= $keepEnd) {
+                $adjustments[] = ['ref' => $ref, 'start' => $start->toIso8601String(), 'end' => $slotStart->toIso8601String()];
+
+                continue;
+            }
+
+            if ($keepEnd >= $minimum) {
+                $adjustments[] = ['ref' => $ref, 'start' => $slotEnd->toIso8601String(), 'end' => $end->toIso8601String()];
+
+                continue;
+            }
+
+            return null;
+        }
+
+        return $adjustments === [] ? null : $adjustments;
     }
 
     /**

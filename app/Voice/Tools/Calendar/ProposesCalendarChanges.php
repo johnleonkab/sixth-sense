@@ -68,7 +68,30 @@ trait ProposesCalendarChanges
                 'event' => $event ? $this->card($event) : null,
                 ...$details,
             ]),
+            beside: $this->dayBeside($user, $event, $details),
         );
+    }
+
+    /**
+     * The day of a time that does not fit, so the person can pick another.
+     *
+     * @param  array<string, mixed>  $details
+     */
+    private function dayBeside(User $user, ?CalendarEvent $event, array $details): ?Canvas
+    {
+        if (($details['conflict_count'] ?? 0) < 1) {
+            return null;
+        }
+
+        $start = $details['new_event']['start'] ?? $details['updated_event']['start'] ?? $event?->start->toIso8601String();
+
+        if (! is_string($start)) {
+            return null;
+        }
+
+        $day = CarbonImmutable::parse($start);
+
+        return (new CalendarCanvas($this->reader))->covering($user, $day, $day, $day);
     }
 
     /**

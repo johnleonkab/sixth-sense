@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Wingman;
 
 use App\Http\Controllers\Controller;
+use App\Services\PostHogService;
 use App\Wingman\WingmanCalls;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,7 @@ class ExtensionController extends Controller
     /**
      * The person joined a call.
      */
-    public function start(Request $request, WingmanCalls $calls): JsonResponse
+    public function start(Request $request, WingmanCalls $calls, PostHogService $posthog): JsonResponse
     {
         $data = $request->validate([
             'code' => ['required', 'string', 'regex:/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/'],
@@ -35,6 +36,8 @@ class ExtensionController extends Controller
         ]);
 
         $meeting = $calls->start($request->user(), $data['code'], CarbonImmutable::parse($data['joined_at']));
+
+        $posthog->capture((string) $request->user()->getAuthIdentifier(), 'wingman_call_started');
 
         return response()->json(['meeting_id' => $meeting->id, 'title' => $meeting->title]);
     }
@@ -61,12 +64,14 @@ class ExtensionController extends Controller
     /**
      * The person left it.
      */
-    public function end(Request $request, int $meeting, WingmanCalls $calls): JsonResponse
+    public function end(Request $request, int $meeting, WingmanCalls $calls, PostHogService $posthog): JsonResponse
     {
         $meeting = $request->user()->wingmanMeetings()->findOrFail($meeting);
         $data = $request->validate(['left_at' => ['required', 'date']]);
 
         $calls->end($meeting, CarbonImmutable::parse($data['left_at']));
+
+        $posthog->capture((string) $request->user()->getAuthIdentifier(), 'wingman_call_ended');
 
         return response()->json(['ended' => true]);
     }

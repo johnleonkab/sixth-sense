@@ -55,11 +55,23 @@ return [
         'redirect' => env('ATLASSIAN_REDIRECT_URI', env('APP_URL').'/settings/connections/atlassian/callback'),
     ],
 
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI', env('APP_URL').'/settings/connections/github/callback'),
+    ],
+
     'notion' => [
         'client_id' => env('NOTION_CLIENT_ID'),
         'client_secret' => env('NOTION_CLIENT_SECRET'),
         // Must match a redirect URI of the public connection in Notion's developer portal.
         'redirect' => env('NOTION_REDIRECT_URI', env('APP_URL').'/settings/connections/notion/callback'),
+    ],
+
+    'vapid' => [
+        'subject' => env('VAPID_SUBJECT', 'mailto:sixth-sense@localhost'),
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
     ],
 
 ];

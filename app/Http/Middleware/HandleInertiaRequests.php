@@ -2,11 +2,33 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PostHogService;
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
+    public function __construct(private PostHogService $posthog) {}
+
+    /**
+     * @param  Closure(Request): Response  $next
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        $context = $this->posthog->contextFromHeaders($request->headers->all());
+
+        if (($user = $request->user()) !== null) {
+            $context['distinctId'] = (string) $user->getAuthIdentifier();
+        }
+
+        return $this->posthog->withContext(
+            $context,
+            fn (): Response => parent::handle($request, $next),
+        );
+    }
+
     /**
      * The root template that's loaded on the first page visit.
      *

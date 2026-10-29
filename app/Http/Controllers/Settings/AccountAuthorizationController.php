@@ -6,14 +6,18 @@ use App\Connections\AccountStatus;
 use App\Connections\AuthorizationCancelled;
 use App\Connections\AuthorizedAccount;
 use App\Connections\Authorizers\AtlassianAuthorizer;
+use App\Connections\Authorizers\GithubAuthorizer;
 use App\Connections\Authorizers\GoogleAuthorizer;
 use App\Connections\Authorizers\NotionAuthorizer;
 use App\Connections\Authorizers\SlackAuthorizer;
 use App\Connections\Provider;
+use App\Connectors\GitHub\GithubRepositories;
 use App\Http\Controllers\Controller;
+use App\Jobs\LearnSlackAttention;
 use App\Jobs\WarmChats;
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -38,7 +42,7 @@ class AccountAuthorizationController extends Controller
     /**
      * Store the account the provider sends back.
      */
-    public function callback(Request $request, Provider $provider): RedirectResponse
+    public function callback(Request $request, Provider $provider, GithubRepositories $repositories, PostHogService $posthog): RedirectResponse
     {
         abort_unless($provider->isConnectable(), 404);
 
@@ -54,8 +58,23 @@ class AccountAuthorizationController extends Controller
 
         $account = $this->store($user, $provider, $authorized);
 
+        $posthog->capture((string) $user->getAuthIdentifier(), 'connection_authorized', [
+            'provider' => $provider->value,
+            'account_created' => $account->wasRecentlyCreated,
+            'missing_scope_count' => count($account->missingScopes()),
+        ]);
+
         if ($provider === Provider::Slack) {
             WarmChats::dispatch($user);
+            LearnSlackAttention::dispatch($user);
+        }
+
+        if ($provider === Provider::GitHub) {
+            try {
+                $repositories->sync($account);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         if ($account->missingScopes() !== []) {
@@ -67,14 +86,14 @@ class AccountAuthorizationController extends Controller
             : "Cuenta {$account->email} actualizada.");
     }
 
-    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer|AtlassianAuthorizer
+    private function authorizer(Provider $provider): GoogleAuthorizer|SlackAuthorizer|NotionAuthorizer|AtlassianAuthorizer|GithubAuthorizer
     {
         return match ($provider) {
             Provider::Google => app(GoogleAuthorizer::class),
             Provider::Slack => app(SlackAuthorizer::class),
             Provider::Notion => app(NotionAuthorizer::class),
             Provider::Atlassian => app(AtlassianAuthorizer::class),
-            default => abort(404),
+            Provider::GitHub => app(GithubAuthorizer::class),
         };
     }
 

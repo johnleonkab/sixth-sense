@@ -40,7 +40,8 @@ test('inviting someone shows the new guest as a draft and changes nothing yet', 
         ->assertJsonPath('canvas.view', 'calendar.change')
         ->assertJsonPath('canvas.props.kind', 'invite')
         ->assertJsonPath('canvas.props.new_people.0.email', 'pablo@covermanager.test')
-        ->assertJsonPath('canvas.props.event.title', '1:1 con Marta');
+        ->assertJsonPath('canvas.props.event.title', '1:1 con Marta')
+        ->assertJsonPath('beside', null);
 
     expect($this->writer->changes)->toBe([]);
 });
@@ -78,6 +79,8 @@ test('a new meeting warns about what it clashes with', function () {
         ->assertJsonPath('canvas.props.new_event.video_call', true)
         ->assertJsonPath('canvas.props.new_event.attendees.0.email', 'marta@covermanager.test')
         ->assertJsonPath('canvas.props.conflicts.0.title', 'Revisión flujo de prepago')
+        ->assertJsonPath('beside.view', 'calendar.day')
+        ->assertJsonPath('beside.props.from', '2026-10-08')
         ->assertJsonPath('output.conflict_count', 1);
 });
 

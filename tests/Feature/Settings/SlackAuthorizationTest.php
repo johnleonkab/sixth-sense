@@ -2,6 +2,7 @@
 
 use App\Connections\Capability;
 use App\Connections\Provider;
+use App\Jobs\LearnSlackAttention;
 use App\Jobs\WarmChats;
 use App\Models\ConnectedAccount;
 use App\Models\User;
@@ -67,6 +68,7 @@ test('the callback stores the workspace account even without the browser session
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), 'oauth.v2.access') && $request['code'] === 'abc' && $request['client_secret'] === 'secret');
     Queue::assertPushed(WarmChats::class, fn (WarmChats $job) => $job->user->is($this->user));
+    Queue::assertPushed(LearnSlackAttention::class, fn (LearnSlackAttention $job) => $job->user->is($this->user));
 });
 
 test('a state can only be used once and can not be forged', function () {

@@ -6,8 +6,10 @@ use App\Connectors\Chat\ChatConversation;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
+use App\Connectors\Chat\ChatView;
 use App\Connectors\Chat\NameMatch;
 use App\Models\User;
+use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
 use RuntimeException;
 
@@ -113,5 +115,15 @@ trait UsesChats
     private function forAssistant(array $messages, ToolContext $context): array
     {
         return array_map(fn (ChatMessage $message): array => $message->toAssistant($context->timezone()), $messages);
+    }
+
+    private function conversationCanvas(ChatView $view, ToolContext $context): Canvas
+    {
+        return new Canvas('slack.conversation', [
+            'conversation' => $view->conversation->toArray(),
+            'thread_ref' => $view->threadRef,
+            'focus_ref' => $view->focusRef,
+            'messages' => array_map(fn (ChatMessage $message): array => $message->toCanvas($context->timezone()), $view->messages),
+        ]);
     }
 }

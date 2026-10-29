@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
@@ -251,7 +253,7 @@ type AlertCenterProps = {
  * waits for the person's answer rings. The button keeps count of what is
  * still pending and opens the list with where each one stands.
  */
-export default function AlertCenter({ pending: initial = [], onOpen, onHistory, onArrive, onTellMe, listening = false }: AlertCenterProps) {
+export default function AlertCenter({ pending: initial = [], onOpen, onHistory, onArrive, onTellMe, listening = false, embedInHeader = false }: AlertCenterProps & { embedInHeader?: boolean }) {
     const feed = useAlertFeed({
         initial,
         onArrive: (alert) => alert.state === 'meeting' && onArrive?.(alert),
@@ -271,9 +273,12 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
 
         if (onOpen) {
             onOpen(alert);
-        } else if (alert.external_url) {
-            window.open(alert.external_url, '_blank', 'noopener');
+
+            return;
         }
+
+        document.documentElement.dataset.nav = 'back';
+        router.visit(`/?alert=${alert.id}`);
     };
 
     // Escape closes the list.
@@ -288,81 +293,333 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
         return () => window.removeEventListener('keydown', onKey);
     }, [open]);
 
+    useEffect(() => {
+        if (!open || window.matchMedia('(min-width: 768px)').matches) {
+            return;
+        }
+
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previous;
+        };
+    }, [open]);
+
+    const inbox = (
+        <>
+            {waiting.length > 0 && (
+                <section aria-label="Pendientes de responder">
+                    <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
+                    <ol>
+                        {waiting.map((item, index) => (
+                            <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
+                        ))}
+                    </ol>
+                </section>
+            )}
+
+            <section aria-label="Entrantes">
+                <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
+                {recent.length === 0 ? (
+                    <p className="px-2.5 pb-3 text-[13px] text-faint">Nada nuevo en las últimas 48 horas.</p>
+                ) : (
+                    <ol>
+                        {recent.map((item, index) => (
+                            <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={(waiting.length + index) * 35} />
+                        ))}
+                    </ol>
+                )}
+            </section>
+
+            {onHistory && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setOpen(false);
+                        onHistory();
+                    }}
+                    className="mt-1 min-h-11 w-full rounded-[10px] border-t border-line px-2.5 py-2.5 text-center text-[12.5px] text-accent hover:bg-soft"
+                >
+                    Ver todo el historial
+                </button>
+            )}
+        </>
+    );
+
+    const toasts = feed.fresh.map((item) => (
+        <div key={item.id} className="w-full">
+            <IncomingToast
+                alert={item}
+                onOpen={openAlert}
+                onClose={() => feed.dismissFresh(item.id)}
+                onDismiss={dismissAlert}
+                onTellMe={onTellMe}
+                listening={listening}
+            />
+        </div>
+    ));
+
+    const pull = useRef(0);
+    const [reveal, setReveal] = useState(0);
+    const gesture = useRef<{ y: number; dragging: boolean } | null>(null);
+    const suppressClick = useRef(false);
+
+    const onChipPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (open || window.matchMedia('(min-width: 768px)').matches) {
+            return;
+        }
+
+        gesture.current = { y: event.clientY, dragging: false };
+    };
+
+    const onChipPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        const start = gesture.current;
+
+        if (!start) {
+            return;
+        }
+
+        const distance = Math.max(0, event.clientY - start.y);
+
+        if (!start.dragging) {
+            if (distance < 8) {
+                return;
+            }
+
+            start.dragging = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+        }
+
+        pull.current = distance;
+        setReveal(distance);
+    };
+
+    const endChipGesture = () => {
+        const start = gesture.current;
+        gesture.current = null;
+
+        if (!start?.dragging) {
+            return;
+        }
+
+        suppressClick.current = true;
+
+        if (pull.current > 72) {
+            setOpen(true);
+        }
+
+        pull.current = 0;
+        setReveal(0);
+    };
+
+    const cluster = embedInHeader
+        ? 'relative md:fixed md:top-[60px] md:right-4 md:z-50 md:flex md:w-[min(380px,calc(100vw-32px))] md:flex-col md:items-end md:gap-2'
+        : 'fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2 max-md:top-[calc(env(safe-area-inset-top)+4.75rem)]';
+
     return (
-        <div className="fixed top-[60px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col items-end gap-2">
-            <div className="flex items-start gap-2">
-                {/* Wingman's bubble, beside the alerts, only while in a call. */}
-                <WingmanBubble />
+        <div className={cluster}>
+            <div className="flex items-center gap-2 md:items-start">
+                <div className="max-md:fixed max-md:top-[calc(env(safe-area-inset-top)+4.75rem)] max-md:right-4 max-md:z-30">
+                    <WingmanBubble />
+                </div>
 
                 <button
                     type="button"
                     aria-expanded={open}
                     aria-label={`Avisos: ${waiting.length} pendientes`}
-                    onClick={() => setOpen(!open)}
-                    className={`flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[12.5px] shadow-card transition-all hover:bg-soft ${open ? 'border-accent/50' : 'border-line'}`}
+                    onPointerDown={onChipPointerDown}
+                    onPointerMove={onChipPointerMove}
+                    onPointerUp={endChipGesture}
+                    onPointerCancel={endChipGesture}
+                    onClick={() => {
+                        if (suppressClick.current) {
+                            suppressClick.current = false;
+
+                            return;
+                        }
+
+                        setOpen(!open);
+                    }}
+                    className={`flex h-11 touch-none items-center gap-1.5 rounded-full border bg-surface px-2.5 text-[12.5px] shadow-card transition-all hover:bg-soft md:h-auto md:touch-auto md:gap-2 md:px-3 md:py-1.5 ${open ? 'border-accent/50' : 'border-line'}`}
                 >
                     <span
                         title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
                         className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
                     />
-                    {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
-                    {working && <span className="text-muted">· analizando</span>}
+                    {embedInHeader && waiting.length > 0 && <span className="font-medium tabular-nums md:hidden">{waiting.length}</span>}
+                    <span className={embedInHeader ? 'max-md:sr-only' : ''}>
+                        {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
+                        {working && <span className="text-muted"> · analizando</span>}
+                    </span>
                 </button>
             </div>
 
-            {open ? (
-                <div className="alerts-panel-in max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card">
-                    {waiting.length > 0 && (
-                        <section aria-label="Pendientes de responder">
-                            <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
-                            <ol>
-                                {waiting.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
-                                ))}
-                            </ol>
-                        </section>
-                    )}
-
-                    <section aria-label="Entrantes">
-                        <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
-                        {recent.length === 0 ? (
-                            <p className="px-2.5 pb-3 text-[13px] text-faint">Nada nuevo en las últimas 48 horas.</p>
-                        ) : (
-                            <ol>
-                                {recent.map((item, index) => (
-                                    <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={(waiting.length + index) * 35} />
-                                ))}
-                            </ol>
-                        )}
-                    </section>
-
-                    {onHistory && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setOpen(false);
-                                onHistory();
-                            }}
-                            className="mt-1 w-full rounded-[10px] border-t border-line px-2.5 py-2.5 text-center text-[12.5px] text-accent hover:bg-soft"
-                        >
-                            Ver todo el historial
-                        </button>
-                    )}
+            {open && (
+                <div className="alerts-panel-in hidden max-h-[70vh] w-full overflow-auto rounded-[16px] border border-line bg-surface p-1.5 shadow-card md:block">
+                    {inbox}
                 </div>
-            ) : (
-                feed.fresh.map((item) => (
-                    <div key={item.id} className="w-full">
-                        <IncomingToast
-                            alert={item}
-                            onOpen={openAlert}
-                            onClose={() => feed.dismissFresh(item.id)}
-                            onDismiss={dismissAlert}
-                            onTellMe={onTellMe}
-                            listening={listening}
-                        />
-                    </div>
-                ))
+            )}
+
+            <AlertSheet open={open} reveal={reveal} onClose={() => setOpen(false)}>
+                {inbox}
+            </AlertSheet>
+
+            {!open && (
+                <div
+                    className={
+                        embedInHeader
+                            ? 'flex w-full flex-col items-end gap-2 max-md:fixed max-md:inset-x-4 max-md:bottom-[calc(var(--voice-dock-height,9rem)+var(--keyboard-lift,0px)+0.75rem)] max-md:z-40 max-md:w-auto'
+                            : 'flex w-full flex-col items-end gap-2'
+                    }
+                >
+                    {toasts}
+                </div>
             )}
         </div>
+    );
+}
+
+/**
+ * The alert list on a phone. It rises from the bottom, follows a finger
+ * dragged down from the chip or the sheet, and closes when that drag is let go.
+ */
+function AlertSheet({ open, reveal, onClose, children }: { open: boolean; reveal: number; onClose: () => void; children: ReactNode }) {
+    const sheet = useRef<HTMLDivElement>(null);
+    const scroller = useRef<HTMLDivElement>(null);
+    const offset = useRef(0);
+    const startY = useRef<number | null>(null);
+    const shown = useRef(false);
+    const [y, setY] = useState(() => (typeof window === 'undefined' ? 480 : Math.round(window.innerHeight * 0.8)));
+    const [dragging, setDragging] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    const place = (value: number) => {
+        offset.current = value;
+        setY(value);
+    };
+
+    const height = () => sheet.current?.offsetHeight || Math.round(window.innerHeight * 0.8);
+
+    useLayoutEffect(() => {
+        if (reveal > 0 && !open) {
+            shown.current = true;
+            setMounted(true);
+            setDragging(true);
+            place(Math.max(0, height() - reveal));
+
+            return;
+        }
+
+        if (open) {
+            shown.current = true;
+            setMounted(true);
+
+            return;
+        }
+
+        if (!shown.current) {
+            return;
+        }
+
+        setDragging(false);
+        place(height());
+        const timer = window.setTimeout(() => {
+            shown.current = false;
+            setMounted(false);
+        }, 280);
+
+        return () => window.clearTimeout(timer);
+    }, [open, reveal]);
+
+    useEffect(() => {
+        if (!open || reveal > 0 || offset.current < 8) {
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() => place(0));
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [open, reveal]);
+
+    if (!mounted || typeof document === 'undefined') {
+        return null;
+    }
+
+    const travel = height();
+    const fade = travel === 0 ? 1 : Math.max(0, 1 - y / travel);
+
+    const beginDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+        const fromHandle = (event.target as HTMLElement).dataset.handle === 'true';
+
+        if (!fromHandle && (scroller.current?.scrollTop ?? 0) > 0) {
+            return;
+        }
+
+        startY.current = event.clientY;
+    };
+
+    const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (startY.current === null) {
+            return;
+        }
+
+        const next = event.clientY - startY.current;
+
+        if (next < 8) {
+            return;
+        }
+
+        setDragging(true);
+        sheet.current?.setPointerCapture(event.pointerId);
+        place(next);
+    };
+
+    const endDrag = () => {
+        if (startY.current === null) {
+            return;
+        }
+
+        startY.current = null;
+        setDragging(false);
+
+        if (offset.current > 72) {
+            onClose();
+
+            return;
+        }
+
+        place(0);
+    };
+
+    return createPortal(
+        <div className="fixed inset-0 z-50 md:hidden">
+            <button
+                type="button"
+                aria-label="Cerrar avisos"
+                className="absolute inset-0 bg-black/55 transition-opacity duration-300 data-[dragging=true]:transition-none"
+                data-dragging={dragging ? 'true' : undefined}
+                style={{ opacity: fade }}
+                onClick={onClose}
+            />
+            <div
+                ref={sheet}
+                data-dragging={dragging ? 'true' : undefined}
+                className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card transition-transform duration-300 ease-out data-[dragging=true]:transition-none"
+                style={{ transform: `translateY(${y}px)` }}
+                onPointerDown={beginDrag}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+            >
+                <div data-handle="true" className="flex shrink-0 cursor-grab justify-center py-3 touch-none">
+                    <span aria-hidden data-handle="true" className="h-1 w-10 rounded-full bg-line" />
+                </div>
+                <div ref={scroller} className="min-h-0 overflow-auto p-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    {children}
+                </div>
+            </div>
+        </div>,
+        document.body,
     );
 }

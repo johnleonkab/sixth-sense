@@ -1,10 +1,12 @@
 <?php
 
+use App\Actions\Actions;
 use App\Alerts\AlertFollowUp;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
+use App\Connectors\Calendar\CalendarEvent;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\FakeCalendarReader;
@@ -13,6 +15,7 @@ use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
 use App\Connectors\Mail\FakeMailbox;
 use App\Connectors\Mail\Mailbox;
+use App\Jobs\ExecutePendingAction;
 use App\Models\AgendaTask;
 use App\Models\AlertSetting;
 use App\Models\InboxItem;
@@ -73,9 +76,79 @@ test('weekends are skipped, and others must be free too', function () {
     expect(slot(30, '2026-10-17 08:00', '2026-10-20 23:59', ['marta@cm.com']))->toBe(['Mon 15:00', '15:30']);
 });
 
-test('no slot when nothing fits before the end', function () {
-    expect(slot(120, '2026-10-14 08:30', '2026-10-14 23:59'))->toBeNull();
+test('no slot when nothing fits before the end, even stretching the day', function () {
+    expect(slot(300, '2026-10-14 08:30', '2026-10-14 23:59'))->toBeNull();
 });
+
+test('a short task uses a gap the margin used to hide', function () {
+    expect(slot(15, '2026-10-14 12:30', '2026-10-14 13:00'))->toBe(['Wed 12:30', '12:45']);
+});
+
+test('the day stretches past the usual close when nothing fits inside it', function () {
+    expect(slot(120, '2026-10-14 08:30', '2026-10-14 23:59'))->toBe(['Wed 17:15', '19:15']);
+});
+
+test('a task of the person is shortened when that is the only room', function () {
+    blockTheMorning();
+
+    $task = scheduleFor('Preparar la demo', ['effortMinutes' => 60, 'urgency' => Urgency::Today]);
+
+    expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
+        ->and($task->starts_at->setTimezone('Europe/Madrid')->format('H:i'))->toBe('08:30')
+        ->and($this->writer->changes[0][0])->toBe('update')
+        ->and($this->writer->changes[0][1]['ref'])->toBe('demo:focus')
+        ->and($this->writer->changes[0][1]['start'])->toContain('09:30')
+        ->and($this->writer->changes[0][1]['end'])->toContain('12:00')
+        ->and($this->writer->changes[0][1]['notify'])->toBeFalse()
+        ->and($this->writer->changes[1][0])->toBe('create');
+});
+
+test('shortening a task for a meeting waits until the person says yes', function () {
+    blockTheMorning();
+
+    $task = scheduleFor('Hablar del prepago', ['people' => ['Marta'], 'effortMinutes' => 60, 'urgency' => Urgency::Today]);
+
+    expect($task->status)->toBe(AgendaTaskStatus::Proposed)
+        ->and($this->writer->changes)->toBe([])
+        ->and($task->pendingAction->payload['squeeze'][0]['ref'])->toBe('demo:focus');
+
+    app(Actions::class)->confirm($task->pendingAction);
+    (new ExecutePendingAction($task->pendingAction->refresh()))->handle(app(Actions::class));
+
+    expect($this->writer->changes[0][0])->toBe('update')
+        ->and($this->writer->changes[0][1]['notify'])->toBeFalse()
+        ->and($this->writer->changes[1][0])->toBe('create');
+});
+
+/**
+ * A task of the person from 9:00 to 12:00, and a meeting with someone else for the rest of the day.
+ */
+function blockTheMorning(): void
+{
+    test()->reader->scripted = [
+        new CalendarEvent(
+            id: 'focus',
+            title: 'Revisar el PRD',
+            start: CarbonImmutable::parse('2026-10-14 09:00', 'Europe/Madrid'),
+            end: CarbonImmutable::parse('2026-10-14 12:00', 'Europe/Madrid'),
+            allDay: false,
+            account: 'demo@sixth-sense.test',
+            ref: 'demo:focus',
+            flexible: true,
+        ),
+        new CalendarEvent(
+            id: 'blocked',
+            title: 'Bloqueado',
+            start: CarbonImmutable::parse('2026-10-14 12:00', 'Europe/Madrid'),
+            end: CarbonImmutable::parse('2026-10-14 20:00', 'Europe/Madrid'),
+            allDay: false,
+            account: 'demo@sixth-sense.test',
+            attendees: [['name' => 'Marta', 'email' => 'marta@cm.com']],
+            meetingUrl: 'https://meet.google.com/abc-defg-hij',
+            ref: 'demo:blocked',
+        ),
+    ];
+}
 
 test('the person own work is booked at once, marked as a task', function () {
     $task = scheduleFor('Revisar el PRD del prepago', ['context' => 'Marta lo pide antes del jueves.']);
@@ -89,7 +162,7 @@ test('the person own work is booked at once, marked as a task', function () {
 });
 
 test('urgency decides how far it may go: today only looks at today', function () {
-    $task = scheduleFor('Contestar a riesgos', ['effortMinutes' => 120, 'urgency' => Urgency::Today]);
+    $task = scheduleFor('Contestar a riesgos', ['effortMinutes' => 300, 'urgency' => Urgency::Today]);
 
     expect($task->status)->toBe(AgendaTaskStatus::Conflict);
 
@@ -99,7 +172,7 @@ test('urgency decides how far it may go: today only looks at today', function ()
         ->and($alert->status)->toBe(AlertStatus::Pending)
         ->and($alert->state())->toBe('important')
         ->and($alert->title)->toBe('Sin hueco: Contestar a riesgos')
-        ->and($alert->why)->toContain('No encuentro 120 minutos libres');
+        ->and($alert->why)->toContain('No encuentro 300 minutos libres');
 });
 
 test('a meeting with others is proposed and waits for the person', function () {
@@ -174,9 +247,17 @@ test('by voice: it says when, and why that urgency, and it can be undone', funct
         ->assertJsonPath('canvas.props.task.status', 'scheduled')
         ->assertJsonPath('output.when', 'miércoles 14 de octubre, 10:00')
         ->assertJsonPath('output.urgency', 'Esta semana')
-        ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.');
+        ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.')
+        ->assertJsonPath('beside', null);
 
     runAgendaTool('cancel_scheduled_task', ['task_id' => $booked->json('output.task_id')])
         ->assertJsonPath('canvas.props.task.status', 'cancelled')
         ->assertJsonPath('output.say', 'Quitado: «Revisar el PRD del prepago» ya no está en tu calendario.');
+});
+
+test('when nothing fits, the day stays beside the task so the person can decide', function () {
+    runAgendaTool('schedule_task', ['what' => 'Contestar a riesgos', 'effort_minutes' => 300, 'urgency' => 'today'])
+        ->assertJsonPath('canvas.props.task.status', 'conflict')
+        ->assertJsonPath('beside.view', 'calendar.day')
+        ->assertJsonPath('beside.props.from', '2026-10-14');
 });

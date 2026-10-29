@@ -66,7 +66,7 @@ test('email is read from the primary inbox and the sent folder of the last week'
 
 test('a source that fails is left out and the others are still read', function () {
     $this->app->instance(Wiki::class, Mockery::mock(FakeWiki::class, function ($wiki) {
-        $wiki->shouldReceive('search')->andThrow(new RuntimeException('Notion is down'));
+        $wiki->shouldReceive('outline')->andThrow(new RuntimeException('Notion is down'));
     }));
     WorkContext::factory()->for($this->user)->create();
 

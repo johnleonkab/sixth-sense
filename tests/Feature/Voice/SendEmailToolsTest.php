@@ -38,6 +38,8 @@ test('a reply is shown as a draft and nothing is sent', function () {
         ->assertJsonPath('canvas.props.cc', [])
         ->assertJsonPath('canvas.props.subject', 'Re: Contrato Grupo Vela — versión final')
         ->assertJsonPath('canvas.props.message', 'Lo firmo mañana a primera hora.')
+        ->assertJsonPath('beside.view', 'mail.message')
+        ->assertJsonPath('beside.props.subject', 'Contrato Grupo Vela — versión final')
         ->assertJsonPath('output.status', 'esperando confirmación');
 
     expect(PendingAction::sole()->type)->toBe('mail.send')
@@ -63,7 +65,9 @@ test('a forward keeps the attachments and resolves who it goes to', function () 
         ->assertJsonPath('canvas.props.mode', 'forward')
         ->assertJsonPath('canvas.props.to.0.email', 'pablo@covermanager.test')
         ->assertJsonPath('canvas.props.subject', 'Fwd: Flujo de prepago v4: necesito tu revisión')
-        ->assertJsonPath('canvas.props.attachments.0.name', 'prepago-v4.pdf');
+        ->assertJsonPath('canvas.props.attachments.0.name', 'prepago-v4.pdf')
+        ->assertJsonPath('beside.view', 'mail.message')
+        ->assertJsonPath('beside.props.subject', 'Flujo de prepago v4: necesito tu revisión');
 });
 
 test('a new email goes to the resolved people', function () {

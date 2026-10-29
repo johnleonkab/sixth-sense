@@ -21,6 +21,15 @@ interface Wiki
     public function search(User $user, ?string $query, int $limit = 10): array;
 
     /**
+     * Pages from the top of what the person can see, then fewer at each
+     * deeper level. The first number is how many roots to keep.
+     *
+     * @param  list<int>  $widths
+     * @return list<array{page: WikiPageSummary, depth: int}>
+     */
+    public function outline(User $user, array $widths): array;
+
+    /**
      * A page by its ref, its URL or its id. For a URL or id, every account is
      * tried until one can open it.
      */

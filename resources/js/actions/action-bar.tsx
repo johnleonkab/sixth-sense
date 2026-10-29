@@ -30,9 +30,26 @@ type ActionBarProps = {
     verb?: string;
     /** "Se aplicará", "Se enviará"… before the countdown. */
     countdownLabel?: string;
+    /** Replaces "Sí, {verb}" when the screen saves something the person edited. */
+    confirmLabel?: string;
+    /** Runs instead of the plain confirm, for example after editing the proposal. */
+    onConfirm?: () => void;
+    busy?: boolean;
+    /** Replaces "o di «sí» / «cancela»". */
+    hint?: string;
 };
 
-export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Docs', verb = 'aplicar', countdownLabel }: ActionBarProps) {
+export default function ActionBar({
+    initial,
+    doneLabel,
+    linkLabel = 'Abrir en Docs',
+    verb = 'aplicar',
+    countdownLabel,
+    confirmLabel,
+    onConfirm,
+    busy = false,
+    hint = 'o di «sí» / «cancela»',
+}: ActionBarProps) {
     const { actions } = useCanvas();
     const action = actions.actions[initial.id] ?? initial;
     const secondsLeft = useSecondsLeft(action.status === 'confirmed' ? action.undo_until : null);
@@ -44,7 +61,8 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
         }
     }, [initial.id]);
 
-    const base = 'mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-[13px]';
+    const base = 'mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4 text-[13px] max-md:sticky max-md:bottom-0 max-md:z-10 max-md:flex-col max-md:items-stretch max-md:bg-surface max-md:pb-3';
+    const thumb = 'max-md:min-h-11 max-md:text-[15px]';
 
     switch (action.status) {
         case 'pending':
@@ -52,19 +70,20 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                 <div className={base}>
                     <button
                         type="button"
-                        onClick={() => void actions.confirm(action.id)}
-                        className="rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90"
+                        disabled={busy}
+                        onClick={() => (onConfirm ? onConfirm() : void actions.confirm(action.id))}
+                        className={`rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90 disabled:opacity-40 ${thumb}`}
                     >
-                        Sí, {verb}
+                        {busy ? 'Guardando…' : (confirmLabel ?? `Sí, ${verb}`)}
                     </button>
                     <button
                         type="button"
                         onClick={() => void actions.cancel(action.id)}
-                        className="rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft"
+                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
                     >
                         Cancelar
                     </button>
-                    <span className="text-muted">o di «sí» / «cancela»</span>
+                    <span className="text-muted">{hint}</span>
                 </div>
             );
         case 'confirmed':
@@ -80,7 +99,7 @@ export default function ActionBar({ initial, doneLabel, linkLabel = 'Abrir en Do
                     <button
                         type="button"
                         onClick={() => void actions.undo(action.id)}
-                        className="rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft"
+                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
                     >
                         Deshacer
                     </button>

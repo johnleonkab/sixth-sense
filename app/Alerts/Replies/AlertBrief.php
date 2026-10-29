@@ -25,5 +25,22 @@ final readonly class AlertBrief
         public array $participants = [],
         public array $conversation = [],
         public ?string $why = null,
+        public string $findings = '',
     ) {}
+
+    public function withFindings(string $findings): self
+    {
+        return new self(
+            source: $this->source,
+            where: $this->where,
+            from: $this->from,
+            subject: $this->subject,
+            text: $this->text,
+            receivedAt: $this->receivedAt,
+            participants: $this->participants,
+            conversation: $this->conversation,
+            why: $this->why,
+            findings: $findings,
+        );
+    }
 }

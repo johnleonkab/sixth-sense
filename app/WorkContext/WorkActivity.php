@@ -4,6 +4,7 @@ namespace App\WorkContext;
 
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Docs\DocumentSummary;
+use App\Connectors\Issues\IssueSummary;
 use App\Connectors\Mail\MailMessage;
 use App\Connectors\Wiki\WikiPageSummary;
 
@@ -17,8 +18,9 @@ final readonly class WorkActivity
      * @param  list<ChatMessage>  $messages  Slack: written by, to or mentioning them, newest first.
      * @param  list<MailMessage>  $emails  Received in the primary inbox and sent, newest first.
      * @param  list<array{document: DocumentSummary, excerpt: ?string}>  $documents  Google Docs edited lately, newest first.
-     * @param  list<array{page: WikiPageSummary, excerpt: ?string}>  $pages  Notion pages edited lately, newest first.
+     * @param  list<array{page: WikiPageSummary, depth: int, excerpt: ?string}>  $pages  Notion, from the top of the workspace downward.
      * @param  list<string>  $failedSources  Sources that could not be read.
+     * @param  list<IssueSummary>  $issues  Recent Jira issues, following each site's rules.
      */
     public function __construct(
         public array $messages = [],
@@ -26,17 +28,18 @@ final readonly class WorkActivity
         public array $documents = [],
         public array $pages = [],
         public array $failedSources = [],
+        public array $issues = [],
     ) {}
 
     public function isEmpty(): bool
     {
-        return $this->messages === [] && $this->emails === [] && $this->documents === [] && $this->pages === [];
+        return $this->messages === [] && $this->emails === [] && $this->documents === [] && $this->pages === [] && $this->issues === [];
     }
 
     /**
      * How much was read from each source.
      *
-     * @return array{slack: int, gmail: int, docs: int, notion: int}
+     * @return array{slack: int, gmail: int, docs: int, notion: int, jira: int}
      */
     public function counts(): array
     {
@@ -45,6 +48,7 @@ final readonly class WorkActivity
             'gmail' => count($this->emails),
             'docs' => count($this->documents),
             'notion' => count($this->pages),
+            'jira' => count($this->issues),
         ];
     }
 }

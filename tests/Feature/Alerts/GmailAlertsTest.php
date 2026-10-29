@@ -4,14 +4,16 @@ use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
-use App\Alerts\Judgement;
+use App\Alerts\Intents\IntentAssigner;
+use App\Alerts\Intents\IntentClassifier;
+use App\Alerts\Intents\IntentDecision;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Triage;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
+use App\Jobs\AssignIntent;
 use App\Jobs\CheckAccountForAlerts;
-use App\Jobs\JudgeInboxItem;
 use App\Models\AlertSetting;
 use App\Models\ConnectedAccount;
 use App\Models\User;
@@ -80,26 +82,15 @@ test('the first check only remembers where the inbox is, so old mail never alert
     Event::assertNotDispatched(InboxItemCreated::class);
 });
 
-test('every new email is listed at once, and judged in the background', function () {
-    Queue::fake([JudgeInboxItem::class]);
+test('a new email is taken at once and classified in the background', function () {
+    Queue::fake([AssignIntent::class]);
     fakeGmailHistory([incoming('m1')]);
 
-    $listed = app(AlertInbox::class)->check($this->account);
-
-    expect($listed)->toHaveCount(1)
-        ->and($listed[0]->title)->toBe('Contrato: necesito la firma antes del viernes')
-        ->and($listed[0]->actor_name)->toBe('Andrés Vela')
-        ->and($listed[0]->triage)->toBe(Triage::Judging)
-        ->and($listed[0]->state())->toBe('judging')
-        ->and($listed[0]->external_id)->toBe("{$this->account->id}.m1")
-        ->and($this->judge->judged)->toBe([])
+    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+        ->and($this->user->inboxItems()->count())->toBe(0)
         ->and($this->account->refresh()->watch_cursor)->toBe('200');
 
-    Queue::assertPushed(JudgeInboxItem::class, fn (JudgeInboxItem $job) => $job->item->is($listed[0]));
-    Event::assertDispatched(InboxItemCreated::class, fn (InboxItemCreated $event) => $event->item->is($listed[0])
-        && $event->broadcastOn()[0]->name === "private-App.Models.User.{$this->user->id}"
-        && $event->broadcastAs() === 'inbox.item.created'
-        && $event->broadcastWith()['state'] === 'judging');
+    Queue::assertPushed(AssignIntent::class, fn (AssignIntent $job) => $job->candidate['external_id'] === "{$this->account->id}.m1");
 });
 
 test('an important email becomes an alert waiting for an answer, and its proposal is prepared', function () {
@@ -113,11 +104,10 @@ test('an important email becomes an alert waiting for an answer, and its proposa
         ->and($item->planning)->toBeFalse()
         ->and($item->state())->toBe('ready');
 
-    // Judged, then the proposal: the browser hears of each step.
-    Event::assertDispatchedTimes(InboxItemUpdated::class, 2);
+    Event::assertDispatchedTimes(InboxItemUpdated::class, 1);
 });
 
-test('noise is listed quietly without asking the judge; the user own mail is not listed', function () {
+test('noise and the user own mail never become alerts', function () {
     fakeGmailHistory([
         incoming('promo', ['labels' => ['INBOX', 'CATEGORY_PROMOTIONS']]),
         incoming('newsletter', ['headers' => [['name' => 'List-Unsubscribe', 'value' => '<mailto:x@y.z>']]]),
@@ -126,24 +116,15 @@ test('noise is listed quietly without asking the judge; the user own mail is not
         incoming('archived', ['labels' => ['UNREAD']]),
     ]);
 
-    $listed = app(AlertInbox::class)->check($this->account);
-
-    expect(array_map(fn ($item) => [$item->external_id, $item->state(), $item->why], $listed))->toBe([
-        ["{$this->account->id}.promo", 'routine', 'Promoción'],
-        ["{$this->account->id}.newsletter", 'routine', 'Envío masivo o newsletter'],
-        ["{$this->account->id}.robot", 'routine', 'Remitente automático'],
-    ])->and($this->judge->judged)->toBe([]);
+    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+        ->and($this->user->inboxItems()->count())->toBe(0);
 });
 
-test('emails the judge finds unimportant stay listed, quietly', function () {
+test('an email that asks for nothing does not become an alert', function () {
     fakeGmailHistory([incoming('m1', ['subject' => 'Gracias por el café', 'body' => 'Un placer verte ayer.'])]);
 
-    $item = app(AlertInbox::class)->check($this->account)[0]->refresh();
-
-    expect($item->state())->toBe('routine')
-        ->and($item->status)->toBe(AlertStatus::Notice)
-        ->and($item->why)->toBe('Informativo, sin nada que hacer.')
-        ->and($this->judge->judged)->toHaveCount(1);
+    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+        ->and($this->user->inboxItems()->count())->toBe(0);
 });
 
 test('the same email is never listed twice', function () {
@@ -156,29 +137,30 @@ test('the same email is never listed twice', function () {
     Event::assertDispatchedTimes(InboxItemCreated::class, 1);
 });
 
-test('if the ai judge can not answer, the inbox keeps moving and, out of tries, simple rules decide', function () {
-    $this->app->instance(RelevanceJudge::class, new class implements RelevanceJudge
+test('if the classifier can not answer, the inbox keeps moving and, out of tries, simple rules decide', function () {
+    $this->app->instance(IntentClassifier::class, new class implements IntentClassifier
     {
-        public function judge(User $user, InboxCandidate $candidate): Judgement
+        public function classify(User $user, InboxCandidate $candidate, array $intents, string $context): IntentDecision
         {
-            throw new RuntimeException('Gemini is down');
+            throw new RuntimeException('The model is down');
         }
     });
-    Queue::fake([JudgeInboxItem::class]);
+    Queue::fake([AssignIntent::class]);
     fakeGmailHistory([incoming('m1')]);
 
-    $item = app(AlertInbox::class)->check($this->account)[0];
+    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+        ->and($this->account->refresh()->watch_cursor)->toBe('200');
 
-    expect($this->account->refresh()->watch_cursor)->toBe('200');
+    $job = Queue::pushed(AssignIntent::class)->sole();
 
-    $job = new JudgeInboxItem($item);
-    expect(fn () => $job->handle(app(RelevanceJudge::class)))->toThrow(RuntimeException::class)
-        ->and($item->refresh()->state())->toBe('judging');
+    expect(fn () => $job->handle(app(IntentAssigner::class)))->toThrow(RuntimeException::class)
+        ->and($this->user->inboxItems()->count())->toBe(0);
 
-    $job->failed(new RuntimeException('Gemini is down'));
+    $job->failed(new RuntimeException('The model is down'));
 
-    expect($item->refresh()->state())->not->toBe('judging')
-        ->and($item->status)->toBe(AlertStatus::Pending)
+    $item = $this->user->inboxItems()->sole();
+
+    expect($item->status)->toBe(AlertStatus::Pending)
         ->and($item->why)->toBe('Andrés Vela te pide algo: «Contrato: necesito la firma antes del viernes»')
         ->and($item->relevance)->toBe(50);
 });

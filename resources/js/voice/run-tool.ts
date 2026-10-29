@@ -6,6 +6,7 @@ import type { ToolCall } from '@/voice/types';
 export type ToolOutcome = {
     output: Record<string, unknown>;
     canvas: CanvasDirective | null;
+    beside?: CanvasDirective | null;
 };
 
 /**

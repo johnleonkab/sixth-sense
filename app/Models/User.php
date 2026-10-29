@@ -17,7 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled', 'wingman_settings', 'wingman_token_hash', 'wingman_token_used_at'])]
-#[Hidden(['password', 'remember_token', 'wingman_token_hash'])]
+#[Hidden(['password', 'remember_token', 'wingman_token_hash', 'gemini_api_key', 'deepseek_api_key'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -47,6 +47,8 @@ class User extends Authenticatable
             'wingman_enabled' => 'boolean',
             'wingman_settings' => 'array',
             'wingman_token_used_at' => 'immutable_datetime',
+            'gemini_api_key' => 'encrypted',
+            'deepseek_api_key' => 'encrypted',
         ];
     }
 
@@ -79,6 +81,16 @@ class User extends Authenticatable
     public function pendingActions(): HasMany
     {
         return $this->hasMany(PendingAction::class);
+    }
+
+    /**
+     * Compound requests opened for this person.
+     *
+     * @return HasMany<Scene, $this>
+     */
+    public function scenes(): HasMany
+    {
+        return $this->hasMany(Scene::class);
     }
 
     /**
@@ -118,6 +130,77 @@ class User extends Authenticatable
     }
 
     /**
+     * Agents copied from the work repository.
+     *
+     * @return HasMany<SenseAgent, $this>
+     */
+    public function senseAgents(): HasMany
+    {
+        return $this->hasMany(SenseAgent::class);
+    }
+
+    /**
+     * The one GitHub repository this person uses as their work archive.
+     */
+    public function workRepository(): ?GithubRepository
+    {
+        return GithubRepository::query()
+            ->where('is_work', true)
+            ->whereIn('connected_account_id', $this->connectedAccounts()->select('id'))
+            ->first();
+    }
+
+    /**
+     * What the reply agent has learned while resolving intents.
+     *
+     * @return HasMany<IntentLesson, $this>
+     */
+    public function intentLessons(): HasMany
+    {
+        return $this->hasMany(IntentLesson::class);
+    }
+
+    /**
+     * How this person has been answering Slack, learned from the last month.
+     *
+     * @return HasOne<SlackAttentionProfile, $this>
+     */
+    public function slackAttentionProfile(): HasOne
+    {
+        return $this->hasOne(SlackAttentionProfile::class);
+    }
+
+    /**
+     * Slack messages already triaged, including the ones that did not ring.
+     *
+     * @return HasMany<SlackTriageDecision, $this>
+     */
+    public function slackTriageDecisions(): HasMany
+    {
+        return $this->hasMany(SlackTriageDecision::class);
+    }
+
+    /**
+     * Attention rules she has stated, proposed until she says yes.
+     *
+     * @return HasMany<SlackPreferenceRule, $this>
+     */
+    public function slackPreferenceRules(): HasMany
+    {
+        return $this->hasMany(SlackPreferenceRule::class);
+    }
+
+    /**
+     * How far each Slack action may go. A missing row stays at draft.
+     *
+     * @return HasMany<SlackAutonomyLevel, $this>
+     */
+    public function slackAutonomyLevels(): HasMany
+    {
+        return $this->hasMany(SlackAutonomyLevel::class);
+    }
+
+    /**
      * Alerts raised for this user, newest first.
      *
      * @return HasMany<InboxItem, $this>
@@ -125,6 +208,16 @@ class User extends Authenticatable
     public function inboxItems(): HasMany
     {
         return $this->hasMany(InboxItem::class)->latest('received_at');
+    }
+
+    /**
+     * Browsers registered for system notifications.
+     *
+     * @return HasMany<PushSubscription, $this>
+     */
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
     }
 
     /**

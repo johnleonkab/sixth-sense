@@ -17,17 +17,18 @@ const services: { name: string; icon: Service }[] = [
     { name: 'Slack', icon: 'slack' },
     { name: 'Jira', icon: 'jira' },
     { name: 'Notion', icon: 'notion' },
+    { name: 'GitHub', icon: 'github' },
     { name: 'Google Meet', icon: 'meet' },
 ];
 
 const steps = [
     {
         title: 'You speak',
-        body: '“What do I have today?” “Open Marta’s email.” “Move it to Thursday and invite Pablo.” “Create the story in Jira.” Voice first; typing is just a fallback.',
+        body: '“What do I have today?” “Open Marta’s email.” “Move it to Thursday and invite Pablo.” “Create the story in Jira.” Voice first; typing is there if you want it.',
     },
     {
         title: 'It shows what you’re talking about',
-        body: 'The assistant answers out loud and puts the calendar, the email, the Slack thread, the Jira issue or the PDF on screen. Point at it: “open the second one”.',
+        body: 'The assistant answers out loud and puts the calendar, the email, the Slack thread, the Jira issue or the PDF on screen. When a decision needs both, it opens two at once: the draft and the thread, the meeting that does not fit and the day.',
     },
     {
         title: 'Nothing changes without your “yes”',
@@ -38,7 +39,7 @@ const steps = [
 const features = [
     {
         title: 'Alerts that wait for you',
-        body: 'Watches Gmail, Slack and your Jira mentions, and only rings for what needs your answer, always saying why. One alert per conversation, updated as it goes, with a reply already proposed. Swipe it away when it needs nothing.',
+        body: 'Watches Gmail, Slack and your Jira mentions, and only rings for what needs your answer, always saying why. The same alert arrives on your phone. One conversation, updated as it goes, with a reply already proposed.',
     },
     {
         title: 'Finds time for your work',
@@ -69,6 +70,11 @@ const tools = [
         service: 'docs' as Service,
         title: 'Docs, PDFs and images',
         body: 'Read a document and its comments, answer them, page through a PDF, zoom an image, or have any of it read aloud.',
+    },
+    {
+        service: 'github' as Service,
+        title: 'A work archive you own',
+        body: 'Point it at a GitHub repository and it keeps the notes and agents of your work there, on main. Reading is free; every change waits for your “yes”.',
     },
     {
         service: 'slack' as Service,
@@ -245,7 +251,7 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
 
             <div lang="en" className="min-h-full px-4 md:px-6">
                 <header className="mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 py-5">
-                    <Wordmark className="h-5 sm:h-6" />
+                    <Wordmark to="/" className="h-5 sm:h-6" />
                     <nav className="flex min-w-0 items-center gap-1 text-[13.5px]">
                         <a
                             href={repositoryUrl}
@@ -281,10 +287,11 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                                 <br />
                                 spoken.
                             </h1>
-                            <p className="mt-5 max-w-[460px] text-[16px] leading-relaxed text-muted">
+                            <p className="mt-4 font-medium text-ink">Tu jornada de trabajo, hablando.</p>
+                            <p className="mt-3 max-w-[460px] text-[16px] leading-relaxed text-muted">
                                 You talk; the AI answers out loud and, at the same time, puts on screen exactly what you’re talking about: your
-                                calendar, an email, a Slack thread, a Jira issue, a document. In your meetings, Wingman listens quietly and brings
-                                in what helps.
+                                calendar, an email, a Slack thread, a Jira issue, a document. Install it on a server you control, with your own
+                                keys. In your meetings, Wingman listens quietly and brings in what helps.
                             </p>
                             <div className="mt-8 flex flex-wrap gap-3">
                                 <a
@@ -379,12 +386,16 @@ export default function Landing({ canRegister, repositoryUrl }: LandingProps) {
                         <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                             <div className="space-y-4 text-[14.5px] leading-relaxed text-muted">
                                 <p>
-                                    Sixth Sense is open source under the <span className="text-ink">MIT license</span>. Every line that reads your email
-                                    or talks to Slack is there for you to check.
+                                    Sixth Sense is open source under the{' '}
+                                    <a href={`${repositoryUrl}/blob/main/LICENSE`} className="text-ink underline underline-offset-4">
+                                        MIT license
+                                    </a>
+                                    . Every line that reads your email or talks to Slack is there for you to check.
                                 </p>
                                 <p>
-                                    Run it on your own server with your own API keys: your accounts connect to your instance, OAuth tokens are stored
-                                    encrypted, and audio goes straight from your browser to the voice provider, never through the server.
+                                    Run it on your own server. Bring your own Gemini and DeepSeek keys, or use the ones configured on that server:
+                                    either way they stay encrypted and never go back to the browser. OAuth tokens are stored encrypted, and audio
+                                    goes straight from your browser to the voice provider.
                                 </p>
                                 <p>
                                     Wingman’s extension only reads Meet’s captions in your own browser and sends them to your own instance; it never

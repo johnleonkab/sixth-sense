@@ -113,7 +113,9 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
                     case 'rule':
                         return <hr key={i} className="my-6 border-line" />;
                     case 'image':
-                        return (
+                        return block.src ? (
+                            <img key={i} src={block.src} alt="" className="my-4 max-h-[480px] w-full rounded-lg object-contain" />
+                        ) : (
                             <p key={i} className="my-3 rounded-lg border border-dashed border-line px-3 py-2 text-[12.5px] text-faint">
                                 Imagen
                             </p>

@@ -3,6 +3,7 @@
 namespace App\Alerts\Replies;
 
 use App\Models\User;
+use Illuminate\Support\Str;
 
 /**
  * For tests and demo mode: always proposes to answer the sender.
@@ -22,6 +23,7 @@ class FakeReplyPlanner implements ReplyPlanner
             reply: ['to' => 'sender', 'text' => "Hola {$name}, lo miro hoy y te digo algo."],
             otherActions: str_contains(mb_strtolower($brief->text), 'reunión') ? ['Proponer una reunión para hablarlo'] : [],
             task: preg_match('/revis/iu', $brief->text) ? ['title' => 'Revisar lo que pide '.$name, 'effort_minutes' => 30, 'deadline' => null, 'people' => []] : null,
+            learned: $name.' pide «'.($brief->subject ?: Str::limit($brief->text, 80)).'».',
         );
     }
 }

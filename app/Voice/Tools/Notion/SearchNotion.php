@@ -22,6 +22,7 @@ class SearchNotion implements VoiceTool
     public function description(): string
     {
         return 'Busca páginas de Notion por su título y las muestra numeradas, la editada más recientemente primero. Sin query, las últimas editadas. '
+            .'Para buscar a la vez en Notion y en Google Drive, usa find_files. '
             .'Para abrir una, usa open_notion_page con su page_id ("abre la 2").';
     }
 

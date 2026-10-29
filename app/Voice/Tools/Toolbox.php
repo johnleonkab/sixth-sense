@@ -18,6 +18,7 @@ use App\Voice\Tools\Calendar\ProposeEventSummary;
 use App\Voice\Tools\Calendar\ProposeEventUpdate;
 use App\Voice\Tools\Calendar\ProposeNewEvent;
 use App\Voice\Tools\Calendar\ShowCalendar;
+use App\Voice\Tools\Docs\FindFiles;
 use App\Voice\Tools\Docs\OpenDocument;
 use App\Voice\Tools\Docs\ProposeCommentReply;
 use App\Voice\Tools\Docs\ProposeDocumentComment;
@@ -42,13 +43,26 @@ use App\Voice\Tools\Notion\ProposeNotionComment;
 use App\Voice\Tools\Notion\ProposeNotionEdit;
 use App\Voice\Tools\Notion\ProposeNotionPage;
 use App\Voice\Tools\Notion\SearchNotion;
+use App\Voice\Tools\Scenes\OpenSceneTool;
 use App\Voice\Tools\Screen\ControlViewer;
+use App\Voice\Tools\Sense\FocusSenseAgent;
+use App\Voice\Tools\Sense\ListSenseFiles;
+use App\Voice\Tools\Sense\ProposeSenseDelete;
+use App\Voice\Tools\Sense\ProposeSenseFile;
+use App\Voice\Tools\Sense\ReadSenseFile;
+use App\Voice\Tools\Sense\SyncSenseAgents;
+use App\Voice\Tools\Slack\AnswerSlackAttention;
+use App\Voice\Tools\Slack\CorrectSlackTriage;
 use App\Voice\Tools\Slack\FindSlackConversations;
 use App\Voice\Tools\Slack\FindSlackPeople;
+use App\Voice\Tools\Slack\LowerSlackAutonomy;
 use App\Voice\Tools\Slack\OpenSlackFile;
+use App\Voice\Tools\Slack\ProposeSlackAutonomy;
 use App\Voice\Tools\Slack\ProposeSlackMessage;
 use App\Voice\Tools\Slack\SearchSlackMessages;
+use App\Voice\Tools\Slack\ShowSlackAutonomy;
 use App\Voice\Tools\Slack\ShowSlackConversation;
+use App\Voice\Tools\Slack\ShowSlackDigest;
 use App\Voice\Tools\Slack\ShowSlackUnread;
 use App\Voice\Tools\Wingman\DismissMeetingActions;
 use App\Voice\Tools\Wingman\ProposeMeetingAction;
@@ -84,11 +98,18 @@ class Toolbox
         ProposeEmailForward::class,
         SearchDocuments::class,
         ShowDocumentResults::class,
+        FindFiles::class,
         OpenDocument::class,
         ProposeDocumentEdit::class,
         ProposeDocumentComment::class,
         ProposeCommentReply::class,
         ShowSlackUnread::class,
+        ShowSlackDigest::class,
+        CorrectSlackTriage::class,
+        AnswerSlackAttention::class,
+        ShowSlackAutonomy::class,
+        ProposeSlackAutonomy::class,
+        LowerSlackAutonomy::class,
         ShowSlackConversation::class,
         SearchSlackMessages::class,
         FindSlackConversations::class,
@@ -115,6 +136,13 @@ class Toolbox
         ReviewMeeting::class,
         ProposeMeetingAction::class,
         DismissMeetingActions::class,
+        ListSenseFiles::class,
+        ReadSenseFile::class,
+        ProposeSenseFile::class,
+        ProposeSenseDelete::class,
+        SyncSenseAgents::class,
+        FocusSenseAgent::class,
+        OpenSceneTool::class,
     ];
 
     public function __construct(private Container $container) {}

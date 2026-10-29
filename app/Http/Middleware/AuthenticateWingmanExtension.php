@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PostHogService;
 use App\Wingman\ExtensionTokens;
 use Closure;
 use Illuminate\Http\Request;
@@ -14,7 +15,10 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AuthenticateWingmanExtension
 {
-    public function __construct(private ExtensionTokens $tokens) {}
+    public function __construct(
+        private ExtensionTokens $tokens,
+        private PostHogService $posthog,
+    ) {}
 
     /**
      * Handle an incoming request.
@@ -35,6 +39,9 @@ class AuthenticateWingmanExtension
 
         Auth::setUser($user);
 
-        return $next($request);
+        $context = $this->posthog->contextFromHeaders($request->headers->all());
+        $context['distinctId'] = (string) $user->getAuthIdentifier();
+
+        return $this->posthog->withContext($context, fn (): Response => $next($request));
     }
 }

@@ -7,6 +7,7 @@ use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
 use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\RecipientNotResolved;
@@ -14,6 +15,7 @@ use App\Connectors\Mail\RecipientResolver;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Models\AgendaTask;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -73,6 +75,7 @@ class Scheduler
         }
 
         [$start, $end] = $slot;
+        $squeeze = $slot[2] ?? [];
         $event = new NewEvent(
             accountId: $accounts[0]->accountId,
             title: $assessment->title,
@@ -86,12 +89,13 @@ class Scheduler
 
         // With other people, an invitation goes out: it waits for the person's "sí".
         if ($people !== []) {
-            $action = $this->actions->propose($user, 'calendar.change', "Convocar «{$event->title}»", ['kind' => 'create', 'event' => $event->toArray()]);
+            $action = $this->actions->propose($user, 'calendar.change', "Convocar «{$event->title}»", ['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze]);
 
             return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);
         }
 
         try {
+            $this->applySqueeze($user, $squeeze);
             $created = $this->calendar->create($user, $event);
         } catch (Throwable $exception) {
             report($exception);
@@ -117,6 +121,22 @@ class Scheduler
         }
 
         return $this->finish($task, ['status' => AgendaTaskStatus::Cancelled]);
+    }
+
+    /**
+     * Shorten the person's own tasks that gave up their time for this one.
+     *
+     * @param  list<array{ref: string, start: string, end: string}>  $squeeze
+     */
+    private function applySqueeze(User $user, array $squeeze): void
+    {
+        foreach ($squeeze as $change) {
+            $this->calendar->update($user, $change['ref'], new EventUpdate(
+                start: CarbonImmutable::parse($change['start']),
+                end: CarbonImmutable::parse($change['end']),
+                notify: false,
+            ));
+        }
     }
 
     /**

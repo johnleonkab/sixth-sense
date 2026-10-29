@@ -35,6 +35,14 @@ class FakeWiki implements Wiki
         )), 0, $limit);
     }
 
+    public function outline(User $user, array $widths): array
+    {
+        return array_map(
+            fn (WikiPageSummary $page): array => ['page' => $page, 'depth' => 0],
+            array_slice($this->search($user, null, $widths[0] ?? 10), 0, $widths[0] ?? 10),
+        );
+    }
+
     public function page(User $user, string $reference): ?WikiPage
     {
         $ref = isset($this->samples()[$reference]) ? $reference : collect(array_keys($this->samples()))->first(fn (string $ref): bool => Str::contains($reference, Str::after($ref, 'demo:')) || Str::contains($reference, str_replace('-', '', Str::after($ref, 'demo:'))));

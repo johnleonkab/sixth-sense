@@ -1,6 +1,6 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 
 const appName = import.meta.env.VITE_APP_NAME || 'sixth-sense';
@@ -9,6 +9,24 @@ const appName = import.meta.env.VITE_APP_NAME || 'sixth-sense';
  * After a rebuild or deploy, an open tab may ask for lazy chunks that no longer
  * exist. Reload once to pick up the new build instead of failing.
  */
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+
+    navigator.serviceWorker.addEventListener('message', (event: MessageEvent<{ type?: string; url?: string }>) => {
+        if (event.data?.type !== 'open-alert' || typeof event.data.url !== 'string') {
+            return;
+        }
+
+        const target = new URL(event.data.url, window.location.origin);
+
+        if (target.origin !== window.location.origin) {
+            return;
+        }
+
+        router.visit(`${target.pathname}${target.search}${target.hash}`);
+    });
+}
+
 window.addEventListener('vite:preloadError', () => {
     const key = 'reloaded-for-new-build-at';
     const lastReload = Number(sessionStorage.getItem(key) ?? 0);
@@ -33,3 +51,6 @@ createInertiaApp({
         color: 'var(--accent)',
     },
 });
+
+router.on('finish', () => document.documentElement.removeAttribute('data-nav'));
+router.on('httpException', () => document.documentElement.removeAttribute('data-nav'));

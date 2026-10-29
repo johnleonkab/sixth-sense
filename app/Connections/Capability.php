@@ -28,6 +28,8 @@ enum Capability: string
     case JiraRead = 'jira.read';
     case JiraWrite = 'jira.write';
     case JiraComment = 'jira.comment';
+    case GithubRead = 'github.read';
+    case GithubWrite = 'github.write';
 
     public function provider(): Provider
     {
@@ -51,6 +53,8 @@ enum Capability: string
             self::JiraRead,
             self::JiraWrite,
             self::JiraComment => Provider::Atlassian,
+            self::GithubRead,
+            self::GithubWrite => Provider::GitHub,
         };
     }
 
@@ -84,6 +88,8 @@ enum Capability: string
             self::NotionRead, self::NotionEdit, self::NotionComment => [],
             self::JiraRead => ['read:jira-work', 'read:jira-user'],
             self::JiraWrite, self::JiraComment => ['write:jira-work'],
+            // Classic OAuth has no read-only scope for private repositories: `repo` is both.
+            self::GithubRead, self::GithubWrite => ['repo'],
         };
     }
 
@@ -117,6 +123,8 @@ enum Capability: string
             self::JiraRead => 'Ver issues y comentarios',
             self::JiraWrite => 'Crear y editar issues',
             self::JiraComment => 'Comentar issues',
+            self::GithubRead => 'Leer repositorios',
+            self::GithubWrite => 'Actualizar código',
         };
     }
 
@@ -129,7 +137,7 @@ enum Capability: string
      */
     public function writes(): bool
     {
-        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment, self::JiraWrite, self::JiraComment], true);
+        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment, self::JiraWrite, self::JiraComment, self::GithubWrite], true);
     }
 
     /**

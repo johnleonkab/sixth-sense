@@ -26,7 +26,7 @@ class GoogleDocParser
         $this->runs = [];
         $this->characters = 0;
 
-        $blocks = $this->blocks($data['body']['content'] ?? [], $data['lists'] ?? []);
+        $blocks = $this->blocks($data['body']['content'] ?? [], $data['lists'] ?? [], $this->images($data));
 
         return new Document(
             ref: $ref,
@@ -42,9 +42,10 @@ class GoogleDocParser
     /**
      * @param  list<array<string, mixed>>  $content
      * @param  array<string, mixed>  $lists
+     * @param  array<string, string>  $images
      * @return list<array<string, mixed>>
      */
-    private function blocks(array $content, array $lists): array
+    private function blocks(array $content, array $lists, array $images = []): array
     {
         $blocks = [];
 
@@ -56,12 +57,12 @@ class GoogleDocParser
             }
 
             if (isset($element['paragraph'])) {
-                $blocks[] = $this->paragraph($element['paragraph'], $lists);
+                array_push($blocks, ...$this->paragraph($element['paragraph'], $lists, $images));
             } elseif (isset($element['table'])) {
                 $blocks[] = [
                     'type' => 'table',
                     'rows' => array_map(fn (array $row): array => array_map(
-                        fn (array $cell): array => $this->blocks($cell['content'] ?? [], $lists),
+                        fn (array $cell): array => $this->blocks($cell['content'] ?? [], $lists, $images),
                         $row['tableCells'] ?? [],
                     ), $element['table']['tableRows'] ?? []),
                 ];
@@ -72,19 +73,41 @@ class GoogleDocParser
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function images(array $data): array
+    {
+        $images = [];
+
+        foreach ($data['inlineObjects'] ?? [] as $id => $object) {
+            $uri = $object['inlineObjectProperties']['embeddedObject']['imageProperties']['contentUri'] ?? null;
+
+            if (is_string($id) && is_string($uri) && preg_match('~^https://~i', $uri)) {
+                $images[$id] = $uri;
+            }
+        }
+
+        return $images;
+    }
+
+    /**
      * @param  array<string, mixed>  $paragraph
      * @param  array<string, mixed>  $lists
-     * @return array<string, mixed>
+     * @param  array<string, string>  $images
+     * @return list<array<string, mixed>>
      */
-    private function paragraph(array $paragraph, array $lists): array
+    private function paragraph(array $paragraph, array $lists, array $images): array
     {
         $runs = [];
-        $hasImage = false;
+        $pictures = [];
         $hasRule = false;
 
         foreach ($paragraph['elements'] ?? [] as $element) {
-            if (isset($element['inlineObjectElement'])) {
-                $hasImage = true;
+            $objectId = $element['inlineObjectElement']['inlineObjectId'] ?? null;
+
+            if (is_string($objectId) && isset($images[$objectId])) {
+                $pictures[] = ['type' => 'image', 'src' => $images[$objectId]];
             }
 
             if (isset($element['horizontalRule'])) {
@@ -114,34 +137,34 @@ class GoogleDocParser
             }
         }
 
+        $blocks = $pictures;
+
         if ($runs === [] && $hasRule) {
-            return ['type' => 'rule'];
+            $blocks[] = ['type' => 'rule'];
+        } elseif ($runs !== [] || ($pictures === [] && ! $hasRule)) {
+            $style = $paragraph['paragraphStyle']['namedStyleType'] ?? 'NORMAL_TEXT';
+
+            if (isset($paragraph['bullet'])) {
+                $level = (int) ($paragraph['bullet']['nestingLevel'] ?? 0);
+                $glyph = $lists[$paragraph['bullet']['listId']]['listProperties']['nestingLevels'][$level] ?? [];
+
+                $blocks[] = [
+                    'type' => 'list_item',
+                    'level' => $level,
+                    'ordered' => isset($glyph['glyphType']) && ! in_array($glyph['glyphType'], ['GLYPH_TYPE_UNSPECIFIED', 'NONE'], true),
+                    'runs' => $runs,
+                ];
+            } else {
+                $blocks[] = match (true) {
+                    $style === 'TITLE' => ['type' => 'heading', 'level' => 0, 'runs' => $runs],
+                    $style === 'SUBTITLE' => ['type' => 'heading', 'level' => 6, 'runs' => $runs],
+                    str_starts_with($style, 'HEADING_') => ['type' => 'heading', 'level' => (int) substr($style, 8), 'runs' => $runs],
+                    default => ['type' => 'paragraph', 'runs' => $runs],
+                };
+            }
         }
 
-        if ($runs === [] && $hasImage) {
-            return ['type' => 'image'];
-        }
-
-        $style = $paragraph['paragraphStyle']['namedStyleType'] ?? 'NORMAL_TEXT';
-
-        if (isset($paragraph['bullet'])) {
-            $level = (int) ($paragraph['bullet']['nestingLevel'] ?? 0);
-            $glyph = $lists[$paragraph['bullet']['listId']]['listProperties']['nestingLevels'][$level] ?? [];
-
-            return [
-                'type' => 'list_item',
-                'level' => $level,
-                'ordered' => isset($glyph['glyphType']) && ! in_array($glyph['glyphType'], ['GLYPH_TYPE_UNSPECIFIED', 'NONE'], true),
-                'runs' => $runs,
-            ];
-        }
-
-        return match (true) {
-            $style === 'TITLE' => ['type' => 'heading', 'level' => 0, 'runs' => $runs],
-            $style === 'SUBTITLE' => ['type' => 'heading', 'level' => 6, 'runs' => $runs],
-            str_starts_with($style, 'HEADING_') => ['type' => 'heading', 'level' => (int) substr($style, 8), 'runs' => $runs],
-            default => ['type' => 'paragraph', 'runs' => $runs],
-        };
+        return $blocks;
     }
 
     private function safeUrl(?string $url): ?string

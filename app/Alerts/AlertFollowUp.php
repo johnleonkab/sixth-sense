@@ -2,8 +2,17 @@
 
 namespace App\Alerts;
 
+use App\Alerts\Intents\AutonomyLevel;
+use App\Alerts\Intents\IntentResearch;
+use App\Alerts\Intents\SlackAction;
+use App\Alerts\Intents\SlackAutonomy;
+use App\Alerts\Intents\SlackDraft;
+use App\Alerts\Intents\SlackDraftBrief;
 use App\Alerts\Replies\AlertBrief;
+use App\Alerts\Replies\ReplyPlan;
 use App\Alerts\Replies\ReplyPlanner;
+use App\Analytics\ProductAnalytics;
+use App\Analytics\SlackTriageEvent;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Issues\IssueComment;
@@ -14,7 +23,9 @@ use App\Events\InboxItemUpdated;
 use App\Jobs\ScheduleTask;
 use App\Models\AgendaTask;
 use App\Models\InboxItem;
+use App\Models\SlackTriageDecision;
 use App\Models\User;
+use App\Scenes\SceneMatch;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -33,6 +44,11 @@ class AlertFollowUp
         private Mailbox $mailbox,
         private Chats $chats,
         private IssueTracker $issues,
+        private SceneMatch $scenes,
+        private IntentResearch $research,
+        private SlackDraft $drafts,
+        private ProductAnalytics $analytics,
+        private SlackAutonomy $autonomy,
     ) {}
 
     /**
@@ -46,6 +62,21 @@ class AlertFollowUp
             return;
         }
 
+        $scene = $this->scenes->openFor($item);
+
+        if ($scene !== null) {
+            $item->update([
+                'proposal' => [
+                    'summary' => 'Hay una escena preparada en este aviso.',
+                    'scene_id' => $scene->id,
+                ],
+                'planning' => false,
+            ]);
+            InboxItemUpdated::dispatch($item);
+
+            return;
+        }
+
         $brief = $this->brief($item);
 
         if ($brief === null) {
@@ -54,12 +85,56 @@ class AlertFollowUp
             return;
         }
 
+        $decision = $this->slackDecision($item);
+        $draft = null;
+
+        if ($decision !== null) {
+            $draft = $this->drafts->prepare($item->user, $brief, $decision);
+            $brief = $brief->withFindings($draft->findings);
+        } else {
+            $brief = $brief->withFindings($this->research->gather($item->user, $brief));
+        }
+
         $plan = $this->planner->plan($item->user, $brief);
-        $item->update(['proposal' => $plan->toArray(), 'planning' => false]);
+
+        if (filled($plan->learned)) {
+            $item->user->intentLessons()->create([
+                'inbox_item_id' => $item->id,
+                'body' => $plan->learned,
+            ]);
+        }
+
+        $proposal = $plan->toArray();
+
+        if ($draft !== null && $decision !== null) {
+            $proposal = $this->proposal($plan, $decision, $draft);
+        }
+
+        $item->update(['proposal' => $proposal, 'planning' => false]);
         InboxItemUpdated::dispatch($item);
 
+        if ($draft !== null && $decision !== null) {
+            $this->analytics->capture($item->user, SlackTriageEvent::ReplyPlanned, [
+                'action' => $decision->action,
+                'place' => $decision->place,
+                'sufficient' => $draft->sufficient,
+                'agent_asked' => $draft->agentAsked,
+                'conflict' => $draft->conflict,
+            ]);
+
+            $text = $this->draftText($proposal);
+
+            if ($text !== null) {
+                $decision->update(['draft_text' => $text]);
+            }
+
+            if ($text !== null && $draft->sufficient && $this->autonomy->level($item->user, SlackAction::from($decision->action)) === AutonomyLevel::Act) {
+                $this->autonomy->perform($item->user, $decision, $text);
+            }
+        }
+
         // Work the person has to do themselves: the scheduler finds time for it.
-        if ($plan->task !== null && $item->user->wantsAlertsFrom(AlertSource::Agenda) && ! AgendaTask::where('inbox_item_id', $item->id)->exists()) {
+        if ($decision?->action !== SlackAction::Redirect->value && $plan->task !== null && $item->user->wantsAlertsFrom(AlertSource::Agenda) && ! AgendaTask::where('inbox_item_id', $item->id)->exists()) {
             $task = $item->user->agendaTasks()->create([
                 'inbox_item_id' => $item->id,
                 'origin' => 'alert',
@@ -69,6 +144,67 @@ class AlertFollowUp
 
             ScheduleTask::dispatch($task, $plan->task['effort_minutes'], $plan->task['deadline'], $plan->task['people']);
         }
+    }
+
+    /**
+     * A Slack reply keeps the draft and adds what the search found. A redirect
+     * proposes who and the message, and does not answer in the channel.
+     *
+     * @return array<string, mixed>
+     */
+    private function proposal(ReplyPlan $plan, SlackTriageDecision $decision, SlackDraftBrief $draft): array
+    {
+        if ($decision->action === SlackAction::Redirect->value) {
+            $text = trim((string) ($plan->reply['text'] ?? ''));
+
+            return [
+                'summary' => 'Pasárselo a '.($decision->target ?: 'otra persona').'.',
+                'reply' => null,
+                'other_actions' => [],
+                'question' => $draft->sufficient ? null : $draft->note,
+                'task' => null,
+                'redirect' => ['to' => $decision->target, 'text' => Str::limit(trim($text."\n\n".$draft->note), 2000)],
+            ];
+        }
+
+        $proposal = $plan->toArray();
+
+        if (is_array($proposal['reply'])) {
+            $proposal['reply']['text'] = Str::limit(trim($proposal['reply']['text']."\n\n".$draft->note), 2000);
+        }
+
+        if (! $draft->sufficient) {
+            $proposal['question'] = $draft->note;
+        }
+
+        return $proposal;
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposal
+     */
+    private function draftText(array $proposal): ?string
+    {
+        $redirect = $proposal['redirect']['text'] ?? null;
+        $reply = $proposal['reply']['text'] ?? null;
+        $text = trim((string) ($redirect ?: $reply));
+
+        return $text === '' ? null : $text;
+    }
+
+    private function slackDecision(InboxItem $item): ?SlackTriageDecision
+    {
+        if ($item->source !== AlertSource::Slack) {
+            return null;
+        }
+
+        $decision = $item->user->slackTriageDecisions()->where('external_id', $item->external_id)->first();
+
+        if ($decision === null || ! in_array($decision->action, [SlackAction::Reply->value, SlackAction::Redirect->value], true)) {
+            return null;
+        }
+
+        return $decision;
     }
 
     /**

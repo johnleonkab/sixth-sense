@@ -60,6 +60,33 @@ test('search lists pages, newest edit first, with the api version it was written
         && $request['filter'] === ['property' => 'object', 'value' => 'page']);
 });
 
+test('the outline starts at the highest pages and keeps fewer as it goes deeper', function () {
+    $child = '9f8e7d6c-0000-4000-8000-000000000002';
+
+    Http::fake(function (Request $request) use ($child) {
+        if (str_contains($request->url(), '/children')) {
+            return Http::response(['results' => [[
+                'type' => 'child_page',
+                'id' => $child,
+                'child_page' => ['title' => 'Detalle'],
+            ]]]);
+        }
+
+        return Http::response(['results' => [notionPage([
+            'parent' => ['type' => 'workspace', 'workspace' => true],
+        ])]]);
+    });
+
+    $outline = $this->wiki->outline($this->user, [1, 1]);
+
+    expect($outline)->toHaveCount(2)
+        ->and($outline[0]['depth'])->toBe(0)
+        ->and($outline[0]['page']->title)->toBe('Plan de lanzamiento')
+        ->and($outline[1]['depth'])->toBe(1)
+        ->and($outline[1]['page']->title)->toBe('Detalle')
+        ->and($outline[1]['page']->parentTitle)->toBe('Plan de lanzamiento');
+});
+
 test('a page opens from a link, with its markdown and its links to share', function () {
     Http::fake([
         'api.notion.com/v1/pages/'.PAGE_ID.'/markdown' => Http::response(['markdown' => "# Plan\n- [ ] Revisión", 'truncated' => false]),

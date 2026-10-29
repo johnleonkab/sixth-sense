@@ -22,6 +22,7 @@ final readonly class ReplyPlan
         public array $otherActions = [],
         public ?string $question = null,
         public ?array $task = null,
+        public ?string $learned = null,
     ) {}
 
     /**

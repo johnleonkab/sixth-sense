@@ -49,7 +49,7 @@ export default function Register() {
             <main className="grid min-h-full place-items-center px-4 py-12">
                 <div className="w-full max-w-[360px]">
                     <div className="mb-8 text-[15px]">
-                        <Wordmark className="h-8" />
+                        <Wordmark to="/" className="h-8" />
                         <p className="mt-3 text-muted">Tu jornada, hablando.</p>
                     </div>
 

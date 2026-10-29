@@ -3,7 +3,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { useEffect, useRef, useState } from 'react';
 
 import CanvasFrame from '@/canvas/canvas-frame';
-import { nextZoom, ToolbarButton, type FileProps } from '@/canvas/files/viewer-toolbar';
+import { nextZoom, ToolbarButton, usePinchZoom, type FileProps } from '@/canvas/files/viewer-toolbar';
 import { fileSize } from '@/canvas/mail/types';
 import type { CanvasComponent } from '@/canvas/types';
 import { registerViewer } from '@/canvas/viewers';
@@ -42,6 +42,7 @@ const PdfViewer: CanvasComponent<PdfViewerProps> = ({ index, ...props }) => {
     const [width, setWidth] = useState(0);
     const scroller = useRef<HTMLDivElement>(null);
     const canvas = useRef<HTMLCanvasElement>(null);
+    usePinchZoom(scroller, (direction) => setZoom((current) => nextZoom(current, direction)));
 
     // The current values, for the assistant's calls.
     const state = useRef({ pdf, page, zoom });
@@ -234,7 +235,7 @@ const PdfViewer: CanvasComponent<PdfViewerProps> = ({ index, ...props }) => {
                 </div>
             </div>
 
-            <div ref={scroller} className="max-h-[68vh] overflow-auto rounded-xl bg-soft [scrollbar-gutter:stable]">
+            <div ref={scroller} className="max-h-[68vh] overflow-auto rounded-xl bg-soft touch-[pan-x_pan-y] [scrollbar-gutter:stable]">
                 {failed ? (
                     <div className="p-10 text-center text-[13px] text-muted">
                         <p>No he podido abrir este PDF.</p>

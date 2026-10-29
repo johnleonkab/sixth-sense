@@ -10,14 +10,13 @@ use App\Models\WingmanSegment;
 use App\Wingman\ExtensionTokens;
 use App\Wingman\MeetingStatus;
 use App\Wingman\Notes\FakeNoteTaker;
-use App\Wingman\Notes\GeminiNoteTaker;
 use App\Wingman\Notes\LiveNotes;
+use App\Wingman\Notes\LlmNoteTaker;
 use App\Wingman\Notes\MeetingNotes;
 use App\Wingman\Notes\NoteTaker;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\RecordingTextModel;
 
 beforeEach(function () {
     Event::fake([WingmanMeetingUpdated::class, WingmanMeetingEnded::class]);
@@ -80,22 +79,22 @@ test('as lines arrive from the extension, notes are asked for every little while
     Queue::assertPushed(CloseWingmanMeeting::class, 1);
 });
 
-test('gemini gets the notes so far and the new lines, and answers the whole notes', function () {
-    Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+test('the note-taker gets the notes so far and the new lines, and answers the whole notes', function () {
+    $model = new RecordingTextModel([
         'summary' => 'Se revisa el reembolso parcial.',
         'topics' => [['title' => 'Reembolso parcial', 'points' => ['Depende de la pasarela']]],
         'decisions' => [],
         'questions' => ['¿Entra en el sprint?'],
         'commitments' => [['who' => 'Tú', 'what' => 'Mirar CPD-412', 'when' => 'hoy']],
-    ])]]]]]])]);
-    $taker = new GeminiNoteTaker(['api_key' => 'k', 'base_url' => 'https://generativelanguage.googleapis.com', 'model' => 'm', 'thinking_level' => null, 'timeout' => 5]);
+    ]);
+    $taker = new LlmNoteTaker($model);
 
     $notes = $taker->update($this->meeting, MeetingNotes::empty(), [['at' => '10:01', 'speaker' => 'Tú', 'is_me' => true, 'text' => 'Lo miro hoy']]);
 
     expect($notes->summary)->toBe('Se revisa el reembolso parcial.')
-        ->and($notes->commitments[0])->toBe(['who' => 'Tú', 'what' => 'Mirar CPD-412', 'when' => 'hoy']);
-    Http::assertSent(fn (Request $request) => str_contains($request['systemInstruction']['parts'][0]['text'], '«Tú» es John León')
-        && str_contains($request['contents'][0]['parts'][0]['text'], '[10:01] Tú: Lo miro hoy'));
+        ->and($notes->commitments[0])->toBe(['who' => 'Tú', 'what' => 'Mirar CPD-412', 'when' => 'hoy'])
+        ->and($model->calls[0]['system'])->toContain('«Tú» es John León')
+        ->and($model->calls[0]['user'])->toContain('[10:01] Tú: Lo miro hoy');
 });
 
 test('when the note-taker fails, the lines stay to be taken next time', function () {

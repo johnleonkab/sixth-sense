@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * Something that deserved an alert, with why: a message waiting for the
  * person's answer (with how an AI proposes to answer it), or a reminder.
  */
-#[Fillable(['source', 'external_id', 'thread_key', 'external_url', 'actor_name', 'title', 'body', 'why', 'relevance', 'status', 'triage', 'planning', 'resolution', 'payload', 'proposal', 'read_at', 'resolved_at', 'received_at'])]
+#[Fillable(['source', 'external_id', 'thread_key', 'external_url', 'actor_name', 'title', 'body', 'why', 'relevance', 'status', 'triage', 'planning', 'resolution', 'payload', 'proposal', 'read_at', 'resolved_at', 'received_at', 'last_push_key'])]
 class InboxItem extends Model
 {
     /** @use HasFactory<InboxItemFactory> */
@@ -67,6 +67,16 @@ class InboxItem extends Model
     }
 
     /**
+     * The scene this alert opened, when the alert matched a scene kind.
+     *
+     * @return HasOne<Scene, $this>
+     */
+    public function scene(): HasOne
+    {
+        return $this->hasOne(Scene::class);
+    }
+
+    /**
      * Alerts still waiting for the person's answer.
      *
      * @param  Builder<InboxItem>  $query
@@ -101,9 +111,22 @@ class InboxItem extends Model
     }
 
     /**
+     * Conversations this intent already covers, across channels.
+     *
+     * @return list<string>
+     */
+    public function threads(): array
+    {
+        return array_values(array_unique(array_filter([
+            ...($this->payload['threads'] ?? []),
+            $this->thread_key,
+        ])));
+    }
+
+    /**
      * One message of a conversation, as an alert keeps it.
      *
-     * @return array{id: string, from: ?string, text: string, at: string}
+     * @return array{id: string, from: ?string, text: string, at: string, source: string}
      */
     public static function messageOf(InboxCandidate $candidate): array
     {
@@ -112,6 +135,7 @@ class InboxItem extends Model
             'from' => $candidate->from?->label(),
             'text' => mb_substr($candidate->excerpt, 0, 1000),
             'at' => $candidate->receivedAt->toIso8601String(),
+            'source' => $candidate->source->value,
         ];
     }
 
@@ -121,6 +145,22 @@ class InboxItem extends Model
     public function messageRef(): string
     {
         return $this->external_id;
+    }
+
+    /**
+     * Waiting for the person: the states that already ring inside the app.
+     */
+    public function awaitsPush(): bool
+    {
+        return in_array($this->state(), ['important', 'planning', 'ready'], true);
+    }
+
+    /**
+     * One notification per message. A proposal becoming ready does not change it.
+     */
+    public function pushKey(): string
+    {
+        return $this->id.':'.count($this->messages()).':'.$this->external_id;
     }
 
     /**

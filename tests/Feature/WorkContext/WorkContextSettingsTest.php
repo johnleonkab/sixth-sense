@@ -55,7 +55,9 @@ test('switching it on builds it right away the first time', function () {
     $this->actingAs($this->user)->put(route('settings.context.update'), ['enabled' => true])->assertRedirect();
 
     expect($this->user->workContext()->first()->enabled)->toBeTrue();
-    Queue::assertPushed(BuildWorkContext::class, fn (BuildWorkContext $job) => $job->user->is($this->user));
+    Queue::assertPushed(BuildWorkContext::class, fn (BuildWorkContext $job) => $job->user->is($this->user)
+        && $job->connection === 'redis-long'
+        && $job->queue === 'context');
 });
 
 test('switching it on again waits for the night when it was already built', function () {

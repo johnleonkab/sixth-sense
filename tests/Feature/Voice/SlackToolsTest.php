@@ -85,7 +85,10 @@ test('a reply in a thread tagging someone is a draft until confirmed', function 
         ->assertJsonPath('canvas.view', 'slack.draft')
         ->assertJsonPath('canvas.props.to', '#producto')
         ->assertJsonPath('canvas.props.mentions', ['Pablo Gil'])
-        ->assertJsonPath('canvas.props.thread.ref', 'demo:C01:1001.000400');
+        ->assertJsonPath('canvas.props.thread.ref', 'demo:C01:1001.000400')
+        ->assertJsonPath('beside.view', 'slack.conversation')
+        ->assertJsonPath('beside.props.thread_ref', 'demo:C01:1001.000100')
+        ->assertJsonCount(4, 'beside.props.messages');
 
     expect($this->chats->sent)->toBe([]);
 

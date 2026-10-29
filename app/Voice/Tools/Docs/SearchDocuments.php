@@ -19,7 +19,8 @@ class SearchDocuments implements VoiceTool
     public function description(): string
     {
         return 'Busca documentos de Google Docs para responder SOLO por voz ("¿quién editó el PRD de prepago?", "¿tengo algún documento de Grupo Vela?"). '
-            .'Si pide ver, listar o buscar documentos en pantalla, usa show_document_results; para verlo entero, open_document.';
+            .'Para encontrar un archivo del que se está hablando, en Drive o en Notion, usa find_files. '
+            .'Si pide ver la lista en pantalla, usa show_document_results; para verlo entero, open_document.';
     }
 
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult

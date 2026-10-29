@@ -6,108 +6,129 @@
 </p>
 
 <p align="center">
-  <b>Tu jornada de trabajo, hablando.</b><br>
-  Hablas; la IA te responde con voz y, a la vez, pone en pantalla justo lo que hace falta.
+  <b>Your workday, spoken.</b><br>
+  Tu jornada de trabajo, hablando.<br>
+  You talk. It answers out loud and puts on screen the calendar, the email, the thread or the document you are talking about.
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2e56e6" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
   <img src="https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white" alt="PHP 8.5">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
-  <img src="https://img.shields.io/badge/Inertia-3-9553E9" alt="Inertia 3">
-  <img src="https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind 4">
-  <img src="https://img.shields.io/badge/Gemini_Live-voz-4285F4?logo=googlegemini&logoColor=white" alt="Gemini Live">
-  <img src="https://img.shields.io/badge/tests-Pest-F28D1A" alt="Pest">
+  <img src="https://img.shields.io/badge/self--hosted-your%20keys-141515" alt="Self-hosted">
+</p>
+
+<p align="center">
+  <a href="https://github.com/johnleonkab/sixth-sense">GitHub</a>
+  ·
+  <a href="#run-it-yourself">Run it yourself</a>
+  ·
+  <a href="LICENSE">MIT</a>
 </p>
 
 ---
 
-Sixth Sense no es un dashboard ni un chatbot con voz. Es una **pantalla compartida**: lo que se dice y lo que se ve se refieren a lo mismo. Le pides «enséñame mañana», «abre el email de Marta», «contesta a este» o «pasa a la página 3», y la IA habla y muestra el calendario, el email, el hilo de Slack o el PDF del que estáis hablando.
+Sixth Sense is an open-source assistant for a workday you already have. It is not a dashboard and it is not a chatbot with a microphone bolted on. The screen and the voice refer to the same thing, so you can say “open the second one”, “reply to this” or “move it to Thursday”.
 
-Conecta con **Google Calendar, Gmail, Google Docs, Google Drive, Slack y Notion**, con todas las cuentas que quieras de cada uno.
+You run it. Your Google, Slack, Jira, Notion and GitHub accounts connect to **your** instance. API keys stay on that server, encrypted. Audio goes from the browser to the voice provider and never through Laravel.
 
-## Qué se le puede pedir
+The interface speaks Spanish. The code is in English.
 
-> «¿Qué tengo hoy?» · «Busca el email donde Andrés habla del contrato» · «Contéstale a todos que lo reviso antes de las 12» · «Muévela al jueves e invita a Pablo» · «Abre el documento que me ha pasado Marta por Slack» · «Léeme la segunda página» · «¿Qué tengo pendiente de responder?» · «Dime»
+## A line you can post
 
-| | Leer y mostrar | Cambiar (siempre con tu «sí») |
+> Sixth Sense es tu jornada de trabajo, hablando. Código abierto (MIT): lo instalas tú, con tus claves, y la pantalla muestra lo mismo que estás diciendo. https://github.com/johnleonkab/sixth-sense
+
+> Your workday, spoken. An open-source assistant that answers out loud and shows the calendar, the email or the thread you mean. Self-host it. https://github.com/johnleonkab/sixth-sense
+
+## What you can ask
+
+> “What do I have today?” · “Find the email where Andrés mentions the contract” · “Reply to everyone that I’ll review it before 12” · “Move it to Thursday and invite Pablo” · “Open the doc Marta sent on Slack” · “Read me the second page” · “What’s waiting on me?”
+
+| | Read and show | Change, always after your “yes” |
 |---|---|---|
-| **Calendar** | Día y agenda de todos tus calendarios; buscar eventos | Crear reuniones con Meet, invitar, añadir resumen, cancelar, aceptar o rechazar |
-| **Gmail** | Búsqueda con expresiones regulares («donde X dice Y»), resultados y detalle, adjuntos | Redactar, responder (a uno o a todos) y reenviar |
-| **Docs y Drive** | Buscar, abrir con formato, abrir los enlazados desde emails, eventos o Slack, archivos de Word | Proponer ediciones y comentarios |
-| **Slack** | Personas, canales y DMs, no leídos importantes, hilos, archivos | Mensajes en conversaciones o hilos, con menciones |
-| **Notion** | Buscar y abrir páginas, sus comentarios y enlaces | Crear y editar páginas, comentar y responder comentarios |
-| **Archivos** | Visor de PDF (páginas, zoom, leer en voz alta) e imágenes | — |
+| **Calendar** | Day and agenda across every calendar you connect | Create meetings with Meet, invite, add a summary, cancel, accept or decline |
+| **Gmail** | Search, including “where X says Y”, threads and attachments | Write, reply (one person or everyone) and forward |
+| **Docs and Drive** | Search, open with formatting, follow links from mail, events or Slack | Propose edits and comments |
+| **Slack** | People, channels, DMs, important unread, threads, files | Messages in a channel or a thread, with mentions |
+| **Jira** | Search and open issues | Create and edit issues, set dependencies, comment |
+| **Notion** | Search and open pages, comments and links | Create and edit pages, comment and reply |
+| **GitHub** | A work archive of notes and agents, on the repository you choose | Propose a file or a deletion; it lands on `main` only after you confirm |
+| **Files** | PDF pages, zoom, read aloud, and images | — |
 
-## Proactiva, con criterio
+When a decision needs two things, both stay on screen: the draft and the thread, the meeting that does not fit and the day. On a phone they stack.
 
-Sixth Sense vigila **Gmail y Slack** y solo te interrumpe cuando algo **espera tu respuesta**:
+## It speaks up only when it matters
 
-1. **Detecta**: los mensajes nuevos pasan primero por unas reglas baratas (newsletters, bots, tus propios mensajes) y después por un juez de IA que decide si te toca responder y **por qué**.
-2. **Te avisa** con un sonido propio de cada fuente y una nota breve. La alerta queda **pendiente** hasta que respondes, aunque recargues.
-3. **Propone**: un motor de respuestas independiente piensa cómo resolverla. Por ejemplo: «Responder a todos que no llegamos y proponer el jueves», con borrador y otras acciones como crear el evento.
-4. **La revisas hablando**: dices «dime», cambias lo que quieras y la IA prepara cada acción para que la confirmes.
-5. **Se cierra sola** cuando respondes, ya sea desde aquí o desde Gmail o Slack.
+Sixth Sense watches **Gmail, Slack and Jira** and interrupts you when something is **waiting on you**:
 
-También avisa antes de cada **reunión**: hasta 30 minutos antes si hay que preparar algo, y un par de minutos antes si no.
+1. **Detects.** New messages pass cheap rules first (newsletters, bots, your own messages), then a model that decides whether you need to answer, and why.
+2. **Tells you.** A sound per source, a short note, and a system notification on this phone or computer. The alert stays until you deal with it.
+3. **Proposes.** A separate planner drafts a way through: “Reply to everyone that we can’t make it, and offer Thursday”, with the draft and the meeting ready to confirm.
+4. **You review it by voice.** Say “tell me”, change what you want, and confirm each action.
+5. **Closes itself** once you have replied, from here or from Gmail, Slack or Jira.
 
-## Sabe en qué estás
+It also warns you before a **meeting**: up to 30 minutes ahead when there is something to prepare, and a couple of minutes ahead when there is not.
 
-Si activas **Configuración → Contexto**, cada noche Sixth Sense repasa tu semana **en modo solo lectura**:
+Install the site to your home screen and turn on **Avisar en este dispositivo**. Opening the notification lands you on that alert.
 
-- **Slack**: los últimos 5 días de lo que escribes, lo que te escriben y donde te mencionan.
-- **Gmail**: 7 días de la bandeja principal y de enviados.
-- **Google Docs y Notion**: los documentos y páginas que se han creado, compartido o editado en 7 días.
+## It knows what you are in the middle of
 
-Con eso escribe un contexto breve: en qué procesos estás, por qué, con quién y dónde, y qué tienes pendiente. El asistente lo lee al empezar cada conversación, así que entiende «lo del prepago» o «lo de Marta» sin que se lo expliques, y no añade ninguna llamada ni retraso. En la misma pantalla ves su estado, lo que sabe el asistente y un botón para regenerarlo. Si tiene más de 3 días, el asistente deja de usarlo.
+Turn on **Configuración → Contexto** and, each night, Sixth Sense reads the week in **read-only** mode: recent Slack, Gmail, Google Docs and Notion. It writes a short brief of the workstreams, why they matter, who is involved, and what is still open. The assistant reads that brief at the start of each conversation, so “the prepayment thing” or “Marta’s doc” already means something. Older than three days, it stops using it. You can read the brief and rebuild it from the same screen.
 
-## Principios
+A GitHub repository can hold the longer archive: the notes and the agents for that work. You edit them from settings or by voice. Writes wait for a yes, and they go to `main`.
 
-- **Voz primero.** Todo se puede hacer hablando. El teclado es solo una alternativa: haz clic en la línea de tu voz para escribir.
-- **La pantalla es lo que hablas.** El agente decide qué mostrar, con un máximo de dos columnas.
-- **Solo dos líneas de texto**: lo que dices y lo que responde. No hay historial de chat.
-- **Leer es libre; escribir siempre pide un «sí».** Todo cambio se muestra antes como borrador y, una vez confirmado, tienes 8 segundos para deshacerlo.
-- **Multicuenta desde el principio.** Puedes conectar varias cuentas de Google o de Slack, y las lecturas las juntan.
-- **Diseño limpio.** Una tipografía, un color de acento, modo claro y oscuro.
+## In a Google Meet call
 
-## Arquitectura
+[Wingman](extensions/wingman-meet) is a small browser extension. It reads Meet’s own captions on your screen. No bot joins the call. During the meeting it can surface the ticket you just named, a slot that is free, or a message you promised to send. When you hang up, what you committed to is waiting as actions you can confirm. Transcripts are discarded once the notes exist.
+
+## Principles
+
+- **Voice first.** The keyboard is there: click the line of what you are saying and type.
+- **The screen is what you are talking about.** At most two columns.
+- **Two lines of text.** What you are saying, and what it answers. No chat history.
+- **Reading is free. Writing always asks for a “yes”.** You see the draft first. After you confirm, you have 8 seconds to undo.
+- **Several accounts from the start.** More than one Google, Slack, Jira or Notion account. Reads join them.
+- **Quiet on purpose.** One typeface, one accent colour, light and dark.
+
+## How it is built
 
 ```mermaid
 flowchart LR
-    subgraph Navegador
-        Mic([Micrófono]) --> Live[Gemini Live<br/>voz a voz]
-        Live --> Voice[Sesión de voz]
+    subgraph Browser
+        Mic([Microphone]) --> Live[Gemini Live]
+        Live --> Voice[Voice session]
         Voice -- tool calls --> Tools
-        Canvas[Lienzo<br/>canvases React]
-        Alerts[Avisos]
+        Canvas[Canvases]
+        Alerts[Alerts]
     end
 
     subgraph Laravel
         Tools[POST /voice/tools] --> Toolbox
-        Toolbox --> Connectors[(Conectores<br/>Google · Slack · Notion)]
-        Toolbox -- escritura --> Pending[PendingAction<br/>«sí» + deshacer]
-        Watchers[Watchers<br/>Gmail · Slack] --> Judge[Juez IA] --> Inbox[(Alertas)]
-        Inbox --> Planner[Motor de respuestas]
-        Nightly[Contexto nocturno<br/>solo lectura] --> Connectors
+        Toolbox --> Connectors[(Connectors)]
+        Toolbox -- writes --> Pending[Pending action]
+        Watchers[Gmail · Slack · Jira] --> Judge[Judge] --> Inbox[(Alerts)]
+        Inbox --> Planner[Reply planner]
+        Nightly[Nightly context] --> Connectors
     end
 
-    Tools -- output + canvas --> Canvas
-    Inbox -- Reverb --> Alerts
+    Tools -- canvas --> Canvas
+    Inbox -- Reverb + Web Push --> Alerts
 ```
 
-- **Laravel nunca toca el audio.** El navegador habla directamente con el proveedor de voz usando un token efímero que emite Laravel.
-- **Proveedor de voz intercambiable**, detrás de `VoiceProvider` (PHP) y `VoiceTransport` (TS). Hoy es Gemini Live.
-- **Herramientas declaradas una sola vez** en `app/Voice/Tools` y traducidas al formato de cada proveedor. Cada una devuelve `output` para el modelo y, si procede, un **canvas**: una vista preconfigurada que el frontend sabe pintar (`calendar.day`, `mail.message`, `pdf.viewer`, `alerts.review`…).
-- **Toda la lógica de un servicio vive en su conector** (`app/Connectors`), cada uno con un `Fake` para los tests y para el **modo demo**.
-- **Motor de respuestas aislado** tras `ReplyPlanner`. Hoy usa Gemini Flash; se puede sustituir por otro agente con acceso a tu base de conocimiento.
-- **Contexto de trabajo** tras `ContextSummarizer`: un job nocturno lee la semana con los conectores (solo métodos de lectura), Gemini la resume, y el resultado se añade a las instrucciones de cada sesión de voz.
+- **Laravel never handles audio.** The browser talks to the voice provider with a short-lived token.
+- **Voice is Gemini Live.** Other text (alerts, drafts, context, Wingman, the scheduler) goes through DeepSeek by default, or Gemini if you set `AI_TEXT_PROVIDER`.
+- **Each tool lives once** in `app/Voice/Tools` and returns words for the model plus, when it should, a canvas the frontend already knows how to paint.
+- **Each service lives in its connector** (`app/Connectors`), with a fake for tests and for demo mode.
+- **Your keys or the server’s.** A signed-in person can store their own Gemini and DeepSeek keys. They are encrypted, and a background job forgets them when it finishes.
 
-## Puesta en marcha
+## Run it yourself
 
-**Requisitos:** Docker y Node. PHP y Composer se ejecutan dentro del contenedor `app`, así que no hace falta instalarlos.
+**You need** Docker and Node. PHP and Composer run inside the `app` container.
 
 ```bash
-git clone git@github.com:johnleonkab/sixth-sense.git && cd sixth-sense
+git clone https://github.com/johnleonkab/sixth-sense.git
+cd sixth-sense
 cp .env.example .env
 
 docker compose build app
@@ -115,82 +136,85 @@ docker compose run --rm app composer install
 docker compose run --rm app php artisan key:generate
 npm install
 
-docker compose up -d                                   # app :8000, Reverb :8080, Postgres :5433, Redis :6380
+docker compose up -d
 docker compose exec app php artisan migrate
-docker compose exec app php artisan app:create-user    # te pide nombre, email y contraseña
+docker compose exec app php artisan app:create-user
 ```
 
-Para trabajar, en cuatro terminales:
+Then, one terminal each:
 
 ```bash
-docker compose exec app php artisan horizon            # colas
-docker compose exec app php artisan reverb:start       # avisos en tiempo real
-docker compose exec app php artisan schedule:work      # tareas programadas (avisos, contexto nocturno)
-npm run dev                                            # Vite, en tu máquina
+docker compose exec app php artisan horizon
+docker compose exec app php artisan reverb:start
+docker compose exec app php artisan schedule:work
+npm run dev
 ```
 
-> Con PHP 8.5 instalado en tu máquina puedes usar `php artisan …` y `composer dev` directamente, en vez de `docker compose exec app …`.
+Open **http://localhost:8000**, sign in, and press **Hablar**.
 
-Abre **http://localhost:8000**, entra con tu usuario y pulsa **Hablar**.
+With PHP 8.5 on the machine, `php artisan …` and `composer run dev` work without the `docker compose exec app` prefix.
 
-> **Sin cuentas conectadas:** con `CONNECTORS_DEMO=true` todo funciona con los datos de ejemplo del prototipo (`docs/prototype.html`).
+Set `CONNECTORS_DEMO=true` to click through with the sample data from `docs/prototype.html`, before any account is connected.
 
-### Configuración
+### What to fill in
 
-| Variable | Para qué |
+| Variable | What it is |
 |---|---|
-| `GEMINI_API_KEY` | Voz (Gemini Live), juez de alertas y motor de respuestas. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
-| `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE` | Modelo y voz de la conversación. |
-| `ALERTS_GEMINI_MODEL` | Modelo del juez, del motor de respuestas y del contexto de trabajo. El nivel gratuito de Flash tiene un límite diario bajo. |
-| `WORK_CONTEXT_RUN_AT` | Hora a la que se genera el contexto de trabajo cada noche (por defecto `04:30`). |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Cliente OAuth web de Google Cloud, con las APIs de Calendar, Gmail, Docs y Drive activadas. |
-| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | App de Slack con *user token scopes*. La redirección debe ser HTTPS, así que en local se usa un túnel. |
-| `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI` | Integración pública de Notion. |
-| `REGISTRATION_ENABLED` | `true` para que cualquiera pueda crearse una cuenta desde la pantalla de entrada. Por defecto está apagado y las cuentas se crean con `app:create-user`. |
-| `CONNECTORS_DEMO` | `true` para usar datos de ejemplo en lugar de las cuentas reales. |
+| `GEMINI_API_KEY` | Voice. Create one in [Google AI Studio](https://aistudio.google.com/apikey). |
+| `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE` | Conversation model and voice. |
+| `AI_TEXT_PROVIDER` | `deepseek` (default) or `gemini`, for everything that is not the live voice. |
+| `DEEPSEEK_API_KEY` | Text key, from [DeepSeek](https://platform.deepseek.com/api_keys). |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | A Google Cloud web client, with Calendar, Gmail, Docs and Drive enabled. |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | A Slack app with user token scopes. The redirect has to be HTTPS, so local development uses a tunnel. |
+| `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET`, `ATLASSIAN_REDIRECT_URI` | Jira. |
+| `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI` | A public Notion integration. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI` | The archive. GitHub must be allowed to issue a refresh token. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push. The public key is given to the browser. `VAPID_SUBJECT` should be a `mailto:` you actually read. |
+| `REGISTRATION_ENABLED` | `true` lets anyone create an account from the sign-in screen. Off by default; use `app:create-user`. |
+| `CONNECTORS_DEMO` | `true` uses sample data instead of live accounts. |
 
-Las cuentas se conectan desde **Configuración → Conexiones**, los avisos se activan por fuente en **Configuración → Avisos**, y el contexto nocturno en **Configuración → Contexto**.
+People connect accounts in **Configuración → Conexiones**, choose sounds in **Configuración → Avisos**, and turn the nightly brief on in **Configuración → Contexto**. Their own model keys, if they prefer them to the server’s, go in **Configuración → Sistema**.
 
-### Comandos útiles
+### Useful commands
 
 ```bash
-docker compose exec app php artisan alerts:watch                # comprueba Gmail y Slack ahora (el scheduler lo hace cada minuto)
-docker compose exec app php artisan alerts:check-replies        # resuelve las alertas que ya has respondido
-docker compose exec app php artisan alerts:test tu@email.com    # lanza una alerta de prueba en tu propio DM de Slack
-docker compose exec app php artisan chats:warm                  # precarga personas y canales de Slack
-docker compose exec app php artisan context:build               # genera ahora el contexto de trabajo (el scheduler lo hace cada noche)
+docker compose exec app php artisan alerts:watch
+docker compose exec app php artisan alerts:check-replies
+docker compose exec app php artisan alerts:test you@email.com
+docker compose exec app php artisan chats:warm
+docker compose exec app php artisan context:build
 ```
 
 ## Tests
 
 ```bash
-npm run build                                   # los tests de páginas necesitan el manifest de Vite
+npm run build
 docker compose exec app php artisan test --compact
 ```
 
-Hay tests de Pest para cada herramienta, conector, alerta y acción. Ninguno llama a servicios reales: todos usan `Http::fake()` o el `Fake` del conector.
+Pest covers each tool, connector, alert and pending action. Nothing in the suite calls a live service.
 
-## Estructura
+## Layout
 
 ```
 app/
-├── Actions/        Cambios pendientes de confirmar: «sí», «cancela», «deshaz»
-├── Alerts/         Watchers, juez, motor de respuestas, recordatorios de reuniones
-├── Connections/    Cuentas conectadas, OAuth, capacidades y tokens
-├── Connectors/     Google (Calendar, Gmail, Docs, Drive), Slack y Notion, con sus Fakes
-├── Voice/          Proveedor de voz, perfil del asistente y herramientas
-└── WorkContext/    Contexto nocturno: lectura de la semana y resumen
+├── Actions/        Changes waiting for “yes”, “cancel”, “undo”
+├── Alerts/         Watchers, the judge, reply drafts, meeting reminders, Web Push
+├── Connections/    Connected accounts, OAuth, tokens
+├── Connectors/     Google, Slack, Jira, Notion and GitHub, each with a fake
+├── Scenes/         Asks that take more than one step, shown as they run
+├── Sense/          The work archive on GitHub
+├── Voice/          Voice provider, the assistant, and tools
+└── WorkContext/    The nightly read-only brief
 resources/js/
-├── canvas/         Una vista por tipo de contenido (calendario, email, Slack, PDF…)
-├── voice/          Sesión de voz, transporte, memoria y audio
-└── alerts/         Avisos en tiempo real y sonidos (Web Audio)
+├── canvas/         One view per kind of thing on screen
+├── voice/          The voice session
+└── pages/          The assistant, the landing, and settings
+extensions/wingman-meet/   The Meet extension
 ```
 
-## Próximamente
+## License
 
-- Jira.
-- Dos columnas de contenido a la vez.
-- Que la IA pueda ver las imágenes que se le muestran.
-- Un motor de respuestas con acceso a la base de conocimiento.
+[MIT](LICENSE). Use it, change it, run it for yourself, and send a pull request if you want to.
 
-<p align="center"><sub>Hecho con voz, Laravel y mucho espacio en blanco.</sub></p>
+<p align="center"><sub>Made with voice, Laravel, and a lot of white space.</sub></p>

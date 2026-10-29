@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,9 +26,21 @@ class AuthenticatedSessionController extends Controller
     /**
      * Authenticate the user and start a new session.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request, PostHogService $posthog): RedirectResponse
     {
         $request->authenticate();
+
+        if (($user = Auth::user()) !== null) {
+            $distinctId = (string) $user->getAuthIdentifier();
+
+            $posthog->identify($distinctId, [
+                'email' => $user->email,
+                'name' => $user->name,
+            ]);
+            $posthog->capture($distinctId, 'user_logged_in', [
+                'login_method' => 'password',
+            ]);
+        }
 
         $request->session()->regenerate();
 
@@ -37,8 +50,12 @@ class AuthenticatedSessionController extends Controller
     /**
      * Log the user out and invalidate the session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, PostHogService $posthog): RedirectResponse
     {
+        if (($user = $request->user()) !== null) {
+            $posthog->capture((string) $user->getAuthIdentifier(), 'user_logged_out');
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

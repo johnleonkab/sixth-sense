@@ -36,6 +36,7 @@ final readonly class CalendarEvent
         public ?string $description = null,
         public bool $isOrganizer = false,
         public ?string $myResponse = null,
+        public bool $flexible = false,
     ) {}
 
     /**
