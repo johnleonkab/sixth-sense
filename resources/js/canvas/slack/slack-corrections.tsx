@@ -1,17 +1,23 @@
 const taps = [
-    { correction: 'not_important', label: 'No hace falta' },
-    { correction: 'someone_else', label: 'Le toca a otro' },
-    { correction: 'always_notify', label: 'Avísame siempre' },
+    { correction: "not_important", label: "No hace falta" },
+    { correction: "someone_else", label: "Le toca a otro" },
+    { correction: "always_notify", label: "Avísame siempre" },
 ] as const;
 
-export type SlackCorrection = (typeof taps)[number]['correction'];
+export type SlackCorrection = (typeof taps)[number]["correction"];
 
 /**
  * The three taps. Each one proposes a rule and waits for "sí".
  */
-export default function SlackCorrections({ onCorrect }: { onCorrect: (correction: SlackCorrection) => void }) {
+export default function SlackCorrections({
+    onCorrect,
+    className = "mt-3",
+}: {
+    onCorrect: (correction: SlackCorrection) => void;
+    className?: string;
+}) {
     return (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className={`flex flex-wrap gap-1.5 ${className}`}>
             {taps.map((tap) => (
                 <button
                     key={tap.correction}
