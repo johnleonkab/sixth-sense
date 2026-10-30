@@ -1,5 +1,7 @@
+import { useContext } from 'react';
 import type { ReactNode } from 'react';
 
+import { EmbeddedContext } from '@/canvas/embedded';
 import { ServiceIconFor } from '@/components/service-icon';
 
 type CanvasFrameProps = {
@@ -15,6 +17,20 @@ type CanvasFrameProps = {
  * title and where the data comes from.
  */
 export default function CanvasFrame({ index, title, source, aside, children }: CanvasFrameProps) {
+    // Inside a composed view, beside another detail: the view already has the number.
+    if (useContext(EmbeddedContext)) {
+        return (
+            <article className="min-w-0 rounded-xl border border-line bg-bg">
+                <header className="flex items-center gap-2 px-3.5 pt-3 text-[12px] text-muted">
+                    <ServiceIconFor reference={source} size={13} label={false} />
+                    <h4 className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink">{title}</h4>
+                    {aside}
+                </header>
+                <div className="overflow-x-auto px-3.5 pt-3 pb-4">{children}</div>
+            </article>
+        );
+    }
+
     return (
         <article className="canvas-in min-w-0 rounded-2xl border border-line bg-surface">
             <header className="flex flex-col gap-2 px-4 pt-4 md:flex-row md:items-center md:gap-2.5 md:px-[22px] md:pt-[18px]">

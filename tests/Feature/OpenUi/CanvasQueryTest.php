@@ -148,3 +148,32 @@ test('the grouping functions count, add up, fold into Otros and order days', fun
         'days' => ['labels' => ['2026-10-01', '2026-10-02', '2026-10-03'], 'values' => [2, 2, 1]],
     ], (string) $output);
 })->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');
+
+test('a view embeds a detail by the tool that opens it, and nothing that proposes or changes', function () {
+    $this->actingAs($this->user)
+        ->postJson(route('canvas.embed'), ['tool' => 'open_jira_issue', 'arguments' => ['issue' => 'CPD-405'], 'timezone' => 'Europe/Madrid'])
+        ->assertOk()
+        ->assertJsonPath('canvas.view', 'jira.issue');
+
+    $this->actingAs($this->user)
+        ->postJson(route('canvas.embed'), ['tool' => 'propose_slack_message', 'arguments' => ['text' => 'Hola', 'to' => 'Marta']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('tool');
+
+    $this->actingAs($this->user)
+        ->postJson(route('canvas.embed'), ['tool' => 'open_jira_issue', 'arguments' => ['issue' => 'NO-0']])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['message']);
+
+    auth()->logout();
+    $this->postJson(route('canvas.embed'), ['tool' => 'open_jira_issue'])->assertUnauthorized();
+});
+
+test('two details side by side make one valid view', function () {
+    expect(<<<'UI'
+        root = View("El issue y el email del cliente", [both])
+        both = Row([issue, email])
+        issue = Embed("open_jira_issue", {issue: "CPD-405"})
+        email = Embed("open_email", {email_id: "18c4"})
+        UI)->toBeValidOpenUi();
+});

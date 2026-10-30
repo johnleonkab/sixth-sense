@@ -6,6 +6,7 @@ import CalendarAgenda from '@/canvas/calendar/calendar-agenda';
 import CalendarChange from '@/canvas/calendar/calendar-change';
 import CalendarDay from '@/canvas/calendar/calendar-day';
 import CanvasFrame from '@/canvas/canvas-frame';
+import { CanvasRendererContext, EmbeddedContext } from '@/canvas/embedded';
 import DocsComment from '@/canvas/docs/docs-comment';
 import DocsDocument from '@/canvas/docs/docs-document';
 import DocsSheet from '@/canvas/docs/docs-sheet';
@@ -96,5 +97,15 @@ export function Canvas({ directive, index }: { directive: CanvasDirective; index
         );
     }
 
-    return <Component {...directive.props} index={index} />;
+    return (
+        <CanvasRendererContext
+            value={(embedded) => (
+                <EmbeddedContext value>
+                    <Canvas directive={embedded} index={index} />
+                </EmbeddedContext>
+            )}
+        >
+            <Component {...directive.props} index={index} />
+        </CanvasRendererContext>
+    );
 }

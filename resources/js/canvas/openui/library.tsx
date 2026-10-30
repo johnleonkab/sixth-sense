@@ -5,11 +5,13 @@ import type { ComponentRenderProps } from '@openuidev/react-lang';
 import ActionBar from '@/actions/action-bar';
 import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
+import { CanvasRendererContext } from '@/canvas/embedded';
 import { LiveItemsContext, openRef } from '@/canvas/openui/refs';
 import { buttonClass, Button as UiButton, Buttons as UiButtons } from '@/components/button';
 import type { ButtonVariant } from '@/components/button';
 import { buildLibrary, top } from '@/canvas/openui/spec';
-import { getJson } from '@/lib/http';
+import type { CanvasDirective } from '@/canvas/types';
+import { browserTimezone, getJson, postJson } from '@/lib/http';
 
 /**
  * How each OpenUI block looks on the canvas: the same tokens, type and
@@ -366,6 +368,37 @@ function Timeline({ props }: Props<{ days: { label: string; events: TimelineEven
     );
 }
 
+/**
+ * A detail opened inside the view (an email, an issue, a page, a
+ * conversation, an alert), as fresh as opening it: Laravel runs the tool that
+ * opens it and the same canvas is drawn here, without its outer frame.
+ */
+function Embed({ props }: Props<{ tool: string; args: Record<string, string | number> }>) {
+    const render = useContext(CanvasRendererContext);
+    const [directive, setDirective] = useState<CanvasDirective | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const key = JSON.stringify([props.tool, props.args]);
+
+    useEffect(() => {
+        setDirective(null);
+        setError(null);
+        postJson<{ canvas: CanvasDirective }>('/canvas/embed', { tool: props.tool, arguments: props.args ?? {}, timezone: browserTimezone() }).then(
+            (answer) => setDirective(answer.canvas),
+            (failure: Error) => setError(failure.message),
+        );
+    }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (error) {
+        return <p className="rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">{error}</p>;
+    }
+
+    if (directive === null || render === null) {
+        return <div className="alerts-shimmer h-40 rounded-xl" aria-label="Abriendo" />;
+    }
+
+    return <div className="min-w-0">{render(directive)}</div>;
+}
+
 function Quote({ props }: Props<{ text: string; author?: string }>) {
     return (
         <blockquote className="border-l-2 border-line pl-3 text-[13.5px] text-muted">
@@ -552,4 +585,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Quote, Draft, Proposal });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Embed, Quote, Draft, Proposal });

@@ -18,9 +18,9 @@ Props typed `ActionExpression` accept one @step, or Action([@steps...]) for seve
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
-Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Embed | Quote | Draft | Proposal | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Embed | Quote | Draft | Proposal)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
+Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Embed | Quote | Draft | Proposal | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
@@ -39,6 +39,10 @@ BarChart(title?: string, labels: string[], values: number[], unit?: string) — 
 LineChart(title?: string, labels: string[], values: number[], unit?: string) — Una línea para ver una tendencia en el tiempo. labels (fechas) y values en el mismo orden.
 DonutChart(title?: string, labels: string[], values: number[], unit?: string, highlight?: string) — Un donut para ver qué parte del total es cada categoría, de un vistazo. Solo para partes de un todo y como mucho 6 partes (el resto va a «Otros» solo). Muestra el total en el centro y una leyenda con valor y %. highlight: la etiqueta a destacar, y el resto en gris. No sirve para comparar valores parecidos: para eso, BarChart.
 Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.
+
+### Detalles
+Embed(tool: "open_email" | "open_jira_issue" | "open_notion_page" | "show_slack_conversation" | "review_alert" | "show_calendar", args: Record<string, string | number>) — Un detalle completo dentro de la vista, tal como se ve al abrirlo: tool es open_email (args {email_id}), open_jira_issue ({issue}), open_notion_page ({page}), show_slack_conversation ({message_id} o {conversation}) review_alert ({alert_id}) o show_calendar ({start_date} YYYY-MM-DD, para un día con su horario). Dos en un Row para verlos lado a lado («el issue y el email del cliente»). Solo ids que vengan de los datos.
+Para combinar en una pantalla lo que se abriría por separado: como mucho dos Embed.
 
 ### Listas que se abren
 ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string, actions?: {label: string, ref: string}[]}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante), ref (cómo se abre, si viene en las filas de una Query) y actions (botones pequeños bajo el elemento: label y ref). Pulsar uno lo abre. Conserva los n, ref y actions que vengan en los datos.

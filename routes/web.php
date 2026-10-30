@@ -4,6 +4,7 @@ use App\Http\Controllers\AlertFeedController;
 use App\Http\Controllers\AlertReplyController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\CanvasEmbedController;
 use App\Http\Controllers\CanvasQueryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
@@ -92,6 +93,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::post('canvas/query/{dataset}', CanvasQueryController::class)->middleware('throttle:60,1')->name('canvas.query');
+    Route::post('canvas/embed', CanvasEmbedController::class)->middleware('throttle:60,1')->name('canvas.embed');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');

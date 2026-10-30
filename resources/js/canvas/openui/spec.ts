@@ -34,7 +34,8 @@ export type BlockName =
     | 'Proposal'
     | 'Quote'
     | 'Draft'
-    | 'Timeline';
+    | 'Timeline'
+    | 'Embed';
 
 /** What the grouping functions return: chart-ready labels and values, in the same order. */
 export type Series = { labels: string[]; values: number[] };
@@ -245,6 +246,17 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Timeline'),
     });
 
+    const Embed = defineComponent({
+        name: 'Embed',
+        description:
+            'Un detalle completo dentro de la vista, tal como se ve al abrirlo: tool es open_email (args {email_id}), open_jira_issue ({issue}), open_notion_page ({page}), show_slack_conversation ({message_id} o {conversation}) review_alert ({alert_id}) o show_calendar ({start_date} YYYY-MM-DD, para un día con su horario). Dos en un Row para verlos lado a lado («el issue y el email del cliente»). Solo ids que vengan de los datos.',
+        props: z.object({
+            tool: z.enum(['open_email', 'open_jira_issue', 'open_notion_page', 'show_slack_conversation', 'review_alert', 'show_calendar']),
+            args: z.record(z.string(), z.union([z.string(), z.number()])),
+        }),
+        component: render('Embed'),
+    });
+
     const Quote = defineComponent({
         name: 'Quote',
         description: 'Un texto citado tal cual: el fragmento de un documento o lo que dijo alguien (author).',
@@ -329,7 +341,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Tabs'),
     });
 
-    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref, Timeline.ref, Quote.ref, Draft.ref, Proposal.ref];
+    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref, Timeline.ref, Embed.ref, Quote.ref, Draft.ref, Proposal.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -407,7 +419,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 
     return createLibrary({
-        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Quote, Draft, Proposal],
+        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Embed, Quote, Draft, Proposal],
         functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
@@ -417,6 +429,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
                 components: ['Metric', 'Table', 'BarChart', 'LineChart', 'DonutChart'],
                 notes: ['Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.'],
             },
+            { name: 'Detalles', components: ['Embed'], notes: ['Para combinar en una pantalla lo que se abriría por separado: como mucho dos Embed.'] },
             { name: 'Listas que se abren', components: ['ItemList', 'Timeline'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
             { name: 'Cambios', components: ['Quote', 'Draft', 'Proposal'], notes: ['Un Proposal por cambio propuesto, al final de la vista, con lo que cambiará encima (Draft para el texto, Quote para lo que responde).'] },
         ],
