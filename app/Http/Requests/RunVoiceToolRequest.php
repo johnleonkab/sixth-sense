@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Voice\Tools\ToolContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,6 +18,7 @@ class RunVoiceToolRequest extends FormRequest
         return [
             'arguments' => ['present', 'array'],
             'timezone' => ['nullable', 'string', 'timezone:all'],
+            'origin' => ['nullable', 'in:voice,screen'],
         ];
     }
 
@@ -28,6 +30,14 @@ class RunVoiceToolRequest extends FormRequest
     public function arguments(): array
     {
         return $this->validated('arguments');
+    }
+
+    /**
+     * Who chose the call: the voice model, or the person from the screen.
+     */
+    public function origin(): string
+    {
+        return $this->validated('origin') ?? ToolContext::SCREEN;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Voice\Tools;
 
+use App\Agents\References\IssuedRefs;
 use App\Models\User;
 use App\Voice\Tools\Actions\GetActionStatus;
 use App\Voice\Tools\Agenda\CancelScheduledTask;
@@ -171,7 +172,7 @@ class Toolbox
         OpenSceneTool::class,
     ];
 
-    public function __construct(private Container $container) {}
+    public function __construct(private Container $container, private IssuedRefs $refs) {}
 
     /**
      * @return list<VoiceTool>
@@ -220,6 +221,16 @@ class Toolbox
             return ToolResult::error('Argumentos no válidos: '.implode(' ', $validator->errors()->all()));
         }
 
-        return $tool->handle($user, $validator->validated(), $context);
+        // A model points only at ids the server handed out, never at one it made up.
+        $invented = $context->byModel() ? $this->refs->unknown($user, $validator->validated()) : null;
+
+        if ($invented !== null) {
+            return ToolResult::error("Ese {$invented} no ha salido de ninguna búsqueda ni de la pantalla. Búscalo primero y usa el id que devuelva.");
+        }
+
+        $result = $tool->handle($user, $validator->validated(), $context);
+        $this->refs->remember($user, $result->output, $result->canvas?->toArray() ?? [], $result->beside?->toArray() ?? []);
+
+        return $result;
     }
 }

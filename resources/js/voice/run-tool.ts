@@ -27,6 +27,8 @@ export async function runTool(call: ToolCall): Promise<ToolOutcome> {
         return await postJson<ToolOutcome>(`/voice/tools/${encodeURIComponent(call.name)}`, {
             arguments: call.args,
             timezone: browserTimezone(),
+            // A click on the screen is the person's; anything else the voice model chose.
+            origin: call.id.startsWith('screen-') ? 'screen' : 'voice',
         });
     } catch (error) {
         console.error(error);
