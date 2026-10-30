@@ -19,7 +19,7 @@ test('the connections page lists every provider with its accounts', function () 
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/connections')
-            ->has('providers', 4)
+            ->has('providers', 5)
             ->has('providers.0', fn (Assert $provider) => $provider
                 ->where('key', 'google')
                 ->where('name', 'Google')
@@ -28,5 +28,6 @@ test('the connections page lists every provider with its accounts', function () 
                 ->where('accounts', []))
             ->where('providers.1.key', 'slack')
             ->where('providers.2.key', 'atlassian')
-            ->where('providers.3.key', 'notion'));
+            ->where('providers.3.key', 'notion')
+            ->where('providers.4.key', 'github'));
 });
