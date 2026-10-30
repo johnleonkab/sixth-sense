@@ -17,6 +17,7 @@ const sections: SettingsSection[] = [
     { href: '/settings/archive/agents', match: '/settings/archive', label: 'Archivo' },
     { href: '/settings/alerts', label: 'Avisos' },
     { href: '/settings/context', label: 'Contexto' },
+    { href: '/settings/mcp', label: 'MCP' },
     { href: '/settings/wingman', label: 'Wingman' },
     { href: '/settings/system', label: 'Sistema' },
     { href: '/settings/impact', label: 'Impacto' },

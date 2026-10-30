@@ -14,6 +14,7 @@ enum Capability: string
     case DocsRead = 'docs.read';
     case SheetsRead = 'sheets.read';
     case DriveRead = 'drive.read';
+    case AnalyticsRead = 'analytics.read';
     case DocsEdit = 'docs.edit';
     case DocsComment = 'docs.comment';
     case GmailSend = 'gmail.send';
@@ -39,6 +40,7 @@ enum Capability: string
             self::DocsRead,
             self::SheetsRead,
             self::DriveRead,
+            self::AnalyticsRead,
             self::DocsEdit,
             self::DocsComment,
             self::GmailSend,
@@ -71,6 +73,7 @@ enum Capability: string
             self::DocsRead => ['https://www.googleapis.com/auth/documents.readonly'],
             self::SheetsRead => ['https://www.googleapis.com/auth/spreadsheets.readonly'],
             self::DriveRead => ['https://www.googleapis.com/auth/drive.readonly'],
+            self::AnalyticsRead => ['https://www.googleapis.com/auth/analytics.readonly'],
             self::DocsEdit => ['https://www.googleapis.com/auth/documents'],
             // Comments live in the Drive API, which has no narrower scope for them.
             self::DocsComment => ['https://www.googleapis.com/auth/drive'],
@@ -109,6 +112,7 @@ enum Capability: string
             self::DocsRead => 'Leer documentos',
             self::SheetsRead => 'Leer hojas de cálculo',
             self::DriveRead => 'Abrir archivos de Drive',
+            self::AnalyticsRead => 'Ver Google Analytics',
             self::DocsEdit => 'Editar documentos',
             self::DocsComment => 'Comentar documentos',
             self::GmailSend => 'Enviar emails',

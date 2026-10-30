@@ -36,6 +36,8 @@ import SlackUnread from '@/canvas/slack/slack-unread';
 import MailMessage from '@/canvas/mail/mail-message';
 import MailResults from '@/canvas/mail/mail-results';
 import type { CanvasComponent, CanvasDirective } from '@/canvas/types';
+import McpCall from '@/canvas/mcp/mcp-call';
+import OpenUiView from '@/canvas/openui/openui-view';
 
 /**
  * Every canvas the assistant can put on screen, by the name Laravel uses.
@@ -44,6 +46,8 @@ import type { CanvasComponent, CanvasDirective } from '@/canvas/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const canvases: Record<string, CanvasComponent<any>> = {
     'calendar.day': CalendarDay,
+    'openui.view': OpenUiView,
+    'mcp.call': McpCall,
     'calendar.agenda': CalendarAgenda,
     'calendar.change': CalendarChange,
     'mail.results': MailResults,

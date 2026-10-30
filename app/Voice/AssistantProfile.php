@@ -12,6 +12,7 @@ use App\Connectors\Jira\JiraRules;
 use App\Knowledge\Gaps\GapStatus;
 use App\Models\KnowledgeGap;
 use App\Models\User;
+use App\Voice\OpenUi\OpenUi;
 use App\Voice\Tools\Toolbox;
 use App\WorkContext\WorkDigest;
 use Carbon\CarbonImmutable;
@@ -50,6 +51,7 @@ final readonly class AssistantProfile
                 self::workContext($user),
                 self::sense($user),
                 self::knowledge($user),
+                OpenUi::prompt(),
                 'Si el encargo necesita más de una herramienta (buscar hueco y contestar, dejar varias historias, preguntar a un agente), la única llamada es open_scene. No encadenes las herramientas de ese encargo.',
                 'Para encontrar un documento, una hoja, unas diapositivas o una página, la única llamada es find_files, con uno o varios términos. No busques primero en Docs y luego en Notion.',
                 $issues ? self::jiraRules($issues->rules($user)) : '',

@@ -10,6 +10,7 @@ use App\Voice\Tools\Alerts\ListAlerts;
 use App\Voice\Tools\Alerts\ResolveAlert;
 use App\Voice\Tools\Alerts\ReviewAlert;
 use App\Voice\Tools\Alerts\ShowAlertHistory;
+use App\Voice\Tools\Analytics\ShowAnalyticsReport;
 use App\Voice\Tools\Calendar\FindCalendarEvents;
 use App\Voice\Tools\Calendar\ProposeEventCancellation;
 use App\Voice\Tools\Calendar\ProposeEventInvite;
@@ -41,6 +42,8 @@ use App\Voice\Tools\Mail\ProposeEmailReply;
 use App\Voice\Tools\Mail\ProposeNewEmail;
 use App\Voice\Tools\Mail\SearchEmails;
 use App\Voice\Tools\Mail\ShowEmailResults;
+use App\Voice\Tools\Mcp\CallMcpTool;
+use App\Voice\Tools\Mcp\ListMcpTools;
 use App\Voice\Tools\Notion\OpenNotionPage;
 use App\Voice\Tools\Notion\ProposeNotionComment;
 use App\Voice\Tools\Notion\ProposeNotionEdit;
@@ -68,6 +71,7 @@ use App\Voice\Tools\Slack\ShowSlackAutonomy;
 use App\Voice\Tools\Slack\ShowSlackConversation;
 use App\Voice\Tools\Slack\ShowSlackDigest;
 use App\Voice\Tools\Slack\ShowSlackUnread;
+use App\Voice\Tools\Views\ShowView;
 use App\Voice\Tools\Wingman\DismissMeetingActions;
 use App\Voice\Tools\Wingman\ProposeMeetingAction;
 use App\Voice\Tools\Wingman\ReviewMeeting;
@@ -143,6 +147,10 @@ class Toolbox
         SearchKnowledge::class,
         ReadKnowledge::class,
         AnswerQuestion::class,
+        ShowView::class,
+        ListMcpTools::class,
+        CallMcpTool::class,
+        ShowAnalyticsReport::class,
         ListSenseFiles::class,
         ReadSenseFile::class,
         ProposeSenseFile::class,

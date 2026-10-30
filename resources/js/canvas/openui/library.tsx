@@ -1,0 +1,197 @@
+import { useTriggerAction } from '@openuidev/react-lang';
+import type { ComponentRenderProps } from '@openuidev/react-lang';
+
+import { buildLibrary } from '@/canvas/openui/spec';
+
+/**
+ * How each OpenUI block looks on the canvas: the same tokens, type and
+ * spacing as every other view. Charts are plain SVG.
+ */
+type Props<P> = ComponentRenderProps<P>;
+type Cell = string | number;
+
+const https = (url: string): boolean => /^https:\/\//i.test(url);
+
+/** The canvas frame already shows the view's title. */
+function View({ props, renderNode }: Props<{ title: string; children: unknown[] }>) {
+    return <div className="grid gap-4">{renderNode(props.children)}</div>;
+}
+
+function Row({ props, renderNode }: Props<{ children: unknown[] }>) {
+    return <div className="grid gap-3 sm:grid-flow-col sm:auto-cols-fr">{renderNode(props.children)}</div>;
+}
+
+function Card({ props, renderNode }: Props<{ title?: string; children: unknown[] }>) {
+    return (
+        <section className="grid gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5">
+            {props.title && <h4 className="text-[14px] font-medium">{props.title}</h4>}
+            {renderNode(props.children)}
+        </section>
+    );
+}
+
+function Text({ props }: Props<{ text: string; tone?: 'default' | 'muted' }>) {
+    return <p className={`text-[14px] leading-[1.55] ${props.tone === 'muted' ? 'text-muted' : ''}`}>{props.text}</p>;
+}
+
+function Metric({ props }: Props<{ label: string; value: string; change?: string; hint?: string }>) {
+    const down = props.change?.trim().startsWith('-');
+
+    return (
+        <div className="rounded-xl bg-soft px-3.5 py-3">
+            <p className="text-[12.5px] text-muted">{props.label}</p>
+            <p className="mt-0.5 flex items-baseline gap-2">
+                <span className="text-[22px] font-medium tracking-[-0.02em] tabular-nums">{props.value}</span>
+                {props.change && <span className={`text-[12.5px] tabular-nums ${down ? 'text-crit' : 'text-ok'}`}>{props.change}</span>}
+            </p>
+            {props.hint && <p className="mt-0.5 text-[12px] text-faint">{props.hint}</p>}
+        </div>
+    );
+}
+
+function Table({ props }: Props<{ columns: string[]; rows: Cell[][] }>) {
+    return (
+        <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full text-left text-[13px]">
+                <thead className="bg-soft text-muted">
+                    <tr>
+                        {props.columns.map((column, index) => (
+                            <th key={index} scope="col" className="px-3 py-2 font-medium">
+                                {column}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                    {props.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                                <td key={cellIndex} className={`px-3 py-2 ${typeof cell === 'number' ? 'text-right tabular-nums' : ''}`}>
+                                    {typeof cell === 'number' ? cell.toLocaleString('es-ES') : cell}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function BarChart({ props }: Props<{ title?: string; labels: string[]; values: number[]; unit?: string }>) {
+    const max = Math.max(1, ...props.values.map((value) => Math.abs(value)));
+
+    return (
+        <figure className="grid gap-2">
+            {props.title && <figcaption className="text-[13px] font-medium">{props.title}</figcaption>}
+            <ul className="grid gap-1.5">
+                {props.labels.map((label, index) => {
+                    const value = props.values[index] ?? 0;
+
+                    return (
+                        <li key={index} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-2 text-[12.5px]">
+                            <span className="truncate text-muted">{label}</span>
+                            <span className="h-2 rounded-full bg-soft">
+                                <span className="block h-2 rounded-full bg-accent" style={{ width: `${(Math.abs(value) / max) * 100}%` }} />
+                            </span>
+                            <span className="tabular-nums">
+                                {value.toLocaleString('es-ES')}
+                                {props.unit ? ` ${props.unit}` : ''}
+                            </span>
+                        </li>
+                    );
+                })}
+            </ul>
+        </figure>
+    );
+}
+
+function LineChart({ props }: Props<{ title?: string; labels: string[]; values: number[]; unit?: string }>) {
+    const width = 600;
+    const height = 160;
+    const values = props.values.length > 0 ? props.values : [0];
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const span = max - min || 1;
+    const step = values.length > 1 ? width / (values.length - 1) : 0;
+    const points = values.map((value, index) => `${index * step},${height - 8 - ((value - min) / span) * (height - 16)}`).join(' ');
+    const last = values[values.length - 1];
+
+    return (
+        <figure className="grid gap-2">
+            <figcaption className="flex items-baseline justify-between gap-3 text-[13px]">
+                <span className="font-medium">{props.title}</span>
+                <span className="text-muted tabular-nums">
+                    {last.toLocaleString('es-ES')}
+                    {props.unit ? ` ${props.unit}` : ''}
+                </span>
+            </figcaption>
+            <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-36 w-full" role="img" aria-label={props.title ?? 'Tendencia'}>
+                <polyline points={points} fill="none" stroke="var(--color-accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+            </svg>
+            <div className="flex justify-between text-[11.5px] text-faint">
+                <span>{props.labels[0]}</span>
+                <span>{props.labels[props.labels.length - 1]}</span>
+            </div>
+        </figure>
+    );
+}
+
+function Image({ props }: Props<{ url: string; caption?: string }>) {
+    if (!https(props.url)) {
+        return null;
+    }
+
+    return (
+        <figure className="grid gap-1.5">
+            <img src={props.url} alt={props.caption ?? ''} loading="lazy" className="max-h-[420px] w-full rounded-xl border border-line object-contain" />
+            {props.caption && <figcaption className="text-[12.5px] text-muted">{props.caption}</figcaption>}
+        </figure>
+    );
+}
+
+const kindLabel: Record<string, string> = { pdf: 'PDF', doc: 'Documento', sheet: 'Hoja', page: 'Página', link: 'Enlace' };
+
+function Document({ props }: Props<{ title: string; url: string; kind?: string; note?: string }>) {
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-2.5">
+            <div className="min-w-0">
+                <p className="truncate text-[14px] font-medium">{props.title}</p>
+                <p className="truncate text-[12.5px] text-muted">{[kindLabel[props.kind ?? 'link'], props.note].filter(Boolean).join(' · ')}</p>
+            </div>
+            {https(props.url) && (
+                <a href={props.url} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft">
+                    Abrir
+                </a>
+            )}
+        </div>
+    );
+}
+
+function List({ props }: Props<{ items: string[]; ordered?: boolean }>) {
+    const Tag = props.ordered ? 'ol' : 'ul';
+
+    return (
+        <Tag className={`grid gap-1 pl-5 text-[14px] leading-[1.5] ${props.ordered ? 'list-decimal' : 'list-disc'}`}>
+            {props.items.map((item, index) => (
+                <li key={index}>{item}</li>
+            ))}
+        </Tag>
+    );
+}
+
+function Button({ props }: Props<{ label: string; action?: unknown }>) {
+    const trigger = useTriggerAction();
+
+    return (
+        <button
+            type="button"
+            onClick={() => void trigger(props.label, undefined, props.action as Parameters<typeof trigger>[2])}
+            className="rounded-full border border-line px-3.5 py-1.5 text-[13px] hover:bg-soft"
+        >
+            {props.label}
+        </button>
+    );
+}
+
+export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button });

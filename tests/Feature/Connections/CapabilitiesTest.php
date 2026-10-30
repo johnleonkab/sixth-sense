@@ -12,6 +12,7 @@ test('google asks for exactly the scopes its capabilities need', function () {
         'https://www.googleapis.com/auth/documents.readonly',
         'https://www.googleapis.com/auth/spreadsheets.readonly',
         'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/analytics.readonly',
         'https://www.googleapis.com/auth/documents',
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/gmail.send',

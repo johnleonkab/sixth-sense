@@ -143,6 +143,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Remote MCP servers the person connected.
+     *
+     * @return HasMany<McpServer, $this>
+     */
+    public function mcpServers(): HasMany
+    {
+        return $this->hasMany(McpServer::class);
+    }
+
+    /**
      * What the system noticed it does not know, and the answers.
      *
      * @return HasMany<KnowledgeGap, $this>

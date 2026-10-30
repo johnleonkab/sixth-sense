@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Actions\Handlers\AcceptSlackAutonomy;
 use App\Actions\Handlers\AcceptSlackPreference;
+use App\Actions\Handlers\CallMcpTool;
 use App\Actions\Handlers\ChangeCalendar;
 use App\Actions\Handlers\ChangeJira;
 use App\Actions\Handlers\ChangeSense;
@@ -52,6 +53,7 @@ class Actions
         'jira.unlink' => ChangeJira::class,
         'jira.comment' => ChangeJira::class,
         'agenda.schedule' => ScheduleAgendaTask::class,
+        'mcp.call' => CallMcpTool::class,
         'sense.write' => ChangeSense::class,
         'sense.delete' => ChangeSense::class,
         'slack.preference' => AcceptSlackPreference::class,

@@ -355,7 +355,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                             </p>
                         )
                     ) : (
-                        <CanvasContext value={{ runTool: runFromScreen, actions }}>
+                        <CanvasContext value={{ runTool: runFromScreen, tell: (text) => void voice.tell(text, true), actions }}>
                             <div
                                 // The chosen display size scales the canvases, not the voice zone.
                                 style={wide ? { zoom: auth.user?.display_scale ?? 1 } : undefined}
