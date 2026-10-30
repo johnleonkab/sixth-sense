@@ -289,3 +289,25 @@ test('a view groups its buttons, the main one first', function () {
         other = Button("Más tarde", null, "tertiary")
         UI)->toBeValidOpenUi();
 });
+
+test('a view gets the records a read-only MCP tool returns as rows, and never calls one that writes', function () {
+    fakeMcpServer([], call: fn (array $params) => ['content' => [['type' => 'text', 'text' => 'ok']], 'structuredContent' => ['data' => ['items' => [
+        ['id' => 1, 'state' => ['name' => 'Done'], 'labels' => ['a', 'b']],
+        ['id' => 2, 'state' => ['name' => 'Todo'], 'labels' => []],
+    ]]]]);
+    McpServer::factory()->for($this->user)->create(['name' => 'Linear', 'url' => 'https://1.1.1.1/mcp']);
+
+    $this->actingAs($this->user)
+        ->postJson(route('canvas.query', 'mcp_rows'), ['arguments' => ['server' => 'linear', 'tool' => 'search', 'arguments' => ['query' => 'x']]])
+        ->assertOk()
+        ->assertJsonPath('rows', [
+            ['id' => 1, 'state.name' => 'Done', 'labels' => '["a","b"]'],
+            ['id' => 2, 'state.name' => 'Todo', 'labels' => '[]'],
+        ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('canvas.query', 'mcp_rows'), ['arguments' => ['server' => 'Linear', 'tool' => 'create_record']])
+        ->assertUnprocessable();
+
+    Http::assertNotSent(fn (Request $request) => (json_decode($request->body(), true)['params']['name'] ?? null) === 'create_record');
+});

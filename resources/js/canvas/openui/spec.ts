@@ -373,7 +373,7 @@ export function viewPrompt(): string {
             'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
             'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.',
             'No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.',
-            'Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.',
+            'Para gráficos y cifras de Jira, Analytics, avisos, el calendario, el índice de conocimiento o un servidor MCP, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.',
         ],
         examples: [
             [

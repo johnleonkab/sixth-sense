@@ -14,6 +14,9 @@ class Datasets
         JiraIssues::class,
         AnalyticsRows::class,
         AlertRows::class,
+        CalendarEvents::class,
+        KnowledgeRows::class,
+        McpRows::class,
     ];
 
     /** Rows a query returns, at most. */

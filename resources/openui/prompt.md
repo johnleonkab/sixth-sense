@@ -229,6 +229,12 @@ Use these with Query() for read operations or Mutation() for write operations. T
   Un informe de Google Analytics 4 como filas: un campo por dimensión y por métrica (mismos nombres que analytics_report). property por nombre, cuenta o id.
 - alerts(status?: "all" | "pending" | "addressed" | "routine", source?: "gmail" | "slack" | "calendar", days?: number, limit?: number) → {rows?: {n?: number, ref?: string, source?: string, actor?: string, title?: string, why?: string, status?: string, received?: string, headline?: string, context?: string, when?: string, proposal?: string, closed?: string, pending?: boolean}[]}
   Avisos como filas, los más recientes primero. status: pending (por defecto, los que esperan respuesta), all, addressed (resueltos o descartados) o routine (sin importancia). Para listarlos: ItemList con n, ref, headline, context, when, proposal, closed y pending (highlight).
+- calendar_events(from: string, to: string, title?: string, attendee?: string) → {rows?: {title?: string, day?: string, weekday?: string, start?: string, minutes?: number, calendar?: string, organizer?: string, attendees?: number, mine?: boolean, declined?: boolean, all_day?: boolean}[]}
+  Eventos del calendario como filas (title, day, weekday, start, minutes, calendar, organizer, attendees, mine, declined, all_day), de from a to (YYYY-MM-DD, como mucho 62 días). Para horas por día: @ByDay(rows, "day", "minutes") y divide entre 60.
+- knowledge(source?: "archive" | "jira" | "notion" | "meeting" | "memory", limit?: number) → {rows?: {source?: string, title?: string, views?: number, summarized?: boolean, last_viewed?: string, updated?: string, indexed?: string}[]}
+  El índice de conocimiento como filas (source, title, views, summarized, last_viewed, updated, indexed), uno por documento. source: archive, jira, notion, meeting o memory.
+- mcp_rows(server: string, tool: string, arguments?: object) → {rows?: object[]}
+  Filas que devuelve una herramienta de solo lectura de un servidor MCP conectado (server, tool y sus arguments, como en mcp_tools). Los campos dependen de la herramienta; mira las filas antes de agruparlas.
 
 ### Default values for Query results
 
@@ -236,6 +242,9 @@ Use these shapes as minimal Query defaults:
 - jira_issues: `{"rows":[]}`
 - analytics_rows: `{"rows":[]}`
 - alerts: `{"rows":[]}`
+- calendar_events: `{"rows":[]}`
+- knowledge: `{"rows":[]}`
+- mcp_rows: `{"rows":[]}`
 
 CRITICAL: Use ONLY the tools listed above in Query() and Mutation() calls. Do NOT invent or guess tool names. If the user asks for functionality that doesn't match any available tool, use realistic mock data instead of fabricating a tool call.
 
@@ -280,4 +289,4 @@ Before finishing, walk your output and verify:
 - Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.
 - Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.
 - No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.
-- Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.
+- Para gráficos y cifras de Jira, Analytics, avisos, el calendario, el índice de conocimiento o un servidor MCP, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.

@@ -1,9 +1,13 @@
 <?php
 
+use App\Connectors\Calendar\CalendarReader;
+use App\Connectors\Calendar\FakeCalendarReader;
 use App\Connectors\Issues\FakeIssueTracker;
 use App\Connectors\Issues\IssueTracker;
+use App\Knowledge\KnowledgeSource;
 use App\Models\ConnectedAccount;
 use App\Models\InboxItem;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
 use App\Voice\OpenUi\Data\Datasets;
 use Illuminate\Support\Facades\Http;
@@ -56,6 +60,38 @@ test('a view gets an Analytics report as rows with one field per dimension and m
             ['sessionDefaultChannelGroup' => 'Organic Search', 'sessions' => 620],
             ['sessionDefaultChannelGroup' => 'Direct', 'sessions' => 380],
         ]);
+});
+
+test('a view gets the calendar as rows, one per event, to add up the hours by day', function () {
+    $this->app->instance(CalendarReader::class, new FakeCalendarReader);
+
+    queryDataset('calendar_events', ['from' => '2026-10-26', 'to' => '2026-10-27'])
+        ->assertOk()
+        ->assertJsonCount(10, 'rows')
+        ->assertJsonPath('rows.0', [
+            'title' => 'Daily de producto', 'day' => '2026-10-26', 'weekday' => 'lunes', 'start' => '09:30', 'minutes' => 15,
+            'calendar' => 'demo@sixth-sense.test', 'organizer' => '', 'attendees' => 2, 'mine' => false, 'declined' => false, 'all_day' => false,
+        ])
+        ->assertJsonPath('rows.2.mine', true);
+
+    queryDataset('calendar_events', ['from' => '2026-01-01', 'to' => '2026-06-01'])->assertUnprocessable();
+    queryDataset('calendar_events', ['from' => '2026-10-27', 'to' => '2026-10-26'])->assertUnprocessable();
+});
+
+test('a view gets the knowledge index as rows, the most read first', function () {
+    KnowledgeDocument::factory()->for($this->user)->create(['source' => KnowledgeSource::Jira, 'title' => 'CPD-412 Prepago', 'views' => 7, 'summary' => 'Resumen']);
+    KnowledgeDocument::factory()->for($this->user)->create(['title' => 'Notas sueltas', 'views' => 0]);
+    KnowledgeDocument::factory()->create(['title' => 'De otra persona', 'views' => 99]);
+
+    queryDataset('knowledge')
+        ->assertOk()
+        ->assertJsonCount(2, 'rows')
+        ->assertJsonPath('rows.0.title', 'CPD-412 Prepago')
+        ->assertJsonPath('rows.0.source', KnowledgeSource::Jira->label())
+        ->assertJsonPath('rows.0.summarized', true)
+        ->assertJsonPath('rows.1.summarized', false);
+
+    queryDataset('knowledge', ['source' => 'jira'])->assertJsonCount(1, 'rows');
 });
 
 test('only listed datasets with valid arguments can be queried, and only signed in', function () {

@@ -200,5 +200,180 @@
         "annotations": {
             "readOnlyHint": true
         }
+    },
+    {
+        "name": "calendar_events",
+        "description": "Eventos del calendario como filas (title, day, weekday, start, minutes, calendar, organizer, attendees, mine, declined, all_day), de from a to (YYYY-MM-DD, como mucho 62 días). Para horas por día: @ByDay(rows, \"day\", \"minutes\") y divide entre 60.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string",
+                    "description": "Primer día, YYYY-MM-DD."
+                },
+                "to": {
+                    "type": "string",
+                    "description": "Último día, YYYY-MM-DD."
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Solo los que tengan esto en el título."
+                },
+                "attendee": {
+                    "type": "string",
+                    "description": "Solo aquellos en los que está esta persona."
+                }
+            },
+            "required": [
+                "from",
+                "to"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string"
+                            },
+                            "day": {
+                                "type": "string"
+                            },
+                            "weekday": {
+                                "type": "string"
+                            },
+                            "start": {
+                                "type": "string"
+                            },
+                            "minutes": {
+                                "type": "number"
+                            },
+                            "calendar": {
+                                "type": "string"
+                            },
+                            "organizer": {
+                                "type": "string"
+                            },
+                            "attendees": {
+                                "type": "number"
+                            },
+                            "mine": {
+                                "type": "boolean"
+                            },
+                            "declined": {
+                                "type": "boolean"
+                            },
+                            "all_day": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
+    },
+    {
+        "name": "knowledge",
+        "description": "El índice de conocimiento como filas (source, title, views, summarized, last_viewed, updated, indexed), uno por documento. source: archive, jira, notion, meeting o memory.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "archive",
+                        "jira",
+                        "notion",
+                        "meeting",
+                        "memory"
+                    ]
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Como mucho 500; los más vistos primero."
+                }
+            }
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "views": {
+                                "type": "number"
+                            },
+                            "summarized": {
+                                "type": "boolean"
+                            },
+                            "last_viewed": {
+                                "type": "string"
+                            },
+                            "updated": {
+                                "type": "string"
+                            },
+                            "indexed": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
+    },
+    {
+        "name": "mcp_rows",
+        "description": "Filas que devuelve una herramienta de solo lectura de un servidor MCP conectado (server, tool y sus arguments, como en mcp_tools). Los campos dependen de la herramienta; mira las filas antes de agruparlas.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "server": {
+                    "type": "string"
+                },
+                "tool": {
+                    "type": "string"
+                },
+                "arguments": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "server",
+                "tool"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": []
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
     }
 ]
