@@ -11,6 +11,9 @@ type Server = {
     name: string;
     url: string;
     has_token: boolean;
+    /** "token", or "oauth" when it is connected by signing in. */
+    auth: 'token' | 'oauth';
+    signed_in: boolean;
     enabled: boolean;
     checked_at: string | null;
     error: string | null;
@@ -22,7 +25,7 @@ const fieldClass = 'w-full rounded-xl border border-line bg-surface px-3 py-2 te
 const formatMoment = (iso: string) => new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 function AddServer() {
-    const form = useForm({ name: '', url: '', token: '' });
+    const form = useForm({ name: '', url: '', token: '', client_id: '', client_secret: '' });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -54,7 +57,9 @@ function AddServer() {
             </div>
             <label className="grid gap-1.5">
                 <span className="text-[13px] font-medium">Token</span>
-                <span className="text-[12.5px] text-muted">Opcional. Se envía como «Authorization: Bearer …» y se guarda cifrado.</span>
+                <span className="text-[12.5px] text-muted">
+                    Opcional. Déjalo vacío si el servidor pide iniciar sesión (Linear, Notion, Atlassian…): te saldrá el botón «Iniciar sesión». Si lo pones, se envía como «Authorization: Bearer …» y se guarda cifrado.
+                </span>
                 <input
                     value={form.data.token}
                     onChange={(event) => form.setData('token', event.target.value)}
@@ -63,6 +68,26 @@ function AddServer() {
                     className={`${fieldClass} font-mono text-[13px]`}
                 />
             </label>
+            <details className="text-[13px]">
+                <summary className="cursor-pointer text-muted">Avanzado: servidores que no permiten registrarse solos</summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1.5">
+                        <span className="font-medium">Client ID</span>
+                        <input value={form.data.client_id} onChange={(event) => form.setData('client_id', event.target.value)} spellCheck={false} className={`${fieldClass} font-mono text-[13px]`} />
+                    </label>
+                    <label className="grid gap-1.5">
+                        <span className="font-medium">Client secret</span>
+                        <input
+                            value={form.data.client_secret}
+                            onChange={(event) => form.setData('client_secret', event.target.value)}
+                            type="password"
+                            autoComplete="off"
+                            className={`${fieldClass} font-mono text-[13px]`}
+                        />
+                    </label>
+                </div>
+                <p className="mt-2 text-[12.5px] text-muted">La URL de vuelta que tienes que registrar en ese servidor es {window.location.origin}/settings/mcp/oauth/callback.</p>
+            </details>
             <div>
                 <button type="submit" disabled={form.processing} className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40">
                     {form.processing ? 'Conectando…' : 'Conectar'}
@@ -91,6 +116,7 @@ function ServerCard({ server }: { server: Server }) {
                         {server.error ? <span className="text-crit">{server.error}</span> : `${server.tools.length} herramientas`}
                         {server.checked_at && ` · comprobado ${formatMoment(server.checked_at)}`}
                         {server.has_token && ' · con token'}
+                        {server.auth === 'oauth' && (server.signed_in ? ' · sesión iniciada' : ' · falta iniciar sesión')}
                     </p>
                 </div>
                 <Switch checked={server.enabled} onChange={toggle} className="mt-1 flex-none">
@@ -112,7 +138,15 @@ function ServerCard({ server }: { server: Server }) {
                 </ul>
             )}
 
-            <footer className="flex gap-2 border-t border-line px-[22px] py-3">
+            <footer className="flex flex-wrap gap-2 border-t border-line px-[22px] py-3">
+                {server.auth === 'oauth' && (
+                    <a
+                        href={`/settings/mcp/${server.id}/connect`}
+                        className={server.signed_in ? 'rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft' : 'rounded-full bg-ink px-3 py-1 text-[12.5px] font-medium text-bg hover:opacity-90'}
+                    >
+                        {server.signed_in ? 'Volver a iniciar sesión' : 'Iniciar sesión'}
+                    </a>
+                )}
                 <button type="button" onClick={refresh} className="rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft">
                     Probar de nuevo
                 </button>
@@ -132,7 +166,7 @@ export default function Mcp({ servers }: { servers: Server[] }) {
     return (
         <SettingsLayout
             title="MCP"
-            description="Conecta servidores MCP remotos (por URL) y el asistente podrá usar sus herramientas. Las que solo leen se ejecutan al momento; las que pueden cambiar algo te piden un sí, como el resto de acciones."
+            description="Conecta servidores MCP remotos por URL, con un token o iniciando sesión, y el asistente podrá usar sus herramientas. Las que solo leen se ejecutan al momento; las que pueden cambiar algo te piden un sí, como el resto de acciones."
         >
             <div className="flex flex-col gap-4">
                 {servers.map((server) => (

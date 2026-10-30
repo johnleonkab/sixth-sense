@@ -24,6 +24,8 @@ class McpClient
 
     private int $id = 0;
 
+    public function __construct(private McpOAuth $oauth) {}
+
     /**
      * Every tool the server offers, as sixth-sense keeps them.
      *
@@ -174,7 +176,7 @@ class McpClient
      *
      * @throws McpError
      */
-    private function post(McpServer $server, ?array $session, array $message): Response
+    private function post(McpServer $server, ?array $session, array $message, bool $retried = false): Response
     {
         $headers = array_filter([
             'Accept' => 'application/json, text/event-stream',
@@ -182,11 +184,13 @@ class McpClient
             'MCP-Protocol-Version' => $session['version'] ?? null,
         ]);
 
+        $token = $server->usesOAuth() ? $this->oauth->accessToken($server, $retried) : $server->token;
+
         try {
             $request = Http::withHeaders($headers)->timeout(25)->withoutRedirecting();
 
-            if (filled($server->token)) {
-                $request = $request->withToken($server->token);
+            if (filled($token)) {
+                $request = $request->withToken($token);
             }
 
             $response = $request->post($server->url, $message);
@@ -194,8 +198,13 @@ class McpClient
             throw new McpError('No he podido conectar con el servidor MCP.');
         }
 
+        // A token that expired early: refresh it once and try again.
+        if ($response->status() === 401 && $server->usesOAuth() && ! $retried) {
+            return $this->post($server, $session, $message, true);
+        }
+
         if (in_array($response->status(), [401, 403], true)) {
-            throw new McpError('El servidor MCP no acepta el token: revisa que sea válido.');
+            throw new McpError($server->usesOAuth() ? 'El servidor MCP no acepta la sesión. Vuelve a iniciar sesión.' : 'El servidor MCP no acepta el token: revisa que sea válido.');
         }
 
         if ($response->failed()) {

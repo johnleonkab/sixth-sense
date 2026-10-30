@@ -22,6 +22,12 @@ class McpServers
      */
     public function check(McpServer $server): bool
     {
+        if ($server->usesOAuth() && ! $server->signedIn()) {
+            $server->update(['checked_at' => now(), 'last_error' => 'Falta iniciar sesión.']);
+
+            return false;
+        }
+
         try {
             $server->update(['tools' => $this->client->tools($server), 'checked_at' => now(), 'last_error' => null]);
 

@@ -95,6 +95,8 @@ Route::middleware('auth')->group(function () {
         Route::get('impact', [ImpactController::class, 'index'])->name('impact.index');
         Route::get('mcp', [McpServerController::class, 'index'])->name('mcp.index');
         Route::post('mcp', [McpServerController::class, 'store'])->middleware('throttle:10,1')->name('mcp.store');
+        Route::get('mcp/oauth/callback', [McpServerController::class, 'callback'])->name('mcp.callback');
+        Route::get('mcp/{server}/connect', [McpServerController::class, 'connect'])->whereNumber('server')->middleware('throttle:10,1')->name('mcp.connect');
         Route::post('mcp/{server}/refresh', [McpServerController::class, 'refresh'])->whereNumber('server')->middleware('throttle:10,1')->name('mcp.refresh');
         Route::put('mcp/{server}', [McpServerController::class, 'update'])->whereNumber('server')->name('mcp.update');
         Route::delete('mcp/{server}', [McpServerController::class, 'destroy'])->whereNumber('server')->name('mcp.destroy');
