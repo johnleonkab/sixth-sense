@@ -398,26 +398,33 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 }
 
+/** The datasets, as the voice is told about them in one line. */
+const datasetLine = (): string => datasets.map((dataset) => dataset.name).join(', ');
+
+/** What every view follows, said once in the always-loaded prompt. */
+const viewRules = (): string[] => [
+    'Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.',
+    'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n, ref y actions de cada elemento de una ItemList y los Proposal tal cual.',
+    'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
+    'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
+    'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.',
+    'No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.',
+    `Para gráficos y cifras de datos vivos (datasets: ${datasetLine()}), o para cambiar una vista que tenga Query o $variables, llama antes a view_data_guide: explica Query, $variables, las funciones y cada dataset.`,
+];
+
 /**
- * What the voice is told when it has to compose a view. Written to
- * resources/openui/prompt.md by `npm run openui:prompt`.
+ * What the voice is told when it has to compose a view, always: the syntax,
+ * the blocks and the rules. Written to resources/openui/prompt.md by
+ * `npm run openui:prompt`. Live data is in dataGuide(), asked for on demand.
  */
 export function viewPrompt(): string {
     return buildLibrary().prompt({
-        tools: datasets,
-        toolCalls: true,
-        bindings: true,
+        toolCalls: false,
+        bindings: false,
+        builtinFunctions: false,
         preamble:
             'Para mostrar en pantalla datos que no tienen una vista propia (resultados de un servidor MCP, analítica, comparativas, archivos, imágenes), llama a show_view con una interfaz escrita en OpenUI Lang. Lo dicho en voz sigue siendo corto: el detalle va en la vista. Textos en español.',
-        additionalRules: [
-            'Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.',
-            'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.',
-            'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
-            'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
-            'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.',
-            'No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.',
-            'Para gráficos y cifras de Jira, Analytics, avisos, el calendario, el índice de conocimiento o un servidor MCP, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.',
-        ],
+        additionalRules: viewRules(),
         examples: [
             [
                 'root = View("Tráfico, últimos 7 días", [kpis, trend, top])',
@@ -429,4 +436,63 @@ export function viewPrompt(): string {
             ].join('\n'),
         ],
     });
+}
+
+/** Sections of OpenUI's own prompt that do not apply here: views never write, and there are no forms. */
+const LEFT_OUT = ['Mutation', 'Forms'];
+
+/** Sections of OpenUI's own prompt that teach live data, kept for the guide (its filters assume Select, so ours are written below). */
+const DATA_SECTIONS = ['Built-in Functions', 'Query', 'Available Tools'];
+
+/** Filters and paging with this library's blocks. */
+const FILTERS = [
+    '## Filtros y «cargar más»',
+    '1. Declara la $variable con su valor inicial: `$status = "pending"`.',
+    '2. Tabs con las opciones y la $variable: `tabs = Tabs([{value: "pending", label: "Pendientes"}, {value: "all", label: "Todos"}], $status)`.',
+    '3. Pásala en los argumentos de la Query: `alerts = Query("alerts", {status: $status, limit: $limit}, {rows: []})`. Al cambiar de pestaña, vuelve a pedir los datos sola.',
+    '4. Para «cargar más», sube el límite: `more = @Count(alerts.rows) >= $limit ? Button("Cargar más", @Set($limit, $limit + 30)) : null`.',
+    'Si se ve un filtro, toda Query a la que afecte lleva su $variable. Las $variables guardan textos o números, nunca listas.',
+].join('\n');
+
+/**
+ * How to use live data in a view: Query, $variables and filters, the
+ * functions and every dataset. The voice asks for it with view_data_guide.
+ * Written to resources/openui/data-guide.md by `npm run openui:prompt`.
+ */
+export function dataGuide(): string {
+    const full = buildLibrary().prompt({
+        tools: datasets,
+        toolCalls: true,
+        bindings: true,
+        additionalRules: viewRules(),
+        toolExamples: [
+            [
+                'root = View("Issues de EXP", [tabs, donut])',
+                '$status = "all"',
+                'tabs = Tabs([{value: "all", label: "Todos"}, {value: "open", label: "Abiertos"}], $status)',
+                'issues = Query("jira_issues", {jql: "project = EXP"}, {rows: []})',
+                'byStatus = @Top(@GroupCount(issues.rows, "status"), 6)',
+                'donut = DonutChart("Por estado", byStatus.labels, byStatus.values)',
+            ].join('\n'),
+        ],
+    });
+
+    const sections = full.split(/^(?=## )/m).filter((section) => {
+        const heading = section.split('\n', 1)[0];
+
+        return DATA_SECTIONS.some((name) => heading.includes(name)) && !LEFT_OUT.some((name) => heading.includes(name));
+    });
+
+    return [
+        '# Datos vivos en una vista',
+        'Las vistas no escriben nada: Query solo lee estos datasets, y no existe Mutation. Para filtros, el bloque Tabs con una $variable (no hay Select ni formularios). Para cambiar algo, usa las herramientas que proponen y esperan el sí.',
+        ...sections.map((section) =>
+            section
+                .trim()
+                // Never made-up data: with no dataset for it, say so.
+                .replace(/^CRITICAL: Use ONLY the tools listed above.*$/m, 'Usa solo estos datasets en Query, con estos nombres. Si ninguno sirve, dilo: nunca escribas datos inventados.')
+                .replace(/ or Mutation\(\) for write operations\. The LLM decides which is appropriate based on the tool's purpose\./, '.'),
+        ),
+        FILTERS,
+    ].join('\n\n');
 }

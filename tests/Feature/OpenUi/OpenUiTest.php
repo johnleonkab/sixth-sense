@@ -49,6 +49,19 @@ test('the voice is told how to compose views from the OpenUI blocks', function (
         ->and(AssistantProfile::for($this->user, CarbonImmutable::now())->instructions)->toContain($prompt);
 });
 
+test('live data is explained only when asked for, so every turn carries a short prompt', function () {
+    expect(OpenUi::prompt())->toContain('view_data_guide')->not->toContain('Query — Live Data Fetching')->not->toContain('Mutation(');
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'view_data_guide'), ['arguments' => []])
+        ->assertOk()
+        ->assertJsonPath('output.guide', fn (string $guide): bool => str_contains($guide, 'Query(')
+            && str_contains($guide, 'calendar_events')
+            && str_contains($guide, 'Tabs(')
+            && ! str_contains($guide, 'Select(')
+            && ! str_contains($guide, 'mock data'));
+});
+
 test('a composed view is shown, and one without a root is refused', function () {
     $ui = "root = View(\"Hoy\", [m])\nm = Metric(\"Usuarios\", \"1.204\")";
 

@@ -75,6 +75,7 @@ use App\Voice\Tools\Views\ForgetView;
 use App\Voice\Tools\Views\OpenSavedView;
 use App\Voice\Tools\Views\SaveView;
 use App\Voice\Tools\Views\ShowView;
+use App\Voice\Tools\Views\ViewDataGuide;
 use App\Voice\Tools\Wingman\DismissMeetingActions;
 use App\Voice\Tools\Wingman\ProposeMeetingAction;
 use App\Voice\Tools\Wingman\ReviewMeeting;
@@ -151,6 +152,7 @@ class Toolbox
         ReadKnowledge::class,
         AnswerQuestion::class,
         ShowView::class,
+        ViewDataGuide::class,
         SaveView::class,
         OpenSavedView::class,
         ForgetView::class,

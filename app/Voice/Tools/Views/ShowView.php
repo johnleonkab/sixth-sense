@@ -22,8 +22,8 @@ class ShowView implements VoiceTool
 
     public function description(): string
     {
-        return 'Muestra en pantalla una vista compuesta en OpenUI Lang con los bloques View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List y Button. '
-            .'Úsala para datos sin vista propia: resultados de un servidor MCP, analítica, comparativas, imágenes o archivos. El formato está en tus instrucciones.';
+        return 'Muestra en pantalla una vista compuesta en OpenUI Lang con los bloques de tus instrucciones. '
+            .'Úsala para datos sin vista propia: resultados de un servidor MCP, analítica, comparativas, imágenes o archivos. Con datos vivos (Query), llama antes a view_data_guide.';
     }
 
     public function parameters(): array

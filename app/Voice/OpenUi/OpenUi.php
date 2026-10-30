@@ -24,6 +24,17 @@ class OpenUi
     }
 
     /**
+     * How to use live data in a view (Query, $variables, the functions and
+     * every dataset), for the voice to ask for when it needs it.
+     */
+    public static function dataGuide(): string
+    {
+        $path = resource_path('openui/data-guide.md');
+
+        return is_file($path) ? trim((string) file_get_contents($path)) : '';
+    }
+
+    /**
      * One OpenUI Lang value: a string, number, boolean, null, list, object
      * (an array with keys; nulls are left out) or a reference to another
      * statement (Ref).
