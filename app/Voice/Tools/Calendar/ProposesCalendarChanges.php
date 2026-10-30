@@ -9,6 +9,7 @@ use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\EventQuery;
 use App\Connectors\Mail\RecipientResolver;
 use App\Models\User;
+use App\Voice\OpenUi\Views\CalendarChangeView;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\Docs\ProposesChanges;
 use App\Voice\Tools\ToolContext;
@@ -62,12 +63,7 @@ trait ProposesCalendarChanges
 
         return new ToolResult(
             output: $this->proposalOutput($action, ['change' => $label, ...array_filter($details, fn (mixed $value): bool => is_scalar($value))]),
-            canvas: new Canvas('calendar.change', [
-                'action' => $action->toState(),
-                'kind' => $kind,
-                'event' => $event ? $this->card($event) : null,
-                ...$details,
-            ]),
+            canvas: CalendarChangeView::canvas($user, $action, $kind, $event ? $this->card($event) : null, $details),
             beside: $this->dayBeside($user, $event, $details),
         );
     }

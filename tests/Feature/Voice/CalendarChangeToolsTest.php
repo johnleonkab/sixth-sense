@@ -36,12 +36,16 @@ test('events found by voice carry the id to change them', function () {
 });
 
 test('inviting someone shows the new guest as a draft and changes nothing yet', function () {
-    runCalendarTool('propose_event_invite', ['event_id' => $this->organised, 'people' => ['Pablo']])
-        ->assertJsonPath('canvas.view', 'calendar.change')
-        ->assertJsonPath('canvas.props.kind', 'invite')
-        ->assertJsonPath('canvas.props.new_people.0.email', 'pablo@covermanager.test')
-        ->assertJsonPath('canvas.props.event.title', '1:1 con Marta')
+    $proposal = runCalendarTool('propose_event_invite', ['event_id' => $this->organised, 'people' => ['Pablo']])
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.source', 'Calendar · Invitación')
         ->assertJsonPath('beside', null);
+
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Card("1:1 con Marta"')
+        ->toContain('Draft("Nuevos invitados", "Pablo Gil")')
+        ->toContain('Proposal('.$proposal->json('output.pending_action_id').', "invitar", "Invitaciones enviadas")')
+        ->toBeValidOpenUi();
 
     expect($this->writer->changes)->toBe([]);
 });
@@ -66,36 +70,37 @@ test('meetings the user does not organise can not be changed, only answered', fu
 ]);
 
 test('a summary is added below the description with today date', function () {
-    runCalendarTool('propose_event_summary', ['event_id' => $this->organised, 'summary' => '- Marta revisa el paso 3'])
-        ->assertJsonPath('canvas.props.kind', 'summary')
-        ->assertJsonPath('canvas.props.heading', 'Resumen · 8 de octubre de 2026')
-        ->assertJsonPath('canvas.props.summary', '- Marta revisa el paso 3');
+    expect(runCalendarTool('propose_event_summary', ['event_id' => $this->organised, 'summary' => '- Marta revisa el paso 3'])->json('canvas.props.ui'))
+        ->toContain('Draft("— Resumen · 8 de octubre de 2026 —", "- Marta revisa el paso 3")')
+        ->toBeValidOpenUi();
 });
 
 test('a new meeting warns about what it clashes with', function () {
-    runCalendarTool('propose_new_event', ['title' => 'Revisión prepago', 'date' => '2026-10-08', 'start_time' => '11:30', 'people' => ['Marta']])
-        ->assertJsonPath('canvas.props.kind', 'create')
-        ->assertJsonPath('canvas.props.new_event.end', '2026-10-08T12:00:00+02:00')
-        ->assertJsonPath('canvas.props.new_event.video_call', true)
-        ->assertJsonPath('canvas.props.new_event.attendees.0.email', 'marta@covermanager.test')
-        ->assertJsonPath('canvas.props.conflicts.0.title', 'Revisión flujo de prepago')
+    $proposal = runCalendarTool('propose_new_event', ['title' => 'Revisión prepago', 'date' => '2026-10-08', 'start_time' => '11:30', 'people' => ['Marta']])
         ->assertJsonPath('beside.view', 'calendar.day')
         ->assertJsonPath('beside.props.from', '2026-10-08')
         ->assertJsonPath('output.conflict_count', 1);
+
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Draft("Reunión nueva · borrador", "Revisión prepago\\nJueves 8 de octubre · 11:30–12:00\\n')
+        ->toContain('Google Meet')
+        ->toContain('Con Marta Ruiz')
+        ->toContain('Text("Choca con «Revisión flujo de prepago» (11:00–11:45).", "warn")')
+        ->toBeValidOpenUi();
 });
 
 test('cancelling a meeting the user organises says who will be told', function () {
-    runCalendarTool('propose_event_cancellation', ['event_id' => $this->organised])
-        ->assertJsonPath('canvas.props.kind', 'cancel')
-        ->assertJsonPath('canvas.props.event.title', '1:1 con Marta');
+    expect(runCalendarTool('propose_event_cancellation', ['event_id' => $this->organised])->json('canvas.props.ui'))
+        ->toContain('Card("1:1 con Marta"')
+        ->toContain('Text("Se borrará de tu calendario')
+        ->toContain('"cancelar", "Reunión cancelada"')
+        ->toBeValidOpenUi();
 });
 
 test('answering an invitation shows the answer and the previous one', function () {
-    runCalendarTool('propose_event_response', ['event_id' => $this->invited, 'response' => 'tentative', 'comment' => 'Llego tarde'])
-        ->assertJsonPath('canvas.props.kind', 'respond')
-        ->assertJsonPath('canvas.props.response_label', 'Quizá')
-        ->assertJsonPath('canvas.props.previous_response', 'needsAction')
-        ->assertJsonPath('canvas.props.comment', 'Llego tarde');
+    expect(runCalendarTool('propose_event_response', ['event_id' => $this->invited, 'response' => 'tentative', 'comment' => 'Llego tarde'])->json('canvas.props.ui'))
+        ->toContain('Draft("Tu respuesta, antes «Sin responder»", "Quizá\\n«Llego tarde»")')
+        ->toBeValidOpenUi();
 });
 
 test('a meeting the user organises has no invitation to answer', function () {
@@ -106,14 +111,14 @@ test('a meeting the user organises has no invitation to answer', function () {
 test('moving a meeting keeps its length and shows the before and after', function () {
     $sync = 'demo:primary:20261008-3';
 
-    runCalendarTool('propose_event_update', ['event_id' => $sync, 'date' => '2026-10-09', 'start_time' => '12:00'])
-        ->assertJsonPath('canvas.props.kind', 'update')
-        ->assertJsonPath('canvas.props.changes.0.label', 'Cuándo')
-        ->assertJsonPath('canvas.props.changes.0.before', 'jueves 8 de octubre, 13:00–14:00')
-        ->assertJsonPath('canvas.props.changes.0.after', 'viernes 9 de octubre, 12:00–13:00')
-        ->assertJsonPath('canvas.props.conflict_count', 1)
-        ->assertJsonPath('canvas.props.notify', true)
+    $proposal = runCalendarTool('propose_event_update', ['event_id' => $sync, 'date' => '2026-10-09', 'start_time' => '12:00'])
         ->assertJsonPath('output.change', 'Mover «Sync producto–ventas»');
+
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Table(["", "Antes", "Después"], [["Cuándo", "jueves 8 de octubre, 13:00–14:00", "viernes 9 de octubre, 12:00–13:00"]])')
+        ->toContain('Text("Se avisará a los invitados del cambio.", "muted")')
+        ->toContain('Text("Choca con «1:1 con Marta» (12:00–12:30).", "warn")')
+        ->toBeValidOpenUi();
 
     expect($this->writer->changes)->toBe([]);
 });
@@ -126,8 +131,9 @@ test('once confirmed the meeting moves, renamed and without who was taken off', 
         'title' => 'Sync ventas',
         'remove_people' => ['Lucía'],
         'notify' => false,
-    ])->assertJsonPath('canvas.props.updated_event.attendees.0.name', 'Pablo Gil')
-        ->assertJsonCount(1, 'canvas.props.updated_event.attendees');
+    ]);
+
+    expect($proposal->json('canvas.props.ui'))->toContain('Draft("Así quedará", "Sync ventas\\nJueves 8 de octubre · 15:00–15:30\\nGoogle Meet\\nCon Pablo Gil")');
 
     $this->actingAs($this->user)->postJson(route('actions.confirm', $proposal->json('output.pending_action_id')))->assertOk();
 
