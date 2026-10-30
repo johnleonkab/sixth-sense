@@ -12,7 +12,6 @@ use App\Connectors\Jira\JiraRules;
 use App\Knowledge\Gaps\GapStatus;
 use App\Models\KnowledgeGap;
 use App\Models\User;
-use App\Voice\OpenUi\OpenUi;
 use App\Voice\Tools\Toolbox;
 use App\WorkContext\WorkDigest;
 use Carbon\CarbonImmutable;
@@ -47,17 +46,28 @@ final readonly class AssistantProfile
         return new self(
             instructions: trim(implode("\n", array_filter([
                 $instructions,
-                $chats ? self::familiarChats($chats->familiar($user)) : '',
-                self::workContext($user),
-                self::sense($user),
-                self::knowledge($user),
-                OpenUi::prompt(),
-                'Si el encargo necesita más de una herramienta (buscar hueco y contestar, dejar varias historias, preguntar a un agente), la única llamada es open_scene. No encadenes las herramientas de ese encargo.',
+                self::context($user, $chats, $issues),
+                'Si el encargo hace algo más que abrir o leer, o necesita más de una herramienta, la única llamada es delegate. No encadenes herramientas ni escribas tú el contenido.',
                 'Para encontrar un documento, una hoja, unas diapositivas o una página, la única llamada es find_files, con uno o varios términos. No busques primero en Docs y luego en Notion.',
-                $issues ? self::jiraRules($issues->rules($user)) : '',
             ]))),
             tools: $toolbox?->declarations() ?? [],
         );
+    }
+
+    /**
+     * What the voice and the agents both need to know about the person: who
+     * and where they talk to in Slack, what they work on, their Archive, what
+     * they have explained, and their Jira rules.
+     */
+    public static function context(User $user, ?Chats $chats = null, ?IssueTracker $issues = null): string
+    {
+        return trim(implode("\n", array_filter([
+            $chats ? self::familiarChats($chats->familiar($user)) : '',
+            self::workContext($user),
+            self::sense($user),
+            self::knowledge($user),
+            $issues ? self::jiraRules($issues->rules($user)) : '',
+        ])));
     }
 
     /**
@@ -175,7 +185,7 @@ final readonly class AssistantProfile
         }
 
         if ($agents->isNotEmpty()) {
-            $lines[] = 'Agentes del archivo. Si el tema encaja con la description de uno, llama a focus_sense_agent con su name antes de responder y sigue las instrucciones que devuelva. Con name vacío vuelves al asistente general. Después de crear o cambiar un agente, una skill o CLAUDE.md, llama a sync_sense_agents.';
+            $lines[] = 'Agentes del archivo: cada uno corre como agente propio. Si el tema encaja con la description de uno, pásale el encargo con delegate y agent archivo:<name>. Después de crear o cambiar un agente, una skill o CLAUDE.md, llama a sync_sense_agents.';
 
             foreach ($agents as $agent) {
                 $lines[] = "- {$agent->name}: {$agent->description}";
@@ -183,7 +193,7 @@ final readonly class AssistantProfile
         }
 
         if ($skills->isNotEmpty()) {
-            $lines[] = 'Skills del archivo. Si el tema encaja con la description de una, llama a use_sense_skill con su name y sigue lo que devuelva.';
+            $lines[] = 'Skills del archivo. Las usan los agentes (con use_sense_skill) cuando el tema encaja con su description.';
 
             foreach ($skills as $skill) {
                 $lines[] = "- {$skill->name}: {$skill->description}";

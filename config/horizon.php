@@ -257,6 +257,35 @@ return [
             'timeout' => 120,
             'nice' => 0,
         ],
+
+        // Agents, on two queues so a heavy one (that reads and reasons for a
+        // while) never holds back a light one (the orchestrator, Agenda, Vistas).
+        // Each agent also has its own concurrency limit (config/agents.php).
+        'supervisor-agents-light' => [
+            'connection' => 'redis',
+            'queue' => ['agents-light'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 3,
+            'timeout' => 100,
+            'nice' => 0,
+        ],
+
+        'supervisor-agents-heavy' => [
+            'connection' => 'redis',
+            'queue' => ['agents-heavy'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 192,
+            'tries' => 3,
+            'timeout' => 210,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -267,6 +296,16 @@ return [
                 'maxProcesses' => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
+            ],
+            // Scenes and agents, one worker each: 3 + 1 + 1 + 1 + 1 + 1 = 8.
+            'supervisor-scenes' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-agents-light' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-agents-heavy' => [
+                'maxProcesses' => 1,
             ],
         ],
 

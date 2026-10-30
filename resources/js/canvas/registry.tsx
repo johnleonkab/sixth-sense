@@ -1,3 +1,4 @@
+import AgentRun from '@/canvas/agents/agent-run';
 import AlertReview from '@/canvas/alerts/alert-review';
 import AgendaTask from '@/canvas/agenda/agenda-task';
 import AlertsHistory from '@/canvas/alerts/alerts-history';
@@ -73,6 +74,7 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'image.viewer': ImageViewer,
     'alerts.list': AlertsList,
     'alerts.review': AlertReview,
+    'agents.run': AgentRun,
     'alerts.history': AlertsHistory,
     'agenda.task': AgendaTask,
     'jira.list': JiraList,

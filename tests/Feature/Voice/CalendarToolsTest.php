@@ -5,7 +5,6 @@ use App\Connectors\Calendar\FakeCalendarReader;
 use App\Models\User;
 use App\Voice\Providers\FakeVoiceProvider;
 use App\Voice\Providers\GeminiVoiceProvider;
-use App\Voice\Tools\Toolbox;
 use App\Voice\VoiceProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
@@ -121,5 +120,10 @@ test('gemini locks the tools into the session with its schema format', function 
             && $mail['folder']['enum'] === ['any', 'inbox', 'sent'];
     });
 
-    expect($grant->json('connection.tools.0.functionDeclarations'))->toHaveCount(count(app(Toolbox::class)->all()));
+    // The voice gets only its own tools: reads, the person's choices, delegate and present.
+    $names = collect($grant->json('connection.tools.0.functionDeclarations'))->pluck('name');
+
+    expect($names)->toHaveCount(count(config('agents.voice_tools')))
+        ->and($names)->toContain('delegate', 'present', 'show_calendar')
+        ->and($names)->not->toContain('propose_slack_message', 'mcp_call', 'show_view', 'use_sense_skill');
 });

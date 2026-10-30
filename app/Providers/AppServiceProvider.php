@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Agents\Models\FakeToolModel;
 use App\Ai\AiObservability;
 use App\Ai\DeepSeekTextModel;
 use App\Ai\GeminiTextModel;
@@ -133,8 +134,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(SceneText::class, DeepSeekSceneText::class);
 
+        // The scripted agent model keeps its script for the whole request (tests, demo).
+        $this->app->singleton(FakeToolModel::class);
+
         $this->app->bind(RelevanceJudge::class, fn (): RelevanceJudge => match (true) {
-            $this->usesTextModel(config('alerts.judge')) => new LlmRelevanceJudge($this->textModel('light')),
+            $this->usesTextModel(config('alerts.judge')) => new LlmRelevanceJudge($this->pipeline('relevance_judge')),
             config('alerts.judge') === 'fake' => new FakeRelevanceJudge,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
@@ -142,40 +146,40 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ProductAnalytics::class, PostHogProductAnalytics::class);
 
         $this->app->singleton(IntentClassifier::class, fn (): IntentClassifier => match (true) {
-            $this->usesTextModel(config('alerts.judge')) => new LlmIntentClassifier($this->textModel('light')),
+            $this->usesTextModel(config('alerts.judge')) => new LlmIntentClassifier($this->pipeline('intent_classifier')),
             config('alerts.judge') === 'fake' => new FakeIntentClassifier,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         // The reply engine is its own piece: it can become another agent without touching the alerts.
         $this->app->bind(ReplyPlanner::class, fn (): ReplyPlanner => match (true) {
-            $this->usesTextModel(config('alerts.planner')) => new LlmReplyPlanner($this->textModel('capable')),
+            $this->usesTextModel(config('alerts.planner')) => new LlmReplyPlanner($this->pipeline('reply_planner')),
             config('alerts.planner') === 'fake' => new FakeReplyPlanner,
             default => throw new InvalidArgumentException('Unsupported reply planner ['.config('alerts.planner').'].'),
         });
 
         // The scheduler's judgement is its own piece too: urgency and length of each task.
         $this->app->bind(TaskAssessor::class, fn (): TaskAssessor => match (true) {
-            $this->usesTextModel(config('agenda.assessor')) => new LlmTaskAssessor($this->textModel('capable')),
+            $this->usesTextModel(config('agenda.assessor')) => new LlmTaskAssessor($this->pipeline('task_assessor')),
             config('agenda.assessor') === 'fake' => new FakeTaskAssessor,
             default => throw new InvalidArgumentException('Unsupported task assessor ['.config('agenda.assessor').'].'),
         });
 
         // A summary per much used document: the cheapest model is enough.
         $this->app->bind(DocumentSummarizer::class, fn (): DocumentSummarizer => match (true) {
-            $this->usesTextModel(config('alerts.judge')) => new LlmDocumentSummarizer($this->textModel('light')),
+            $this->usesTextModel(config('alerts.judge')) => new LlmDocumentSummarizer($this->pipeline('document_summarizer')),
             config('alerts.judge') === 'fake' => new FakeDocumentSummarizer,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         $this->app->bind(TermJudge::class, fn (): TermJudge => match (true) {
-            $this->usesTextModel(config('alerts.judge')) => new LlmTermJudge($this->textModel('light')),
+            $this->usesTextModel(config('alerts.judge')) => new LlmTermJudge($this->pipeline('term_judge')),
             config('alerts.judge') === 'fake' => new FakeTermJudge,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
 
         $this->app->bind(MeetingAdvisor::class, fn (): MeetingAdvisor => match (true) {
-            $this->usesTextModel(config('alerts.judge')) => new LlmMeetingAdvisor($this->textModel('light')),
+            $this->usesTextModel(config('alerts.judge')) => new LlmMeetingAdvisor($this->pipeline('meeting_advisor')),
             config('alerts.judge') === 'fake' => new FakeMeetingAdvisor,
             default => throw new InvalidArgumentException('Unsupported alerts judge ['.config('alerts.judge').'].'),
         });
@@ -183,7 +187,7 @@ class AppServiceProvider extends ServiceProvider
         // A week of activity is a long read: the capable model, with more time.
         $this->app->bind(ContextSummarizer::class, fn (): ContextSummarizer => match (true) {
             $this->usesTextModel(config('work_context.summarizer')) => new LlmContextSummarizer(
-                $this->textModel('capable', (int) config('work_context.timeout')),
+                $this->pipeline('context_summarizer'),
                 $this->app->make(ActivityBrief::class),
                 $this->app->make(IssueTracker::class),
             ),
@@ -198,19 +202,19 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(NoteTaker::class, fn (): NoteTaker => match (true) {
-            $this->usesTextModel(config('wingman.notes.taker')) => new LlmNoteTaker($this->textModel('capable', model: config('wingman.notes.model'))),
+            $this->usesTextModel(config('wingman.notes.taker')) => new LlmNoteTaker($this->pipeline('note_taker')),
             config('wingman.notes.taker') === 'fake' => new FakeNoteTaker,
             default => throw new InvalidArgumentException('Unsupported Wingman note-taker ['.config('wingman.notes.taker').'].'),
         });
 
         $this->app->bind(Detector::class, fn (): Detector => match (true) {
-            $this->usesTextModel(config('wingman.agent.detector')) => new LlmDetector($this->textModel('capable', model: config('wingman.agent.model'))),
+            $this->usesTextModel(config('wingman.agent.detector')) => new LlmDetector($this->pipeline('detector')),
             config('wingman.agent.detector') === 'fake' => new FakeDetector,
             default => throw new InvalidArgumentException('Unsupported Wingman detector ['.config('wingman.agent.detector').'].'),
         });
 
         $this->app->bind(FollowUpPlanner::class, fn (): FollowUpPlanner => match (true) {
-            $this->usesTextModel(config('wingman.follow_ups.planner')) => new LlmFollowUpPlanner($this->textModel('capable', model: config('wingman.follow_ups.model'))),
+            $this->usesTextModel(config('wingman.follow_ups.planner')) => new LlmFollowUpPlanner($this->pipeline('follow_up_planner')),
             config('wingman.follow_ups.planner') === 'fake' => new FakeFollowUpPlanner,
             default => throw new InvalidArgumentException('Unsupported Wingman follow-up planner ['.config('wingman.follow_ups.planner').'].'),
         });
@@ -231,11 +235,23 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * The model of one pipeline, from its entry in config/agents.php: its tier
+     * (the light model answers every new message, the capable one thinks a
+     * proposal through), and its own provider, model or timeout when it sets one.
+     */
+    private function pipeline(string $name): TextModel
+    {
+        $pipeline = config("agents.pipelines.{$name}", []);
+
+        return $this->textModel($pipeline['tier'] ?? 'capable', isset($pipeline['timeout']) ? (int) $pipeline['timeout'] : null, $pipeline['model'] ?? null, $pipeline['provider'] ?? null);
+    }
+
+    /**
      * The light model answers every new message. The capable one thinks a proposal through.
      */
-    private function textModel(string $tier, ?int $timeout = null, ?string $model = null): TextModel
+    private function textModel(string $tier, ?int $timeout = null, ?string $model = null, ?string $provider = null): TextModel
     {
-        $provider = config('ai.text');
+        $provider ??= config('ai.text');
         $config = config("ai.providers.{$provider}");
 
         if (! is_array($config)) {

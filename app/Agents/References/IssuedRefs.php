@@ -22,7 +22,7 @@ class IssuedRefs
      *
      * @var list<string>
      */
-    public const STRICT = ['email_id', 'message_id', 'thread_id', 'event_id', 'file_id', 'link_id'];
+    public const STRICT = ['email_id', 'message_id', 'thread_id', 'event_id', 'file_id', 'link_id', 'reply_to'];
 
     /**
      * Keys under which tools and canvases hand ids out.

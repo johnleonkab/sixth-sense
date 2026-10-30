@@ -2,6 +2,7 @@
 
 namespace App\Voice\Providers;
 
+use App\Ai\GeminiSchema;
 use App\Ai\ProviderKeys;
 use App\Models\User;
 use App\Voice\AssistantProfile;
@@ -142,30 +143,7 @@ class GeminiVoiceProvider implements VoiceProvider
             'name' => $tool['name'],
             'description' => $tool['description'],
             // Gemini rejects objects without properties: tools without arguments declare none.
-            'parameters' => ($tool['parameters']['properties'] ?? []) === [] ? null : $this->schema($tool['parameters']),
+            'parameters' => ($tool['parameters']['properties'] ?? []) === [] ? null : GeminiSchema::of($tool['parameters']),
         ]), $assistant->tools);
-    }
-
-    /**
-     * Gemini expects OpenAPI-style schemas with upper-case types.
-     *
-     * @param  array<string, mixed>  $schema
-     * @return array<string, mixed>
-     */
-    private function schema(array $schema): array
-    {
-        if (isset($schema['type']) && is_string($schema['type'])) {
-            $schema['type'] = strtoupper($schema['type']);
-        }
-
-        if (isset($schema['properties'])) {
-            $schema['properties'] = array_map(fn (array $property): array => $this->schema($property), $schema['properties']);
-        }
-
-        if (isset($schema['items'])) {
-            $schema['items'] = $this->schema($schema['items']);
-        }
-
-        return $schema;
     }
 }

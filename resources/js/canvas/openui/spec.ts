@@ -444,7 +444,7 @@ const datasetLine = (): string => datasets.map((dataset) => dataset.name).join('
 /** What every view follows, said once in the always-loaded prompt. */
 const viewRules = (): string[] => [
     'Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.',
-    'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n, ref y actions de cada elemento de una ItemList y los Proposal tal cual.',
+    'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a compose_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n, ref y actions de cada elemento de una ItemList y los Proposal tal cual.',
     'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
     'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
     'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.',
@@ -463,7 +463,7 @@ export function viewPrompt(): string {
         bindings: false,
         builtinFunctions: false,
         preamble:
-            'Para mostrar en pantalla datos que no tienen una vista propia (resultados de un servidor MCP, analítica, comparativas, archivos, imágenes), llama a show_view con una interfaz escrita en OpenUI Lang. Lo dicho en voz sigue siendo corto: el detalle va en la vista. Textos en español.',
+            'Para mostrar en pantalla datos que no tienen una vista propia (resultados de un servidor MCP, analítica, comparativas, archivos, imágenes), llama a compose_view con una interfaz escrita en OpenUI Lang: la valida antes de mostrarla. Lo que se dice sigue siendo corto: el detalle va en la vista. Textos en español.',
         additionalRules: viewRules(),
         examples: [
             [

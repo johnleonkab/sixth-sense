@@ -34,6 +34,7 @@
         <env name="WINGMAN_AGENT" value="fake"/>
         <env name="WINGMAN_FOLLOW_UPS" value="fake"/>
         <env name="AGENDA_ASSESSOR" value="fake"/>
+        <env name="AGENTS_DRIVER" value="fake"/>
         <env name="WORK_CONTEXT_SUMMARIZER" value="fake"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

@@ -42,11 +42,11 @@ function fakeMcpServer(array $tools, bool $stream = false, ?Closure $call = null
     }]);
 }
 
-test('the voice is told how to compose views from the OpenUI blocks', function () {
+test('views are composed by the Vistas agent, so the voice no longer carries the OpenUI prompt', function () {
     $prompt = OpenUi::prompt();
 
-    expect($prompt)->toContain('show_view')->toContain('View(title: string')->toContain('LineChart(')
-        ->and(AssistantProfile::for($this->user, CarbonImmutable::now())->instructions)->toContain($prompt);
+    expect($prompt)->toContain('compose_view')->toContain('View(title: string')->toContain('LineChart(')
+        ->and(AssistantProfile::for($this->user, CarbonImmutable::now())->instructions)->not->toContain('View(title: string');
 });
 
 test('live data is explained only when asked for, so every turn carries a short prompt', function () {

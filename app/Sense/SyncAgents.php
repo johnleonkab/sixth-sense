@@ -139,6 +139,7 @@ class SyncAgents
             'description' => $description,
             'instructions' => trim((string) ($document['_body'] ?? '')),
             'skills' => ClaudeLayout::names($document['skills'] ?? null),
+            'model' => is_string($document['model'] ?? null) && trim($document['model']) !== '' ? trim($document['model']) : null,
             'source_path' => $path,
             'source_sha' => $sha,
         ];

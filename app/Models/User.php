@@ -173,6 +173,26 @@ class User extends Authenticatable
     }
 
     /**
+     * Every run of an agent for this person.
+     *
+     * @return HasMany<AgentRun, $this>
+     */
+    public function agentRuns(): HasMany
+    {
+        return $this->hasMany(AgentRun::class);
+    }
+
+    /**
+     * What agents produced for this person, by reference.
+     *
+     * @return HasMany<AgentProduction, $this>
+     */
+    public function agentProductions(): HasMany
+    {
+        return $this->hasMany(AgentProduction::class);
+    }
+
+    /**
      * The archive, Jira and Notion copied for search.
      *
      * @return HasMany<KnowledgeDocument, $this>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\RunVoiceToolRequest;
 use App\Voice\Tools\Toolbox;
 use App\Voice\Tools\ToolContext;
+use App\Voice\Tools\ToolResult;
 use Illuminate\Http\JsonResponse;
 
 class VoiceToolController extends Controller
@@ -18,6 +19,11 @@ class VoiceToolController extends Controller
         $voiceTool = $toolbox->find($tool);
 
         abort_if($voiceTool === null, 404);
+
+        // The voice reads and shows; everything else is the agents' work.
+        if ($request->origin() === ToolContext::VOICE && ! $toolbox->forVoice($tool)) {
+            return response()->json(ToolResult::error('Eso lo hacen los agentes: llama a delegate con el encargo.')->toArray());
+        }
 
         $result = $toolbox->run($voiceTool, $request->user(), $request->arguments(), new ToolContext($request->now(), $request->origin()));
 

@@ -1,5 +1,7 @@
 /** What the voice line says while a tool is running. */
 const ACTIONS: Record<string, string> = {
+    delegate: 'Pasándoselo a los agentes…',
+    present: 'Abriéndolo…',
     find_files: 'Buscando en Drive y en Notion…',
     search_documents: 'Buscando en Google Docs…',
     show_document_results: 'Buscando documentos…',

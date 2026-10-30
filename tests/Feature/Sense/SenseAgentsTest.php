@@ -172,7 +172,7 @@ test('focusing an agent preloads the skills it lists', function () {
 });
 
 test('syncing reads agents, skills and CLAUDE.md as Claude Code does', function () {
-    $agent = "---\nname: jira-writer\ndescription: Escribe historias. Úsalo cuando pidan una historia.\nskills: jira-template, otra\ntools: Read, Grep\n---\n\nSigue la plantilla.\n";
+    $agent = "---\nname: jira-writer\ndescription: Escribe historias. Úsalo cuando pidan una historia.\nskills: jira-template, otra\ntools: Read, Grep\nmodel: haiku\n---\n\nSigue la plantilla.\n";
 
     Http::fake([
         'api.github.com/*/git/trees/*' => Http::response(['tree' => [
@@ -210,6 +210,7 @@ test('syncing reads agents, skills and CLAUDE.md as Claude Code does', function 
         ->and($jira->source_path)->toBe('.claude/agents/writers/jira.md')
         ->and($jira->description)->toBe('Escribe historias. Úsalo cuando pidan una historia.')
         ->and($jira->skills)->toBe(['jira-template', 'otra'])
+        ->and($jira->model)->toBe('haiku')
         ->and($template->description)->toBe('Plantilla de Jira')
         ->and($template->files)->toBe(['.claude/skills/jira-template/plantilla.md'])
         ->and($manual->model_invocable)->toBeFalse()
@@ -274,8 +275,8 @@ test('the assistant is told which agents and skills it can use, and carries CLAU
         ->and($profile->instructions)->toContain('prepago: Lleva el prepago. Úsalo cuando hablen de cobros.')
         ->and($profile->instructions)->toContain('jira-template: Plantilla de Jira.')
         ->and($profile->instructions)->not->toContain('deploy:')
-        ->and($profile->instructions)->toContain('focus_sense_agent')
-        ->and($profile->instructions)->toContain('use_sense_skill');
+        ->and($profile->instructions)->toContain('delegate y agent archivo:<name>')
+        ->and($profile->instructions)->not->toContain('focus_sense_agent');
 });
 
 test('an agent that disappeared from the repository is dropped on sync', function () {

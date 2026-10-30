@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AgentRunController;
 use App\Http\Controllers\AlertFeedController;
 use App\Http\Controllers\AlertReplyController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -94,6 +95,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('canvas/query/{dataset}', CanvasQueryController::class)->middleware('throttle:60,1')->name('canvas.query');
     Route::post('canvas/embed', CanvasEmbedController::class)->middleware('throttle:60,1')->name('canvas.embed');
+    Route::get('agents/runs/{run}', AgentRunController::class)->whereNumber('run')->middleware('throttle:240,1')->name('agents.runs.show');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');

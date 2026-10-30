@@ -7,6 +7,9 @@ use App\Models\User;
 use App\Voice\Tools\Actions\GetActionStatus;
 use App\Voice\Tools\Agenda\CancelScheduledTask;
 use App\Voice\Tools\Agenda\ScheduleTaskTool;
+use App\Voice\Tools\Agents\ComposeView;
+use App\Voice\Tools\Agents\Delegate;
+use App\Voice\Tools\Agents\Present;
 use App\Voice\Tools\Alerts\ListAlerts;
 use App\Voice\Tools\Alerts\ResolveAlert;
 use App\Voice\Tools\Alerts\ReviewAlert;
@@ -170,6 +173,9 @@ class Toolbox
         FocusSenseAgent::class,
         UseSenseSkill::class,
         OpenSceneTool::class,
+        Delegate::class,
+        Present::class,
+        ComposeView::class,
     ];
 
     public function __construct(private Container $container, private IssuedRefs $refs) {}
@@ -194,17 +200,27 @@ class Toolbox
     }
 
     /**
-     * Provider-neutral declarations for the voice session setup.
+     * Provider-neutral declarations for the voice session setup: only what
+     * the voice may call itself (config/agents.php, voice_tools). The rest is
+     * the agents'.
      *
      * @return list<array{name: string, description: string, parameters: array<string, mixed>}>
      */
     public function declarations(): array
     {
-        return array_map(fn (VoiceTool $tool): array => [
+        return array_values(array_map(fn (VoiceTool $tool): array => [
             'name' => $tool->name(),
             'description' => $tool->description(),
             'parameters' => $tool->parameters(),
-        ], $this->all());
+        ], array_filter($this->all(), fn (VoiceTool $tool): bool => $this->forVoice($tool->name()))));
+    }
+
+    /**
+     * Whether the voice may call this tool itself.
+     */
+    public function forVoice(string $name): bool
+    {
+        return in_array($name, config('agents.voice_tools'), true);
     }
 
     /**

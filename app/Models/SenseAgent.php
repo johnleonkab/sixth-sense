@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Claude Code reads a subagent. The voice reads this table, not GitHub,
  * when it decides who should take the turn.
  */
-#[Fillable(['slug', 'name', 'description', 'instructions', 'skills', 'source_path', 'source_sha'])]
+#[Fillable(['slug', 'name', 'description', 'instructions', 'skills', 'model', 'source_path', 'source_sha'])]
 class SenseAgent extends Model
 {
     /** @use HasFactory<SenseAgentFactory> */
