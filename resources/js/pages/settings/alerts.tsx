@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { deviceSubscribed, disableDevicePush, enableDevicePush } from '@/alerts/push';
 import type { ActionState } from '@/actions/types';
 import { AutonomyLevels, AutonomyNumbers, type AutonomyBoard } from '@/canvas/slack/slack-autonomy';
+import { buttonClass } from '@/components/button';
 import { ServiceIconFor } from '@/components/service-icon';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
@@ -167,10 +168,10 @@ function SlackAutonomySettings({ board, pending }: { board: AutonomyBoard; pendi
                     }}
                 >
                     <p className="min-w-0 flex-1 text-[13px]">{pending.label}</p>
-                    <button type="button" onClick={() => router.post(`/settings/slack-autonomy/${pending.id}/cancel`, {}, { preserveScroll: true })} className="rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft">
+                    <button type="button" onClick={() => router.post(`/settings/slack-autonomy/${pending.id}/cancel`, {}, { preserveScroll: true })} className={buttonClass({ size: 'small' })}>
                         Cancelar
                     </button>
-                    <button type="submit" className="rounded-full bg-ink px-3 py-1 text-[12.5px] font-medium text-bg hover:opacity-90">
+                    <button type="submit" className={buttonClass({ variant: 'primary', size: 'small' })}>
                         Sí, subir
                     </button>
                 </form>

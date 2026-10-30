@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState, type FormEvent } from 'react';
 
+import { buttonClass } from '@/components/button';
 import LiveMarkdown from '@/components/live-markdown';
 import SettingsLayout from '@/layouts/settings-layout';
 import ArchiveNav from '@/pages/settings/archive-nav';
@@ -132,7 +133,7 @@ function OpenDocument({ document, repository, onDirty }: { document: Document; r
                     <button
                         type="submit"
                         disabled={form.processing || !repository.writable || !form.isDirty}
-                        className="shrink-0 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40"
+                        className={`${buttonClass({ variant: 'primary' })} shrink-0`}
                     >
                         {form.processing ? 'Guardando…' : 'Guardar en main'}
                     </button>
@@ -220,7 +221,7 @@ function CreateDocument({ types, files, repository, onDirty }: { types: TypeSpec
                 <button
                     type="submit"
                     disabled={form.processing || !repository.writable || (form.data.kind === 'file' && spec === null)}
-                    className="shrink-0 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40"
+                    className={`${buttonClass({ variant: 'primary' })} shrink-0`}
                 >
                     {form.processing ? 'Creando…' : 'Crear en main'}
                 </button>

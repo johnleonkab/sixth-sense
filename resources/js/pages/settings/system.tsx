@@ -1,6 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { buttonClass } from '@/components/button';
 import SettingsLayout from '@/layouts/settings-layout';
 import { allowMicrophones, chosenMicrophone, listMicrophones, rememberMicrophone, type MicrophoneOption } from '@/voice/audio/microphone-choice';
 
@@ -264,7 +265,7 @@ function Keys({ keys }: { keys: SystemProps['keys'] }) {
                         onValue={(value) => form.setData('deepseek_api_key', value)}
                     />
                 </div>
-                <button type="submit" disabled={form.processing} className="mt-4 rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40">
+                <button type="submit" disabled={form.processing} className={`${buttonClass({ variant: 'primary' })} mt-4`}>
                     Guardar claves
                 </button>
             </fieldset>

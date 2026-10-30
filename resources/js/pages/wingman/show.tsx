@@ -5,6 +5,7 @@ import { useActions } from '@/actions/use-actions';
 import { CanvasContext } from '@/canvas/canvas-context';
 
 import { IssueKey, StatusChip } from '@/canvas/jira/jira-bits';
+import { buttonClass } from '@/components/button';
 import { dayLabel, timeRange } from '@/wingman/format';
 import InsightCard from '@/wingman/insight-card';
 import MeetingActions from '@/wingman/meeting-actions';
@@ -213,11 +214,11 @@ export default function WingmanShow({ meeting }: { meeting: WingmanMeeting }) {
                         type="button"
                         onClick={prepareAgain}
                         disabled={preparing || refreshing}
-                        className="rounded-full border border-line px-3.5 py-1.5 text-[13px] text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+                        className={buttonClass()}
                     >
                         Actualizar contexto
                     </button>
-                    <a href={meeting.meeting_url} target="_blank" rel="noreferrer noopener" className="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-accent-ink">
+                    <a href={meeting.meeting_url} target="_blank" rel="noreferrer noopener" className={buttonClass({ variant: 'primary' })}>
                         Abrir Meet
                     </a>
                 </div>

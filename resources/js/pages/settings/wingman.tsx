@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
+import { buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
@@ -132,7 +133,7 @@ function SettingsCard({ calendars, settings }: { calendars: string[]; settings: 
             </div>
 
             <div className="flex justify-end border-t border-line px-[22px] py-3">
-                <button type="button" onClick={save} disabled={saving} className="rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-accent-ink disabled:opacity-50">
+                <button type="button" onClick={save} disabled={saving} className={buttonClass({ variant: 'primary' })}>
                     Guardar
                 </button>
             </div>
@@ -184,11 +185,11 @@ function ExtensionCard({ extension }: { extension: WingmanSettingsProps['extensi
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={issue} className="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-accent-ink">
+                    <button type="button" onClick={issue} className={buttonClass({ variant: 'primary' })}>
                         {extension.connected ? 'Generar un token nuevo' : 'Generar token'}
                     </button>
                     {extension.connected && (
-                        <button type="button" onClick={revoke} className="rounded-full border border-line px-3.5 py-1.5 text-[13px] text-muted hover:border-crit hover:text-crit">
+                        <button type="button" onClick={revoke} className={buttonClass({ destructive: true })}>
                             Desconectar
                         </button>
                     )}

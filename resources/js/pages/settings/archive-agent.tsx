@@ -1,6 +1,7 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 
+import { buttonClass } from '@/components/button';
 import SettingsLayout from '@/layouts/settings-layout';
 import ArchiveNav from '@/pages/settings/archive-nav';
 
@@ -129,7 +130,7 @@ export default function ArchiveAgent({ repository, slug, path, fields, body, rea
                     <button
                         type="submit"
                         disabled={form.processing || !repository.writable}
-                        className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40"
+                        className={buttonClass({ variant: 'primary' })}
                     >
                         {submitLabel}
                     </button>

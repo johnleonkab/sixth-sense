@@ -1,5 +1,6 @@
 import { Link, useForm } from '@inertiajs/react';
 
+import { buttonClass } from '@/components/button';
 import SettingsLayout from '@/layouts/settings-layout';
 
 type Props = {
@@ -49,13 +50,13 @@ export default function JiraRules({ account, rules, saved, template, understood,
                     />
                     {form.errors.rules && <p className="mt-1 text-[12.5px] text-crit">{form.errors.rules}</p>}
                     <div className="mt-3 flex items-center gap-2">
-                        <button type="submit" disabled={form.processing || !form.isDirty} className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40">
+                        <button type="submit" disabled={form.processing || !form.isDirty} className={buttonClass({ variant: 'primary' })}>
                             {form.processing ? 'Guardando…' : 'Guardar'}
                         </button>
                         <button
                             type="button"
                             onClick={() => window.confirm('¿Sustituir lo escrito por la plantilla?') && form.setData('rules', template)}
-                            className="rounded-full border border-line px-4 py-1.5 text-[13px] hover:bg-soft"
+                            className={buttonClass()}
                         >
                             Restaurar plantilla
                         </button>

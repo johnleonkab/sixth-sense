@@ -1,5 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 
+import { buttonClass } from '@/components/button';
 import SettingsLayout from '@/layouts/settings-layout';
 import ArchiveNav from '@/pages/settings/archive-nav';
 
@@ -46,12 +47,12 @@ export default function ArchiveAgents({ repository, agents }: Props) {
                     <button
                         type="button"
                         onClick={() => router.post('/settings/archive/agents/sync', {}, { preserveScroll: true })}
-                        className="rounded-full border border-line px-4 py-1.5 text-[13px] hover:bg-soft"
+                        className={buttonClass()}
                     >
                         Sincronizar
                     </button>
                     {repository.writable && (
-                        <Link href="/settings/archive/agents/create" className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90">
+                        <Link href="/settings/archive/agents/create" className={buttonClass({ variant: 'primary' })}>
                             Nuevo agente
                         </Link>
                     )}

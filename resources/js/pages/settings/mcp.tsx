@@ -1,6 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 
+import { buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
@@ -89,7 +90,7 @@ function AddServer() {
                 <p className="mt-2 text-[12.5px] text-muted">La URL de vuelta que tienes que registrar en ese servidor es {window.location.origin}/settings/mcp/oauth/callback.</p>
             </details>
             <div>
-                <button type="submit" disabled={form.processing} className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40">
+                <button type="submit" disabled={form.processing} className={buttonClass({ variant: 'primary' })}>
                     {form.processing ? 'Conectando…' : 'Conectar'}
                 </button>
             </div>
@@ -147,10 +148,10 @@ function ServerCard({ server }: { server: Server }) {
                         {server.signed_in ? 'Volver a iniciar sesión' : 'Iniciar sesión'}
                     </a>
                 )}
-                <button type="button" onClick={refresh} className="rounded-full border border-line px-3 py-1 text-[12.5px] hover:bg-soft">
+                <button type="button" onClick={refresh} className={buttonClass({ size: 'small' })}>
                     Probar de nuevo
                 </button>
-                <button type="button" onClick={remove} className="rounded-full border border-line px-3 py-1 text-[12.5px] text-crit hover:bg-soft">
+                <button type="button" onClick={remove} className={buttonClass({ size: 'small', destructive: true })}>
                     Quitar
                 </button>
             </footer>
