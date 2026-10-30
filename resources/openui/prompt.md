@@ -27,9 +27,9 @@ Props typed `ActionExpression` accept one @step, or Action([@steps...]) for seve
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
-Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
+Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
@@ -38,7 +38,8 @@ Chips(items: string[]) — Etiquetas pequeñas en fila: los filtros de una búsq
 Tabs(options: {value: string, label: string}[], value: $binding<string>) — Pestañas para filtrar: cada opción tiene value y label, y la elegida se guarda en una $variable que las Query usan en sus argumentos.
 Image(url: string, caption?: string) — Una imagen por su URL https, con un pie opcional.
 Document(title: string, url: string, kind?: "pdf" | "doc" | "sheet" | "page" | "link", note?: string) — Un documento o archivo enlazado (PDF, Doc, página, hoja). Muestra título y un botón para abrirlo.
-Button(label: string, action?: ActionExpression) — Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace.
+Button(label: string, action?: ActionExpression, variant?: "primary" | "secondary" | "tertiary") — Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace. variant: primary para lo principal (uno por vista como mucho), secondary (por defecto) o tertiary para lo menos importante.
+Buttons(buttons: Button[]) — Botones que van juntos, en fila: el principal primero. Úsalo siempre que haya más de un Button.
 
 ### Datos
 Metric(label: string, value: string, change?: string, hint?: string) — Una cifra clave con su etiqueta, y opcionalmente el cambio ("+12%") y una nota.
@@ -277,6 +278,6 @@ Before finishing, walk your output and verify:
 - Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.
 - Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.
 - Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.
-- Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.
+- Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.
 - No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.
 - Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.

@@ -5,6 +5,7 @@ import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { Button } from '@/components/button';
 
 export type AutonomyLevelRow = {
     action: 'reply' | 'redirect' | 'task';
@@ -61,14 +62,14 @@ export function AutonomyLevels({
                     <span className="min-w-0 flex-1 text-[14px]">{row.label}</span>
                     <span className="rounded-full bg-soft px-2.5 py-1 text-[12px] text-muted">{row.level_label}</span>
                     {row.can_lower && (
-                        <button type="button" onClick={() => lower(row.action, row.lower_level)} className="rounded-full border border-line px-2.5 py-1 text-[12px] hover:bg-soft">
+                        <Button size="extra-small" onClick={() => lower(row.action, row.lower_level)}>
                             Bajar
-                        </button>
+                        </Button>
                     )}
                     {row.can_raise && (
-                        <button type="button" onClick={() => raise(row.action)} className="rounded-full border border-line px-2.5 py-1 text-[12px] hover:bg-soft">
+                        <Button size="extra-small" onClick={() => raise(row.action)}>
                             Subir
-                        </button>
+                        </Button>
                     )}
                     {row.raise_reason && <p className="basis-full text-[12px] text-muted">{row.raise_reason}</p>}
                 </li>

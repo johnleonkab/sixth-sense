@@ -3,6 +3,7 @@ import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { Button } from '@/components/button';
 
 export type AgendaTaskCard = {
     id: number;
@@ -92,13 +93,9 @@ export function AgendaTaskSummary({ task, compact = false }: { task: AgendaTaskC
                         </a>
                     )}
                     {task.status === 'scheduled' && (
-                        <button
-                            type="button"
-                            onClick={() => runTool('cancel_scheduled_task', { task_id: task.id })}
-                            className="ml-auto rounded-full border border-line px-3 py-1 hover:bg-soft"
-                        >
+                        <Button size="small" onClick={() => runTool('cancel_scheduled_task', { task_id: task.id })} className="ml-auto">
                             Quitar del calendario
-                        </button>
+                        </Button>
                     )}
                 </div>
             )}

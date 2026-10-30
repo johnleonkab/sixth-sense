@@ -5,6 +5,7 @@ import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
+import { Button } from '@/components/button';
 import { echoConnection } from '@/lib/echo';
 import { getJson, postJson } from '@/lib/http';
 
@@ -127,23 +128,18 @@ const SceneBoard: CanvasComponent<SceneBoardProps> = ({ index, scene_id: sceneId
                                 </p>
                             )}
                             {action?.status === 'confirmed' && (
-                                <button type="button" className="mt-2 text-[12.5px] text-muted underline" onClick={() => void actions.undo(action.id)}>
+                                <Button variant="tertiary" size="small" className="mt-2" onClick={() => void actions.undo(action.id)}>
                                     Deshacer esta
-                                </button>
+                                </Button>
                             )}
                         </li>
                     );
                 })}
             </ul>
             {pending && (
-                <button
-                    type="button"
-                    disabled={confirming}
-                    onClick={confirmAll}
-                    className="mt-4 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-bg disabled:opacity-40"
-                >
+                <Button variant="primary" disabled={confirming} onClick={confirmAll} className="mt-4">
                     Sí
-                </button>
+                </Button>
             )}
         </CanvasFrame>
     );

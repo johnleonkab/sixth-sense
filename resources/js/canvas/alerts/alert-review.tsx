@@ -10,6 +10,7 @@ import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import SlackCorrections from '@/canvas/slack/slack-corrections';
 import type { CanvasComponent } from '@/canvas/types';
+import { Button, Buttons } from '@/components/button';
 import { browserTimezone, postJson } from '@/lib/http';
 
 type Proposal = {
@@ -74,10 +75,6 @@ function stateLine(alert: Alert): string {
             return resolutionText[alert.resolution ?? ''] ?? '';
     }
 }
-
-/** The same pills as the OpenUI Button. */
-const primary = 'rounded-full bg-ink px-3.5 py-1.5 font-medium text-bg hover:opacity-90 disabled:opacity-40';
-const secondary = 'rounded-full border border-line px-3.5 py-1.5 hover:bg-soft disabled:opacity-40';
 
 const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => {
     const { runTool } = useCanvas();
@@ -236,13 +233,13 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                 </div>
                             ) : (
                                 canSend && (
-                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                        <button type="button" disabled={busy} onClick={() => void send()} className={`${primary} text-[13px]`}>
+                                    <Buttons className="gap-x-3 gap-y-1.5">
+                                        <Button variant="primary" disabled={busy} onClick={() => void send()}>
                                             {busy ? 'Enviando…' : sendLabel}
-                                        </button>
+                                        </Button>
                                         <span className="text-[12px] text-muted">o dime qué cambio</span>
                                         {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
-                                    </div>
+                                    </Buttons>
                                 )
                             )}
 
@@ -284,25 +281,25 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                         <SlackCorrections className="mr-auto" onCorrect={(correction) => runTool('correct_slack_triage', { alert_id: alert.id, correction })} />
                     )}
                     {busy && <span aria-hidden className="size-3 animate-spin rounded-full border-[1.5px] border-muted border-t-transparent" />}
-                    <span className="ml-auto flex gap-2">
+                    <Buttons className="ml-auto">
                         {pending ? (
                             <>
-                                <button type="button" disabled={busy} onClick={() => change('dismissed')} className={secondary}>
+                                <Button disabled={busy} onClick={() => change('dismissed')}>
                                     Descartar
-                                </button>
+                                </Button>
                                 {/* With a reply ready to send, sending is the main thing to do. */}
-                                <button type="button" disabled={busy} onClick={() => change('done')} className={canSend ? secondary : primary}>
+                                <Button variant={canSend ? 'secondary' : 'primary'} disabled={busy} onClick={() => change('done')}>
                                     Ya está resuelta
-                                </button>
+                                </Button>
                             </>
                         ) : (
                             alert.state !== 'judging' && (
-                                <button type="button" disabled={busy} onClick={() => change('reopen')} className={secondary}>
+                                <Button disabled={busy} onClick={() => change('reopen')}>
                                     {closed ? 'Reabrir' : 'Dejar pendiente'}
-                                </button>
+                                </Button>
                             )
                         )}
-                    </span>
+                    </Buttons>
                 </div>
             )}
         </CanvasFrame>

@@ -1,3 +1,5 @@
+import { Button, Buttons } from '@/components/button';
+
 const taps = [
     { correction: 'not_important', label: 'No hace falta' },
     { correction: 'someone_else', label: 'Le toca a otro' },
@@ -11,17 +13,12 @@ export type SlackCorrection = (typeof taps)[number]['correction'];
  */
 export default function SlackCorrections({ onCorrect, className = 'mt-3' }: { onCorrect: (correction: SlackCorrection) => void; className?: string }) {
     return (
-        <div className={`flex flex-wrap gap-1.5 ${className}`}>
+        <Buttons aria-label="Corregir el aviso" className={`gap-1.5 ${className}`}>
             {taps.map((tap) => (
-                <button
-                    key={tap.correction}
-                    type="button"
-                    onClick={() => onCorrect(tap.correction)}
-                    className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink hover:bg-soft"
-                >
+                <Button key={tap.correction} variant="tertiary" size="small" onClick={() => onCorrect(tap.correction)}>
                     {tap.label}
-                </button>
+                </Button>
             ))}
-        </div>
+        </Buttons>
     );
 }

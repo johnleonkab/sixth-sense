@@ -280,3 +280,12 @@ test('an item from a query opens only an alert review or a day of the calendar',
         null,
     ], (string) $output);
 })->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');
+
+test('a view groups its buttons, the main one first', function () {
+    expect(<<<'UI'
+        root = View("Siguiente paso", [next])
+        next = Buttons([main, other])
+        main = Button("Ver la semana", @ToAssistant("Enséñame la semana"), "primary")
+        other = Button("Más tarde", null, "tertiary")
+        UI)->toBeValidOpenUi();
+});

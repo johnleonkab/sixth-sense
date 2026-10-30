@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
+import { Button } from '@/components/button';
 
 function useSecondsLeft(until: string | null): number {
     const read = () => (until ? Math.max(0, Math.ceil((Date.parse(until) - Date.now()) / 1000)) : 0);
@@ -68,21 +69,12 @@ export default function ActionBar({
         case 'pending':
             return (
                 <div className={base}>
-                    <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => (onConfirm ? onConfirm() : void actions.confirm(action.id))}
-                        className={`rounded-full bg-ink px-4 py-1.5 font-medium text-bg hover:opacity-90 disabled:opacity-40 ${thumb}`}
-                    >
+                    <Button variant="primary" disabled={busy} onClick={() => (onConfirm ? onConfirm() : void actions.confirm(action.id))} className={thumb}>
                         {busy ? 'Guardando…' : (confirmLabel ?? `Sí, ${verb}`)}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => void actions.cancel(action.id)}
-                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
-                    >
+                    </Button>
+                    <Button onClick={() => void actions.cancel(action.id)} className={thumb}>
                         Cancelar
-                    </button>
+                    </Button>
                     <span className="text-muted">{hint}</span>
                 </div>
             );
@@ -96,13 +88,9 @@ export default function ActionBar({
                             style={{ width: `${(secondsLeft / 8) * 100}%` }}
                         />
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => void actions.undo(action.id)}
-                        className={`rounded-full border border-line bg-surface px-4 py-1.5 hover:bg-soft ${thumb}`}
-                    >
+                    <Button onClick={() => void actions.undo(action.id)} className={thumb}>
                         Deshacer
-                    </button>
+                    </Button>
                     <span className="text-muted">o di «deshaz»</span>
                 </div>
             );

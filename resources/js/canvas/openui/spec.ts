@@ -27,6 +27,7 @@ export type BlockName =
     | 'Document'
     | 'List'
     | 'Button'
+    | 'Buttons'
     | 'ItemList'
     | 'Chips'
     | 'Tabs';
@@ -204,12 +205,23 @@ export function buildLibrary(renderers: Renderers = {}): Library {
 
     const Button = defineComponent({
         name: 'Button',
-        description: 'Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace.',
+        description:
+            'Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace. variant: primary para lo principal (uno por vista como mucho), secondary (por defecto) o tertiary para lo menos importante.',
         props: z.object({
             label: z.string(),
             action: action().optional(),
+            variant: z.enum(['primary', 'secondary', 'tertiary']).optional(),
         }),
         component: render('Button'),
+    });
+
+    const Buttons = defineComponent({
+        name: 'Buttons',
+        description: 'Botones que van juntos, en fila: el principal primero. Úsalo siempre que haya más de un Button.',
+        props: z.object({
+            buttons: z.array(Button.ref),
+        }),
+        component: render('Buttons'),
     });
 
     const ItemList = defineComponent({
@@ -254,11 +266,11 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Tabs'),
     });
 
-    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
+    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref];
 
     const Row = defineComponent({
         name: 'Row',
-        description: 'Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.',
+        description: 'Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.',
         props: z.object({
             children: z.array(z.union(leaves)),
         }),
@@ -326,11 +338,11 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 
     return createLibrary({
-        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips],
+        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips],
         functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
-            { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Tabs', 'Image', 'Document', 'Button'] },
+            { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Tabs', 'Image', 'Document', 'Button', 'Buttons'] },
             {
                 name: 'Datos',
                 components: ['Metric', 'Table', 'BarChart', 'LineChart', 'DonutChart'],
@@ -359,7 +371,7 @@ export function viewPrompt(): string {
             'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.',
             'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
             'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
-            'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.',
+            'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir, juntos en un Buttons al final.',
             'No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.',
             'Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.',
         ],

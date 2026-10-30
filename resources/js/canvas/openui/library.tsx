@@ -3,6 +3,8 @@ import { useContext, useEffect, useState } from 'react';
 import type { ComponentRenderProps } from '@openuidev/react-lang';
 
 import { LiveItemsContext, openRef } from '@/canvas/openui/refs';
+import { buttonClass, Button as UiButton, Buttons as UiButtons } from '@/components/button';
+import type { ButtonVariant } from '@/components/button';
 import { buildLibrary, top } from '@/canvas/openui/spec';
 
 /**
@@ -283,18 +285,18 @@ function List({ props }: Props<{ items: string[]; ordered?: boolean }>) {
     );
 }
 
-function Button({ props }: Props<{ label: string; action?: unknown }>) {
+function Button({ props }: Props<{ label: string; action?: unknown; variant?: ButtonVariant }>) {
     const trigger = useTriggerAction();
 
     return (
-        <button
-            type="button"
-            onClick={() => void trigger(props.label, undefined, props.action as Parameters<typeof trigger>[2])}
-            className="rounded-full border border-line px-3.5 py-1.5 text-[13px] hover:bg-soft"
-        >
+        <UiButton variant={props.variant ?? 'secondary'} onClick={() => void trigger(props.label, undefined, props.action as Parameters<typeof trigger>[2])}>
             {props.label}
-        </button>
+        </UiButton>
     );
+}
+
+function Buttons({ props, renderNode }: Props<{ buttons: unknown[] }>) {
+    return <UiButtons>{renderNode(props.buttons)}</UiButtons>;
 }
 
 type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean; ref?: string };
@@ -312,7 +314,7 @@ function Tabs({ props }: Props<{ options: { value: string; label: string }[]; va
                     role="tab"
                     aria-selected={field.value === option.value}
                     onClick={() => field.setValue(option.value)}
-                    className={`rounded-full px-3 py-1 text-[12.5px] transition-colors ${field.value === option.value ? 'bg-ink text-bg' : 'border border-line hover:bg-soft'}`}
+                    className={buttonClass({ variant: field.value === option.value ? 'primary' : 'secondary', size: 'small' })}
                 >
                     {option.label}
                 </button>
@@ -412,4 +414,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips });

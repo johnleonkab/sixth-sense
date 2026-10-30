@@ -4,24 +4,24 @@ import CanvasFrame from '@/canvas/canvas-frame';
 import { Blocks, Comments } from '@/canvas/docs/docs-document';
 import type { NotionPageProps } from '@/canvas/notion/types';
 import type { CanvasComponent } from '@/canvas/types';
+import { Button } from '@/components/button';
 
 /** Copies a link and says so for a moment. */
 function CopyLink({ url, label }: { url: string; label: string }) {
     const [copied, setCopied] = useState(false);
 
     return (
-        <button
-            type="button"
+        <Button
+            size="extra-small"
             onClick={() =>
                 void navigator.clipboard.writeText(url).then(() => {
                     setCopied(true);
                     window.setTimeout(() => setCopied(false), 1800);
                 })
             }
-            className="rounded-full border border-line px-2.5 py-0.5 text-[12px] text-ink hover:bg-soft"
         >
             {copied ? 'Copiado' : label}
-        </button>
+        </Button>
     );
 }
 
