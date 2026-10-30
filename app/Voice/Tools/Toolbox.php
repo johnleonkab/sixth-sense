@@ -71,6 +71,9 @@ use App\Voice\Tools\Slack\ShowSlackAutonomy;
 use App\Voice\Tools\Slack\ShowSlackConversation;
 use App\Voice\Tools\Slack\ShowSlackDigest;
 use App\Voice\Tools\Slack\ShowSlackUnread;
+use App\Voice\Tools\Views\ForgetView;
+use App\Voice\Tools\Views\OpenSavedView;
+use App\Voice\Tools\Views\SaveView;
 use App\Voice\Tools\Views\ShowView;
 use App\Voice\Tools\Wingman\DismissMeetingActions;
 use App\Voice\Tools\Wingman\ProposeMeetingAction;
@@ -148,6 +151,9 @@ class Toolbox
         ReadKnowledge::class,
         AnswerQuestion::class,
         ShowView::class,
+        SaveView::class,
+        OpenSavedView::class,
+        ForgetView::class,
         ListMcpTools::class,
         CallMcpTool::class,
         ShowAnalyticsReport::class,

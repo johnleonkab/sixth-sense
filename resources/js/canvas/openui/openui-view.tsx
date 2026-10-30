@@ -16,6 +16,9 @@ export type OpenUiViewProps = {
     /** The view, in OpenUI Lang. */
     ui: string;
     items?: OpenableItem[];
+    /** A saved view: its name and when its data was taken. */
+    saved_as?: string;
+    saved_at?: string;
 };
 
 /**
@@ -24,7 +27,9 @@ export type OpenUiViewProps = {
  * A button asks the assistant something or opens an https link; an item of
  * a list opens with the tool Laravel said opens it, without the model.
  */
-const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui, items }) => {
+const savedDate = (iso: string) => new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
+const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui, items, saved_as: savedAs, saved_at: savedAt }) => {
     const { tell, runTool } = useCanvas();
 
     const act = (event: ActionEvent) => {
@@ -59,6 +64,11 @@ const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui
 
     return (
         <CanvasFrame index={index} title={title} source={source}>
+            {savedAs && (
+                <p className="-mt-1 mb-3 text-[12px] text-faint">
+                    Guardada como «{savedAs}»{savedAt && ` · datos del ${savedDate(savedAt)}`}
+                </p>
+            )}
             <Renderer response={ui} library={openUiLibrary} isStreaming={false} onAction={act} />
         </CanvasFrame>
     );

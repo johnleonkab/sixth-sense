@@ -10,6 +10,7 @@ use App\Voice\OpenUi\OpenUi;
 use App\Voice\Tools\Analytics\ShowAnalyticsReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\ExpectationFailedException;
@@ -221,4 +222,44 @@ test('a list Laravel built keeps opening its items when the assistant rewrites t
     $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'show_view'), ['arguments' => ['title' => 'Solo en curso', 'ui' => "root = View(\"Solo en curso\", [l])\nl = ItemList([{n: 2, title: \"Integrar la pasarela\"}])"]])
         ->assertJsonPath('canvas.props.items.0.args.issue', 'demo:CPD-405');
+});
+
+test('a composed view is saved by name, opened again another day, and forgotten', function () {
+    $ui = "root = View(\"Jira\", [l])\nl = ItemList([{n: 1, title: \"Integrar la pasarela\"}])";
+    OpenUi::rememberItems($this->user, [['n' => 1, 'title' => 'CPD-405', 'tool' => 'open_jira_issue', 'args' => ['issue' => 'demo:CPD-405']]]);
+
+    $this->actingAs($this->user)->postJson(route('voice.tools.run', 'show_view'), ['arguments' => ['title' => 'Jira', 'source' => 'Jira', 'ui' => $ui]]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'save_view'), ['arguments' => ['name' => 'Mi lunes']])
+        ->assertJsonPath('output.saved_as', 'Mi lunes')
+        ->assertJsonPath('output.replaced', false);
+
+    Cache::flush();
+    $this->travel(3)->days();
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'open_view'), ['arguments' => ['name' => 'mi lunes'], 'timezone' => 'Europe/Madrid'])
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.ui', $ui)
+        ->assertJsonPath('canvas.props.saved_as', 'Mi lunes')
+        ->assertJsonPath('canvas.props.items.0.args.issue', 'demo:CPD-405');
+
+    expect(OpenUi::lastItems($this->user)[0]['args']['issue'])->toBe('demo:CPD-405');
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'open_view'), ['arguments' => []])
+        ->assertJsonPath('output.saved_views', ['Mi lunes (Jira)']);
+
+    $this->actingAs($this->user)->postJson(route('voice.tools.run', 'forget_view'), ['arguments' => ['name' => 'lunes']])->assertJsonPath('output.forgotten', 'Mi lunes');
+
+    expect($this->user->savedViews()->count())->toBe(0);
+});
+
+test('with no composed view on screen there is nothing to save', function () {
+    Cache::flush();
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'save_view'), ['arguments' => ['name' => 'Mi lunes']])
+        ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'No hay ninguna vista'));
 });

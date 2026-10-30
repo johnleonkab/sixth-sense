@@ -51,6 +51,24 @@ class OpenUi
     }
 
     /**
+     * The last composed view the user saw, whole, so it can be saved by name.
+     *
+     * @param  array{title: string, source: string, ui: string, items: list<array<string, mixed>>}  $view
+     */
+    public static function rememberView(User $user, array $view): void
+    {
+        Cache::put("openui-view:{$user->id}", $view, now()->addHours(12));
+    }
+
+    /**
+     * @return array{title: string, source: string, ui: string, items: list<array<string, mixed>>}|null
+     */
+    public static function lastView(User $user): ?array
+    {
+        return Cache::get("openui-view:{$user->id}");
+    }
+
+    /**
      * The items a user's last composed view can open, so a view the
      * assistant rewrites keeps them.
      *

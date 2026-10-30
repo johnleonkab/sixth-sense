@@ -16,7 +16,7 @@ test('the assistant finds what waits for an answer, newest first, with its propo
     ]);
     InboxItem::factory()->create(['title' => 'De otro usuario']);
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->postJson(route('voice.tools.run', 'list_alerts'), ['arguments' => [], 'timezone' => 'Europe/Madrid'])
         ->assertOk()
         ->assertJsonCount(2, 'output.alerts')
@@ -28,9 +28,17 @@ test('the assistant finds what waits for an answer, newest first, with its propo
         ->assertJsonPath('output.alerts.0.status', 'Pendiente, con propuesta')
         ->assertJsonPath('output.alerts.0.received', 'hace 2 minutos')
         ->assertJsonPath('output.alerts.1.subject', 'Antiguo')
-        ->assertJsonPath('canvas.view', 'alerts.list')
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.props.title', '2 pendientes de responder')
-        ->assertJsonPath('canvas.props.alerts.0.number', 1);
+        ->assertJsonPath('canvas.props.items.0.n', 1)
+        ->assertJsonPath('canvas.props.items.0.tool', 'review_alert');
+
+    expect($response->json('canvas.props.ui'))
+        ->toContain('title: "Necesita la firma antes del viernes."')
+        ->toContain('eyebrow: "Gmail · Andrés Vela · Contrato"')
+        ->toContain('snippet: "→ Responder a Andrés que lo firmas el jueves."')
+        ->toContain('highlight: true')
+        ->toBeValidOpenUi();
 });
 
 test('one alert can be found by who or what it is about', function () {
@@ -59,4 +67,14 @@ test('it says so when nothing waits for an answer', function () {
     $this->actingAs($user)
         ->postJson(route('voice.tools.run', 'list_alerts'), ['arguments' => ['status' => 'all']])
         ->assertJsonPath('output.alerts.0.status', 'Resuelta');
+});
+
+test('a meeting in the list opens its day in the calendar', function () {
+    $user = User::factory()->create();
+    InboxItem::factory()->for($user)->create(['source' => AlertSource::Calendar, 'title' => 'Prepago con Marta', 'payload' => ['starts_at' => '2026-10-31T10:00:00+01:00']]);
+
+    $this->actingAs($user)
+        ->postJson(route('voice.tools.run', 'list_alerts'), ['arguments' => ['status' => 'all'], 'timezone' => 'Europe/Madrid'])
+        ->assertJsonPath('canvas.props.items.0.tool', 'show_calendar')
+        ->assertJsonPath('canvas.props.items.0.args', ['start_date' => '2026-10-31']);
 });

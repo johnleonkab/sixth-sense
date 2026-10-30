@@ -63,14 +63,4 @@ trait DescribesAlerts
             'is_email' => $item->source === AlertSource::Gmail,
         ], layout: 'wide');
     }
-
-    /**
-     * What the alert list canvas shows of it.
-     *
-     * @return array<string, mixed>
-     */
-    private function forCanvas(InboxItem $item, int $number): array
-    {
-        return [...$item->toAlert(), 'number' => $number];
-    }
 }

@@ -49,6 +49,8 @@ const ACTIONS: Record<string, string> = {
     read_knowledge: 'Leyendo…',
     answer_question: 'Apuntando…',
     show_view: 'Preparando la vista…',
+    save_view: 'Guardando la vista…',
+    open_view: 'Abriendo la vista…',
     mcp_tools: 'Mirando los servidores MCP…',
     mcp_call: 'Llamando al servidor MCP…',
     analytics_report: 'Pidiendo el informe a Google Analytics…',

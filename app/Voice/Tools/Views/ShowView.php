@@ -56,14 +56,18 @@ class ShowView implements VoiceTool
 
         // A rewritten list keeps opening its items: those of the last view
         // Laravel built, by the number the person sees.
+        $view = [
+            'title' => $arguments['title'],
+            'source' => $arguments['source'] ?? 'Vista',
+            'ui' => $arguments['ui'],
+            'items' => str_contains($arguments['ui'], 'ItemList(') ? OpenUi::lastItems($user) : [],
+        ];
+
+        OpenUi::rememberView($user, $view);
+
         return new ToolResult(
             output: ['shown_on_screen' => true],
-            canvas: new Canvas('openui.view', [
-                'title' => $arguments['title'],
-                'source' => $arguments['source'] ?? 'Vista',
-                'ui' => $arguments['ui'],
-                'items' => str_contains($arguments['ui'], 'ItemList(') ? OpenUi::lastItems($user) : [],
-            ], 'wide'),
+            canvas: new Canvas('openui.view', $view, 'wide'),
         );
     }
 }

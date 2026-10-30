@@ -143,6 +143,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Composed views the person saved to open again.
+     *
+     * @return HasMany<SavedView, $this>
+     */
+    public function savedViews(): HasMany
+    {
+        return $this->hasMany(SavedView::class);
+    }
+
+    /**
      * Remote MCP servers the person connected.
      *
      * @return HasMany<McpServer, $this>

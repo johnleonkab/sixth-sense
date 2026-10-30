@@ -23,12 +23,13 @@ function runSlackTool(string $tool, array $arguments = []): TestResponse
 }
 
 test('unread direct messages and mentions are shown numbered with why', function () {
-    runSlackTool('show_slack_unread')
-        ->assertJsonPath('canvas.view', 'slack.unread')
+    $response = runSlackTool('show_slack_unread')
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.props.title', '2 pendientes en Slack')
-        ->assertJsonPath('canvas.props.items.0.reason', 'dm')
-        ->assertJsonPath('canvas.props.items.1.message.mentions_me', true)
+        ->assertJsonPath('canvas.props.items.1.tool', 'show_slack_conversation')
         ->assertJsonPath('output.unread.1.why', 'te mencionan');
+
+    expect($response->json('canvas.props.ui'))->toContain('eyebrow: "Mensaje directo')->toContain('eyebrow: "Te mencionan en')->toBeValidOpenUi();
 });
 
 test('a message is shown in its thread, highlighted', function () {

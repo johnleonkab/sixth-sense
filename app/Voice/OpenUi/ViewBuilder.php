@@ -41,14 +41,12 @@ class ViewBuilder
      */
     public function canvas(User $user, string $source, string $layout = 'wide'): Canvas
     {
-        OpenUi::rememberItems($user, $this->items);
+        $view = ['title' => $this->title, 'source' => $source, 'ui' => $this->toString(), 'items' => $this->items];
 
-        return new Canvas('openui.view', [
-            'title' => $this->title,
-            'source' => $source,
-            'ui' => $this->toString(),
-            'items' => $this->items,
-        ], $layout);
+        OpenUi::rememberItems($user, $this->items);
+        OpenUi::rememberView($user, $view);
+
+        return new Canvas('openui.view', $view, $layout);
     }
 
     /**
