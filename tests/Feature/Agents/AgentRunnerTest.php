@@ -11,8 +11,11 @@ use App\Connectors\Mail\FakeMailbox;
 use App\Connectors\Mail\Mailbox;
 use App\Models\AgentProduction;
 use App\Models\AgentRun;
+use App\Models\McpServer;
 use App\Models\PendingAction;
+use App\Models\SenseSkill;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->app->instance(Chats::class, $this->chats = new FakeChats);
@@ -149,3 +152,22 @@ test('the Vistas agent is told how to compose views, and its views are checked b
         ->and($run->steps[0]['error'])->toContain('La vista no es válida')
         ->and($run->productions()->sole()->canvas['view'])->toBe('openui.view');
 })->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');
+
+test('an MCP call that could change something and an Archive skill both run in an agent, and the call waits for the yes', function () {
+    Http::preventStrayRequests();
+    McpServer::factory()->for($this->user)->create(['name' => 'Linear', 'url' => 'https://1.1.1.1/mcp']);
+    SenseSkill::factory()->create(['user_id' => $this->user->id, 'name' => 'jira-template', 'description' => 'Plantilla de Jira.', 'instructions' => 'Como rol, quiero…']);
+
+    $this->model->script('integraciones', FakeToolModel::call('mcp_call', ['server' => 'Linear', 'tool' => 'create_record', 'arguments' => ['title' => 'Bug del checkout']]), FakeToolModel::finish('Te dejo el issue para que lo confirmes.'));
+    $this->model->script('redaccion', FakeToolModel::call('use_sense_skill', ['name' => 'jira-template']), FakeToolModel::finish('Sigo la plantilla.'));
+
+    $mcp = runAgent('integraciones', 'Crea en Linear un issue del bug del checkout');
+    $skill = runAgent('redaccion', 'Escribe la historia del reembolso');
+
+    expect($mcp->productions()->sole()->kind)->toBe(AgentProduction::PROPOSAL)
+        ->and(PendingAction::sole()->type)->toBe('mcp.call')
+        ->and($skill->steps[0])->not->toHaveKey('error')
+        ->and($skill->steps[0]['result'])->toContain('Como rol');
+
+    Http::assertNothingSent();
+});
