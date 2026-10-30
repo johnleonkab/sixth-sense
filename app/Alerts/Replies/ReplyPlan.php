@@ -15,6 +15,7 @@ final readonly class ReplyPlan
      * @param  list<string>  $otherActions  Anything else to do, e.g. "Crear un evento el jueves a las 10 con Julián".
      * @param  ?string  $question  What the engine could not decide and the person should say.
      * @param  ?array{title: string, effort_minutes: ?int, deadline: ?string, people: list<string>}  $task  Work the person has to do themselves, beyond answering (for the scheduler).
+     * @param  ?array{to: string, text: string}  $relay  A message to pass on to someone else, when the person is asked to ("dile a Alba…").
      */
     public function __construct(
         public string $summary,
@@ -23,10 +24,11 @@ final readonly class ReplyPlan
         public ?string $question = null,
         public ?array $task = null,
         public ?string $learned = null,
+        public ?array $relay = null,
     ) {}
 
     /**
-     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, task: ?array<string, mixed>}
+     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, task: ?array<string, mixed>, redirect: ?array{to: string, text: string}}
      */
     public function toArray(): array
     {
@@ -36,6 +38,7 @@ final readonly class ReplyPlan
             'other_actions' => $this->otherActions,
             'question' => $this->question,
             'task' => $this->task,
+            'redirect' => $this->relay,
         ];
     }
 }

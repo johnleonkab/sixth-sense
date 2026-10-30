@@ -23,13 +23,34 @@ test('one tap sends the proposed Slack reply in its thread, after the undo windo
     $this->actingAs($this->user)
         ->postJson(route('alerts.reply', $this->alert), ['timezone' => 'Europe/Madrid'])
         ->assertOk()
-        ->assertJsonPath('action.type', 'chat.send');
+        ->assertJsonPath('actions.0.type', 'chat.send');
 
     expect(PendingAction::sole())
         ->status->toBe(ActionStatus::Executed)
         ->undo_until->not->toBeNull()
         ->and($this->chats->sent[0]->text)->toBe('Lo reviso y te confirmo.')
         ->and($this->chats->sent[0]->threadRef)->toBe('demo:C01:1001.000100');
+});
+
+test('a message to pass on goes to that person with the same tap, or nothing goes', function () {
+    $this->alert->update(['proposal' => [
+        'summary' => 'Decirle que vale y pasárselo a Lucía.',
+        'reply' => ['to' => 'conversation', 'text' => 'Ok, se lo digo.'],
+        'redirect' => ['to' => 'Lucía', 'text' => 'Lucía, ¿cerramos la migración?'],
+    ]]);
+
+    $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert))->assertOk()->assertJsonCount(2, 'actions');
+
+    expect($this->chats->sent)->toHaveCount(2)
+        ->and($this->chats->sent[1]->text)->toBe('Lucía, ¿cerramos la migración?')
+        ->and($this->chats->sent[1]->toLabel)->toBe('Lucía Romero');
+
+    $this->chats->sent = [];
+    $this->alert->update(['proposal' => [...$this->alert->proposal, 'redirect' => ['to' => 'Nadie Conocido', 'text' => 'Hola']]]);
+
+    $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert))->assertUnprocessable();
+
+    expect($this->chats->sent)->toBe([]);
 });
 
 test('only a pending Slack alert of the person, with a reply proposed, can be sent', function () {

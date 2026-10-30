@@ -38,10 +38,12 @@ test('a reply draft cites the thread and stops looking', function () {
 
     app(AlertFollowUp::class)->plan($item);
 
-    $reply = $item->refresh()->proposal['reply']['text'];
+    $context = $item->refresh()->proposal['context'];
 
-    expect($reply)->toContain('Según el hilo')
-        ->and($reply)->toContain('paso de pagos')
+    // What the search found is for the person: it is shown beside the draft, never sent.
+    expect($context)->toContain('Según el hilo')
+        ->and($context)->toContain('paso de pagos')
+        ->and($item->proposal['reply']['text'])->not->toContain('Según')
         ->and($recording->events[0]['event'])->toBe('slack_reply_planned')
         ->and($recording->events[0]['properties'])->toMatchArray([
             'action' => 'reply',
@@ -69,8 +71,8 @@ test('a reply draft cites the work archive when the thread says nothing', functi
 
     app(AlertFollowUp::class)->plan($item);
 
-    expect($item->refresh()->proposal['reply']['text'])->toContain('Según el archivo')
-        ->and($item->proposal['reply']['text'])->toContain('jueves');
+    expect($item->refresh()->proposal['context'])->toContain('Según el archivo')
+        ->and($item->proposal['context'])->toContain('jueves');
 });
 
 test('a reply draft says what is missing when nothing answers the ask', function () {
@@ -86,7 +88,7 @@ test('a reply draft says what is missing when nothing answers the ask', function
 
     app(AlertFollowUp::class)->plan($item);
 
-    expect($item->refresh()->proposal['reply']['text'])->toContain('Para responder hay que confirmar')
+    expect($item->refresh()->proposal['context'])->toContain('Para responder hay que confirmar')
         ->and($item->proposal['question'])->toContain('presupuesto')
         ->and($recording->events[0]['properties']['sufficient'])->toBeFalse();
 });
@@ -114,7 +116,7 @@ test('a matching agent briefing is used once', function () {
 
     app(AlertFollowUp::class)->plan($item);
 
-    $reply = $item->refresh()->proposal['reply']['text'];
+    $reply = $item->refresh()->proposal['context'];
 
     expect($reply)->toContain('El agente Despliegue')
         ->and($reply)->toContain('jueves por la noche')
@@ -145,7 +147,7 @@ test('a thread decision that contradicts a document is written into the draft', 
 
     app(AlertFollowUp::class)->plan($item);
 
-    $reply = $item->refresh()->proposal['reply']['text'];
+    $reply = $item->refresh()->proposal['context'];
 
     expect($reply)->toContain('no coinciden')
         ->and($reply)->toContain('viernes')
@@ -168,8 +170,9 @@ test('a private reply is not copied into a channel draft', function () {
 
     app(AlertFollowUp::class)->plan($item);
 
-    expect($item->refresh()->proposal['reply']['text'])->not->toContain('cuarenta')
-        ->and($item->proposal['reply']['text'])->toContain('confirmar');
+    expect($item->refresh()->proposal['context'])->not->toContain('cuarenta')
+        ->and($item->proposal['context'])->toContain('confirmar')
+        ->and($item->proposal['reply']['text'])->not->toContain('cuarenta');
 });
 
 /**

@@ -21,6 +21,8 @@ type Proposal = {
     other_actions: string[];
     question: string | null;
     redirect?: { to: string | null; text: string } | null;
+    /** What the search found, for the person: never part of what is sent. */
+    context?: string | null;
 };
 
 type AlertReviewProps = {
@@ -83,9 +85,11 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const [busy, setBusy] = useState(false);
     const pending = alert.status === 'pending';
     const closed = alert.state === 'resolved' || alert.state === 'dismissed';
-    const [sent, setSent] = useState<ActionState | null>(null);
+    const [sent, setSent] = useState<ActionState[] | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
-    const canSend = pending && props.source_label === 'Slack' && Boolean(props.proposal?.reply?.text);
+    const relay = props.proposal?.redirect?.text && props.proposal.redirect.to ? props.proposal.redirect : null;
+    const canSend = pending && props.source_label === 'Slack' && Boolean(props.proposal?.reply?.text || relay);
+    const sendLabel = props.proposal?.reply?.text && relay ? 'Enviar los dos' : relay ? `Enviar a ${relay.to}` : 'Enviar en Slack';
 
     /** One tap is the "sí": it goes out when the undo window closes. */
     const send = async () => {
@@ -93,7 +97,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
         setSendError(null);
 
         try {
-            setSent((await postJson<{ action: ActionState }>(`/alerts/${alert.id}/reply`, { timezone: browserTimezone() })).action);
+            setSent((await postJson<{ actions: ActionState[] }>(`/alerts/${alert.id}/reply`, { timezone: browserTimezone() })).actions);
         } catch (error) {
             setSendError(error instanceof Error ? error.message : 'No se ha podido enviar.');
         } finally {
@@ -212,25 +216,6 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                 </div>
                             )}
 
-                            {sent ? (
-                                <ActionBar initial={sent} verb="enviar" doneLabel="Enviado" linkLabel="Abrir en Slack" />
-                            ) : (
-                                canSend && (
-                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                        <button
-                                            type="button"
-                                            disabled={busy}
-                                            onClick={() => void send()}
-                                            className={`${primary} text-[13px]`}
-                                        >
-                                            {busy ? 'Enviando…' : 'Enviar en Slack'}
-                                        </button>
-                                        <span className="text-[12px] text-muted">o dime qué cambio</span>
-                                        {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
-                                    </div>
-                                )
-                            )}
-
                             {props.proposal.redirect?.text && (
                                 <div className="rounded-lg bg-soft px-3 py-2.5">
                                     <p className="text-[12px] text-muted">Pasárselo a {props.proposal.redirect.to ?? 'otra persona'}</p>
@@ -238,6 +223,27 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                         {props.proposal.redirect.text}
                                     </p>
                                 </div>
+                            )}
+
+                            {sent ? (
+                                <div className="grid gap-1">
+                                    {sent.map((action) => (
+                                        <div key={action.id}>
+                                            <p className="text-[12px] text-muted">{action.label}</p>
+                                            <ActionBar initial={action} verb="enviar" doneLabel="Enviado" linkLabel="Abrir en Slack" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                canSend && (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                        <button type="button" disabled={busy} onClick={() => void send()} className={`${primary} text-[13px]`}>
+                                            {busy ? 'Enviando…' : sendLabel}
+                                        </button>
+                                        <span className="text-[12px] text-muted">o dime qué cambio</span>
+                                        {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
+                                    </div>
+                                )
                             )}
 
                             {props.proposal.other_actions.length > 0 && (
@@ -249,6 +255,8 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             )}
 
                             {props.proposal.question && <p className="text-[13px] text-accent">{props.proposal.question}</p>}
+
+                            {props.proposal.context && props.proposal.context !== props.proposal.question && <p className="text-[12px] leading-[1.45] text-muted">{props.proposal.context}</p>}
                         </>
                     ) : alert.state === 'planning' ? (
                         <div className="space-y-2" aria-label="Preparando la propuesta">

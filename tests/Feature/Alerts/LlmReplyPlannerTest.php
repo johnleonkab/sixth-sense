@@ -74,3 +74,21 @@ test('when answering is enough, there is no task to schedule', function () {
 
     expect($this->planner->plan($this->user, $this->brief)->task)->toBeNull();
 });
+
+test('asked to pass something on, it acknowledges and drafts the message for that person', function () {
+    planAnswers([
+        'summary' => 'Decirle a Marta que vale y pasarle a Alba lo de la configuración.',
+        'reply_to' => 'conversation',
+        'reply_text' => 'Ok, se lo digo.',
+        'other_actions' => [],
+        'question' => '',
+        'relay_to' => 'Alba',
+        'relay_text' => 'Alba, ¿por qué se está tardando tanto con la config de obeach?',
+    ]);
+
+    $plan = $this->planner->plan($this->user, $this->brief);
+
+    expect($plan->reply['text'])->toBe('Ok, se lo digo.')
+        ->and($plan->toArray()['redirect'])->toBe(['to' => 'Alba', 'text' => 'Alba, ¿por qué se está tardando tanto con la config de obeach?'])
+        ->and($this->model->calls[0]['system'])->toContain('«dile a Alba»');
+});

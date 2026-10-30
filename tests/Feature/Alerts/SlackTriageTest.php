@@ -75,7 +75,7 @@ test('a channel the profile gives to someone else is a redirect and is not sent'
     expect($item->proposal['reply'])->toBeNull()
         ->and($item->proposal['redirect']['to'])->toBe('Marta Ruiz')
         ->and($item->proposal['summary'])->toBe('Pasárselo a Marta Ruiz.')
-        ->and($item->proposal['redirect']['text'])->toContain('confirmar')
+        ->and($item->proposal['context'])->toContain('confirmar')
         ->and($planner->planned)->toHaveCount(1)
         ->and($chats->sent)->toBe([])
         ->and($user->slackTriageDecisions()->sole()->has_target)->toBeTrue()

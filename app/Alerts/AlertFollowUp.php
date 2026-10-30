@@ -122,13 +122,16 @@ class AlertFollowUp
                 'conflict' => $draft->conflict,
             ]);
 
-            $text = $this->draftText($proposal);
+            $text = $this->draftText($proposal, $decision);
 
             if ($text !== null) {
                 $decision->update(['draft_text' => $text]);
             }
 
-            if ($text !== null && $draft->sufficient && $this->autonomy->level($item->user, SlackAction::from($decision->action)) === AutonomyLevel::Act) {
+            // Passing something on as well takes two messages: the person sees both before they go.
+            $relays = $decision->action === SlackAction::Reply->value && filled($proposal['redirect']['text'] ?? null);
+
+            if ($text !== null && $draft->sufficient && ! $relays && $this->autonomy->level($item->user, SlackAction::from($decision->action)) === AutonomyLevel::Act) {
                 $this->autonomy->perform($item->user, $decision, $text);
             }
         }
@@ -147,7 +150,8 @@ class AlertFollowUp
     }
 
     /**
-     * A Slack reply keeps the draft and adds what the search found. A redirect
+     * A Slack reply keeps the draft, and what the search found goes beside it
+     * as context: it is for the person, never part of what is sent. A redirect
      * proposes who and the message, and does not answer in the channel.
      *
      * @return array<string, mixed>
@@ -163,15 +167,12 @@ class AlertFollowUp
                 'other_actions' => [],
                 'question' => $draft->sufficient ? null : $draft->note,
                 'task' => null,
-                'redirect' => ['to' => $decision->target, 'text' => Str::limit(trim($text."\n\n".$draft->note), 2000)],
+                'redirect' => ['to' => $decision->target, 'text' => Str::limit($text, 2000)],
+                'context' => $draft->note,
             ];
         }
 
-        $proposal = $plan->toArray();
-
-        if (is_array($proposal['reply'])) {
-            $proposal['reply']['text'] = Str::limit(trim($proposal['reply']['text']."\n\n".$draft->note), 2000);
-        }
+        $proposal = [...$plan->toArray(), 'context' => $draft->note];
 
         if (! $draft->sufficient) {
             $proposal['question'] = $draft->note;
@@ -181,13 +182,13 @@ class AlertFollowUp
     }
 
     /**
+     * The text the decision would send: the redirect's, or the reply's.
+     *
      * @param  array<string, mixed>  $proposal
      */
-    private function draftText(array $proposal): ?string
+    private function draftText(array $proposal, SlackTriageDecision $decision): ?string
     {
-        $redirect = $proposal['redirect']['text'] ?? null;
-        $reply = $proposal['reply']['text'] ?? null;
-        $text = trim((string) ($redirect ?: $reply));
+        $text = trim((string) ($decision->action === SlackAction::Redirect->value ? ($proposal['redirect']['text'] ?? '') : ($proposal['reply']['text'] ?? '')));
 
         return $text === '' ? null : $text;
     }

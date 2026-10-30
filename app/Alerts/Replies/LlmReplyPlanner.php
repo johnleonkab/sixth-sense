@@ -28,6 +28,8 @@ class LlmReplyPlanner implements ReplyPlanner
                 'reply_text' => ['type' => 'STRING'],
                 'other_actions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                 'question' => ['type' => 'STRING'],
+                'relay_to' => ['type' => 'STRING'],
+                'relay_text' => ['type' => 'STRING'],
                 'learned' => ['type' => 'STRING'],
                 'manual_task' => [
                     'type' => 'OBJECT',
@@ -41,7 +43,7 @@ class LlmReplyPlanner implements ReplyPlanner
                     'required' => ['needed', 'title', 'effort_minutes', 'deadline', 'people'],
                 ],
             ],
-            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'learned', 'manual_task'],
+            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'relay_to', 'relay_text', 'learned', 'manual_task'],
         ], 0.3, AiGenerationContext::forUser($user));
 
         if (blank($answer['summary'] ?? null)) {
@@ -50,6 +52,8 @@ class LlmReplyPlanner implements ReplyPlanner
 
         $audience = in_array($answer['reply_to'] ?? null, ReplyPlan::AUDIENCES, true) ? $answer['reply_to'] : null;
         $text = trim((string) ($answer['reply_text'] ?? ''));
+        $relayTo = trim((string) ($answer['relay_to'] ?? ''));
+        $relayText = trim((string) ($answer['relay_text'] ?? ''));
 
         return new ReplyPlan(
             summary: Str::limit(trim((string) $answer['summary']), 200),
@@ -63,6 +67,7 @@ class LlmReplyPlanner implements ReplyPlanner
                 'people' => array_values(array_filter(array_map('trim', (array) ($answer['manual_task']['people'] ?? [])))),
             ] : null,
             learned: filled($answer['learned'] ?? null) ? Str::limit(trim((string) $answer['learned']), 240) : null,
+            relay: $relayTo !== '' && $relayText !== '' ? ['to' => Str::limit($relayTo, 80), 'text' => Str::limit($relayText, 2000)] : null,
         );
     }
 
@@ -87,6 +92,11 @@ class LlmReplyPlanner implements ReplyPlanner
               decisión), escribe el borrador con la opción más razonable y dilo en question.
             - other_actions: otras acciones que harían falta además de responder, concretas (crear un evento con fecha y personas,
               revisar un documento, avisar a alguien). Vacío si no hace falta nada más.
+            - relay_to y relay_text: si le piden que le pase algo a otra persona («dile a Alba», «avísale a Pablo», «pásaselo a
+              Marta»), relay_to es el nombre de esa persona y relay_text el mensaje para ella, escrito como él, con lo que haya que
+              transmitirle sacado de la conversación (a menudo lo que él mismo dijo justo antes). Entonces reply_text es solo un
+              acuse breve a quien lo pidió («Ok, se lo digo.»). No preguntes qué transmitir si la conversación ya lo dice.
+              Vacíos si no hay que pasarle nada a nadie.
             - question: lo que él tendría que decidir antes de enviarlo, en una pregunta corta; vacío si nada.
             - learned: un dato corto que merezca recordarse la próxima vez (quién pide qué, un plazo, dónde está el documento).
               Vacío si la investigación no aporta nada nuevo. No repitas el borrador.
