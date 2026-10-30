@@ -36,6 +36,10 @@ test('a tap proposes a rule and the next similar message follows it only after y
         ->and($user->slackPreferenceRules()->first()->status)->toBe('proposed')
         ->and($tap->json('output.rule'))->toBe($rule);
 
+    // On screen, the rule and the bar that waits for the "sí".
+    expect($tap->json('canvas.view'))->toBe('openui.view')
+        ->and($tap->json('canvas.props.ui'))->toContain('Proposal('.$tap->json('output.pending_action_id').', "guardar", "Regla guardada")')->toBeValidOpenUi();
+
     $names = collect($recording->events)->pluck('event');
 
     expect($names)->toContain('slack_triage_feedback')

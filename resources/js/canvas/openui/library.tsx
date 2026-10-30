@@ -2,10 +2,14 @@ import { useIsQueryLoading, useStateField, useTriggerAction } from '@openuidev/r
 import { useContext, useEffect, useState } from 'react';
 import type { ComponentRenderProps } from '@openuidev/react-lang';
 
+import ActionBar from '@/actions/action-bar';
+import type { ActionState } from '@/actions/types';
+import { useCanvas } from '@/canvas/canvas-context';
 import { LiveItemsContext, openRef } from '@/canvas/openui/refs';
 import { buttonClass, Button as UiButton, Buttons as UiButtons } from '@/components/button';
 import type { ButtonVariant } from '@/components/button';
 import { buildLibrary, top } from '@/canvas/openui/spec';
+import { getJson } from '@/lib/http';
 
 /**
  * How each OpenUI block looks on the canvas: the same tokens, type and
@@ -299,6 +303,54 @@ function Buttons({ props, renderNode }: Props<{ buttons: unknown[] }>) {
     return <UiButtons>{renderNode(props.buttons)}</UiButtons>;
 }
 
+function Quote({ props }: Props<{ text: string; author?: string }>) {
+    return (
+        <blockquote className="border-l-2 border-line pl-3 text-[13.5px] text-muted">
+            {props.author && <small className="mb-0.5 block text-[11.5px] font-medium text-ink/80 not-italic">{props.author}</small>}
+            <p className="whitespace-pre-wrap">{props.text}</p>
+        </blockquote>
+    );
+}
+
+/** Not sent yet: dashed, in the accent, as drafts look everywhere. */
+function Draft({ props }: Props<{ label: string; text: string }>) {
+    return (
+        <div className="rounded-[10px] border border-dashed border-accent bg-accent-soft px-3.5 py-2.5">
+            <small className="mb-1 block text-[11px] text-accent">{props.label}</small>
+            <p className="text-[14px] whitespace-pre-wrap">{props.text}</p>
+        </div>
+    );
+}
+
+/**
+ * A proposed change, with the same bar as every other proposal: "Sí" and
+ * "Cancelar", then the seconds to undo. Its state comes from Laravel, so a
+ * view the assistant writes can not make one up.
+ */
+function Proposal({ props }: Props<{ action: number; verb?: string; done?: string }>) {
+    const { actions } = useCanvas();
+    const [state, setState] = useState<ActionState | null>(actions.actions[props.action] ?? null);
+    const [missing, setMissing] = useState(false);
+
+    useEffect(() => {
+        if (state === null) {
+            getJson<ActionState>(`/actions/${props.action}`).then(setState, () => setMissing(true));
+        }
+    }, [props.action]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (missing) {
+        return <p className="text-[12.5px] text-muted">Esta propuesta ya no existe.</p>;
+    }
+
+    if (state === null) {
+        return <div className="alerts-shimmer h-9 w-48 rounded-full" />;
+    }
+
+    const verb = props.verb ?? 'aplicar';
+
+    return <ActionBar initial={state} verb={verb} doneLabel={props.done ?? 'Hecho'} countdownLabel={verb === 'enviar' ? undefined : `Se va a ${verb}`} />;
+}
+
 type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean; ref?: string };
 
 /** Filter tabs: the chosen one is a $variable, and the queries that use it load again. */
@@ -414,4 +466,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Quote, Draft, Proposal });

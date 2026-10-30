@@ -6,7 +6,7 @@ use App\Alerts\Intents\SlackPreference;
 use App\Models\PendingAction;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\ProposalViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -72,12 +72,7 @@ class CorrectSlackTriage implements VoiceTool
                 'rule' => $rule->body,
                 'needs_confirmation' => true,
             ],
-            canvas: new Canvas('slack.rule', [
-                'title' => 'Regla de atención',
-                'body' => $rule->body,
-                'saved' => false,
-                'action' => $action?->toState(),
-            ]),
+            canvas: ProposalViews::rule($user, 'Regla de atención', $rule->body, $action),
         );
     }
 

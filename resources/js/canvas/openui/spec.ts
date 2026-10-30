@@ -30,7 +30,10 @@ export type BlockName =
     | 'Buttons'
     | 'ItemList'
     | 'Chips'
-    | 'Tabs';
+    | 'Tabs'
+    | 'Proposal'
+    | 'Quote'
+    | 'Draft';
 
 /** What the grouping functions return: chart-ready labels and values, in the same order. */
 export type Series = { labels: string[]; values: number[] };
@@ -215,6 +218,38 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Button'),
     });
 
+    const Quote = defineComponent({
+        name: 'Quote',
+        description: 'Un texto citado tal cual: el fragmento de un documento o lo que dijo alguien (author).',
+        props: z.object({
+            text: z.string(),
+            author: z.string().optional(),
+        }),
+        component: render('Quote'),
+    });
+
+    const Draft = defineComponent({
+        name: 'Draft',
+        description: 'Un borrador que aún no se ha enviado ni publicado (un comentario, un mensaje): label dice qué es y de quién.',
+        props: z.object({
+            label: z.string(),
+            text: z.string(),
+        }),
+        component: render('Draft'),
+    });
+
+    const Proposal = defineComponent({
+        name: 'Proposal',
+        description:
+            'Un cambio propuesto que espera el sí: botones Sí y Cancelar y, después, unos segundos para deshacer. action es el pending_action_id que devolvió una herramienta que propone (nunca te lo inventes); verb lo que hará (aplicar, enviar, ejecutar, guardar); done lo que dirá al terminar.',
+        props: z.object({
+            action: z.number(),
+            verb: z.string().optional(),
+            done: z.string().optional(),
+        }),
+        component: render('Proposal'),
+    });
+
     const Buttons = defineComponent({
         name: 'Buttons',
         description: 'Botones que van juntos, en fila: el principal primero. Úsalo siempre que haya más de un Button.',
@@ -266,7 +301,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Tabs'),
     });
 
-    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref];
+    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref, Quote.ref, Draft.ref, Proposal.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -338,7 +373,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 
     return createLibrary({
-        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips],
+        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Quote, Draft, Proposal],
         functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
@@ -349,6 +384,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
                 notes: ['Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.'],
             },
             { name: 'Listas que se abren', components: ['ItemList'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
+            { name: 'Cambios', components: ['Quote', 'Draft', 'Proposal'], notes: ['Un Proposal por cambio propuesto, al final de la vista, con lo que cambiará encima (Draft para el texto, Quote para lo que responde).'] },
         ],
         actions: [OpenItem],
         root: 'View',

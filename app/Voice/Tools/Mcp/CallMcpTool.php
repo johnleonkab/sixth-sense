@@ -5,11 +5,14 @@ namespace App\Voice\Tools\Mcp;
 use App\Actions\Actions;
 use App\Connectors\Mcp\McpError;
 use App\Connectors\Mcp\McpServers;
+use App\Models\PendingAction;
 use App\Models\User;
+use App\Voice\OpenUi\ViewBuilder;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
+use Illuminate\Support\Str;
 
 /**
  * Calls a tool of one of the person's MCP servers. A tool the server marks
@@ -87,13 +90,7 @@ class CallMcpTool implements VoiceTool
                     'next_step' => 'Es solo una propuesta: di qué hará y pregunta si lo hace. Tú no puedes confirmarlo. '
                         .'Cuando responda, consulta get_action_status y cuenta exactamente lo que diga.',
                 ],
-                canvas: new Canvas('mcp.call', [
-                    'action' => $action->toState(),
-                    'server' => $server->name,
-                    'tool' => $tool['title'] ?? $tool['name'],
-                    'description' => $tool['description'],
-                    'arguments' => $parameters,
-                ]),
+                canvas: self::proposalView($user, $action, $server->name, $tool, $parameters),
             );
         }
 
@@ -114,5 +111,29 @@ class CallMcpTool implements VoiceTool
             'structured' => $result['structured'],
             'next_step' => 'Si hay datos que mirar, enséñalos con show_view; en voz, solo lo esencial.',
         ]);
+    }
+
+    /**
+     * What the call will do and with which arguments, and the "sí" it waits for.
+     *
+     * @param  array{name: string, title: ?string, description: string}  $tool
+     * @param  array<string, mixed>  $parameters
+     */
+    private static function proposalView(User $user, PendingAction $action, string $server, array $tool, array $parameters): Canvas
+    {
+        $view = new ViewBuilder($tool['title'] ?? $tool['name']);
+
+        if (filled($tool['description'])) {
+            $view->add('Text', [Str::limit($tool['description'], 300), 'muted']);
+        }
+
+        $parameters === [] ? $view->add('Text', ['Sin argumentos.', 'muted']) : $view->add('Table', [['Argumento', 'Valor'], array_map(
+            fn (string $name, mixed $value): array => [$name, is_scalar($value) ? (string) $value : Str::limit((string) json_encode($value, JSON_UNESCAPED_UNICODE), 300)],
+            array_keys($parameters),
+            $parameters,
+        )]);
+        $view->proposal($action, 'ejecutar', "Hecho en {$server}");
+
+        return $view->canvas($user, "MCP · {$server}", 'focus');
     }
 }

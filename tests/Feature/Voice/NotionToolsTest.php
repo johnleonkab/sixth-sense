@@ -87,9 +87,10 @@ test('a new page is a draft inside its parent until confirmed', function () {
 
 test('a comment can answer a thread by its number', function () {
     $proposal = runNotionTool('propose_notion_comment', ['page' => FakeWiki::LAUNCH, 'comment' => 'Riesgos lo cierra el jueves.', 'reply_to' => '1'])
-        ->assertJsonPath('canvas.view', 'docs.comment')
-        ->assertJsonPath('canvas.props.in_reply_to', ['author' => 'Pablo Gil', 'content' => 'Por mi parte sí, falta el ok de Riesgos.'])
-        ->assertJsonPath('canvas.props.action.label', 'Responder a Marta Ruiz en «Plan de lanzamiento: prepago»');
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.title', 'Responder a Marta Ruiz en «Plan de lanzamiento: prepago»');
+
+    expect($proposal->json('canvas.props.ui'))->toContain('Quote("Por mi parte sí, falta el ok de Riesgos.", "Pablo Gil")')->toBeValidOpenUi();
 
     confirmProposal($proposal);
 

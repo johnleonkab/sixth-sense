@@ -4,7 +4,7 @@ namespace App\Voice\Tools\Slack;
 
 use App\Alerts\Intents\SlackPreference;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\ProposalViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -93,12 +93,7 @@ class AnswerSlackAttention implements VoiceTool
                 'saved' => true,
                 'rules' => $lines,
             ],
-            canvas: new Canvas('slack.rule', [
-                'title' => 'Reglas de atención',
-                'body' => implode("\n", $lines),
-                'saved' => true,
-                'action' => null,
-            ]),
+            canvas: ProposalViews::rule($user, 'Reglas de atención', implode("\n", $lines), null),
         );
     }
 

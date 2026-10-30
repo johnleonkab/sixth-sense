@@ -5,7 +5,7 @@ namespace App\Voice\Tools\Notion;
 use App\Connections\Capability;
 use App\Connectors\Docs\DocumentComment;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\ProposalViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -88,16 +88,7 @@ class ProposeNotionComment implements VoiceTool
 
         return new ToolResult(
             output: $this->proposalOutput($action, ['page' => $page->title, 'comment' => $arguments['comment'], 'in_reply_to' => $thread?->author]),
-            canvas: new Canvas('docs.comment', array_filter([
-                'action' => $action->toState(),
-                'title' => $page->title,
-                'url' => $page->url,
-                'source' => 'Notion',
-                'quote' => $thread?->quote,
-                'comment' => $arguments['comment'],
-                'author' => $user->name,
-                'in_reply_to' => $last ? ['author' => $last['author'], 'content' => $last['content']] : null,
-            ], fn (mixed $value): bool => $value !== null)),
+            canvas: ProposalViews::comment($user, $action, 'Notion', $arguments['comment'], $thread?->quote, $last ? ['author' => $last['author'], 'content' => $last['content']] : null),
         );
     }
 }

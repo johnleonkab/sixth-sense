@@ -6,7 +6,7 @@ use App\Actions\Actions;
 use App\Connections\Capability;
 use App\Connectors\Docs\Documents;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\ProposalViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -84,14 +84,7 @@ class ProposeDocumentComment implements VoiceTool
 
         return new ToolResult(
             output: $this->proposalOutput($action, ['document' => $document->title, 'comment' => $arguments['comment'], 'quote' => $quote]),
-            canvas: new Canvas('docs.comment', [
-                'action' => $action->toState(),
-                'title' => $document->title,
-                'url' => $document->url,
-                'quote' => $quote,
-                'comment' => $arguments['comment'],
-                'author' => $user->name,
-            ]),
+            canvas: ProposalViews::comment($user, $action, 'Docs', $arguments['comment'], $quote),
         );
     }
 }

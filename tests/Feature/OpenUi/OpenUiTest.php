@@ -114,8 +114,13 @@ test('a read-only MCP tool runs at once, and any other waits for a yes', functio
 
     $proposal = $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'mcp_call'), ['arguments' => ['server' => 'Linear', 'tool' => 'create_record', 'arguments' => ['title' => 'Nuevo']]])
-        ->assertJsonPath('canvas.view', 'mcp.call')
-        ->assertJsonPath('canvas.props.arguments.title', 'Nuevo');
+        ->assertJsonPath('canvas.view', 'openui.view');
+
+    // A view with what it will do and the bar that waits for the "sí".
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Table(["Argumento", "Valor"], [["title", "Nuevo"]])')
+        ->toContain('Proposal('.$proposal->json('output.pending_action_id').', "ejecutar", "Hecho en Linear")')
+        ->toBeValidOpenUi();
 
     $called = fn (Request $request): ?array => json_decode($request->body(), true)['params'] ?? null;
 

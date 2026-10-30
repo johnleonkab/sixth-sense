@@ -27,9 +27,9 @@ Props typed `ActionExpression` accept one @step, or Action([@steps...]) for seve
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
-Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
+Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
@@ -52,6 +52,12 @@ Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar ca
 ### Listas que se abren
 ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante) y ref (cómo se abre, si viene en las filas de una Query). Pulsar uno lo abre. Conserva los n y ref que vengan en los datos.
 Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
+
+### Cambios
+Quote(text: string, author?: string) — Un texto citado tal cual: el fragmento de un documento o lo que dijo alguien (author).
+Draft(label: string, text: string) — Un borrador que aún no se ha enviado ni publicado (un comentario, un mensaje): label dice qué es y de quién.
+Proposal(action: number, verb?: string, done?: string) — Un cambio propuesto que espera el sí: botones Sí y Cancelar y, después, unos segundos para deshacer. action es el pending_action_id que devolvió una herramienta que propone (nunca te lo inventes); verb lo que hará (aplicar, enviar, ejecutar, guardar); done lo que dirá al terminar.
+Un Proposal por cambio propuesto, al final de la vista, con lo que cambiará encima (Draft para el texto, Quote para lo que responde).
 
 ## Built-in Functions
 

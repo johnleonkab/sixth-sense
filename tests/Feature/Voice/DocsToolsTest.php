@@ -95,14 +95,18 @@ test('edits anchored to text that is not unique are sent back to the assistant',
 });
 
 test('proposing a comment shows it signed by the person', function () {
-    runDocsTool('propose_document_comment', [
+    $proposal = runDocsTool('propose_document_comment', [
         'document' => $this->prd,
         'comment' => 'Me parece bien, pero confirmemos con Pagos.',
         'quote' => 'Reembolso parcial automático',
     ])
-        ->assertJsonPath('canvas.view', 'docs.comment')
-        ->assertJsonPath('canvas.props.author', 'John León')
-        ->assertJsonPath('canvas.props.quote', 'Reembolso parcial automático');
+        ->assertJsonPath('canvas.view', 'openui.view');
+
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Quote("«Reembolso parcial automático»")')
+        ->toContain('Draft("Comentario de John León · borrador", "Me parece bien, pero confirmemos con Pagos.")')
+        ->toContain('Proposal('.$proposal->json('output.pending_action_id').', "publicar", "Comentario publicado")')
+        ->toBeValidOpenUi();
 
     expect($this->documents->comments)->toBe([]);
 });
@@ -161,10 +165,13 @@ test('a document opens with its open comments, numbered, and who waits for an an
 
 test('replying to a comment is a draft until confirmed, then it reaches the document', function () {
     $proposal = runDocsTool('propose_comment_reply', ['document' => $this->prd, 'comment' => '2', 'reply' => 'Confirmado: sigue en el paso 5.', 'resolve' => true])
-        ->assertJsonPath('canvas.view', 'docs.comment')
-        ->assertJsonPath('canvas.props.in_reply_to', ['author' => 'Pablo Gil', 'content' => '@John ¿lo confirmas tú?'])
-        ->assertJsonPath('canvas.props.resolve', true)
-        ->assertJsonPath('canvas.props.action.label', 'Responder y resolver el comentario de Pablo Gil');
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.title', 'Responder y resolver el comentario de Pablo Gil');
+
+    expect($proposal->json('canvas.props.ui'))
+        ->toContain('Quote("@John ¿lo confirmas tú?", "Pablo Gil")')
+        ->toContain('Draft("Respuesta de John León · borrador · y lo marca como resuelto", "Confirmado: sigue en el paso 5.")')
+        ->toBeValidOpenUi();
 
     expect($this->documents->replies)->toBe([]);
 

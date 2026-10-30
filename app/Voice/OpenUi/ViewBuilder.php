@@ -2,6 +2,7 @@
 
 namespace App\Voice\OpenUi;
 
+use App\Models\PendingAction;
 use App\Models\User;
 use App\Voice\Tools\Canvas;
 
@@ -66,6 +67,15 @@ class ViewBuilder
         }
 
         return $ref;
+    }
+
+    /**
+     * A change that waits for the "sí", with its bar: Sí and Cancelar, then
+     * the seconds to undo.
+     */
+    public function proposal(PendingAction $action, string $verb = 'aplicar', ?string $done = null): Ref
+    {
+        return $this->add('Proposal', [$action->id, $verb, $done]);
     }
 
     /**
