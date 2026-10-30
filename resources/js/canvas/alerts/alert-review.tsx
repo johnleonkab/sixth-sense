@@ -1,21 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { StateChip } from "@/alerts/alert-center";
-import { ALERT_CHANGED } from "@/alerts/use-alert-feed";
-import {
-    AgendaTaskSummary,
-    type AgendaTaskCard,
-} from "@/canvas/agenda/agenda-task";
-import type { Alert } from "@/alerts/types";
-import { useCanvas } from "@/canvas/canvas-context";
-import CanvasFrame from "@/canvas/canvas-frame";
-import SlackCorrections from "@/canvas/slack/slack-corrections";
-import type { CanvasComponent } from "@/canvas/types";
+import ActionBar from '@/actions/action-bar';
+import type { ActionState } from '@/actions/types';
+import { StateChip } from '@/alerts/alert-center';
+import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
+import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
+import type { Alert } from '@/alerts/types';
+import { useCanvas } from '@/canvas/canvas-context';
+import CanvasFrame from '@/canvas/canvas-frame';
+import SlackCorrections from '@/canvas/slack/slack-corrections';
+import type { CanvasComponent } from '@/canvas/types';
+import { browserTimezone, postJson } from '@/lib/http';
 
 type Proposal = {
     summary: string;
     reply: {
-        to: "sender" | "all" | "thread" | "conversation";
+        to: 'sender' | 'all' | 'thread' | 'conversation';
         text: string;
     } | null;
     other_actions: string[];
@@ -37,11 +37,11 @@ type AlertReviewProps = {
     is_email: boolean;
 };
 
-const audience: Record<NonNullable<Proposal["reply"]>["to"], string> = {
-    sender: "Responder al remitente",
-    all: "Responder a todos",
-    thread: "Responder en el hilo",
-    conversation: "Responder en la conversación",
+const audience: Record<NonNullable<Proposal['reply']>['to'], string> = {
+    sender: 'Responder al remitente',
+    all: 'Responder a todos',
+    thread: 'Responder en el hilo',
+    conversation: 'Responder en la conversación',
 };
 
 /**
@@ -50,39 +50,56 @@ const audience: Record<NonNullable<Proposal["reply"]>["to"], string> = {
  * assistant then prepares each action as a draft to confirm.
  */
 const resolutionText: Record<string, string> = {
-    replied: "Respondiste tú: se resolvió sola.",
-    marked_done: "La marcaste como resuelta.",
-    dismissed: "La descartaste: no hacía falta hacer nada.",
-    superseded:
-        "La sustituyó un mensaje más reciente de la misma conversación.",
+    replied: 'Respondiste tú: se resolvió sola.',
+    marked_done: 'La marcaste como resuelta.',
+    dismissed: 'La descartaste: no hacía falta hacer nada.',
+    superseded: 'La sustituyó un mensaje más reciente de la misma conversación.',
 };
 
 /** Where the alert stands, said in a line under its label. */
 function stateLine(alert: Alert): string {
     switch (alert.state) {
-        case "judging":
-            return "Viendo si espera tu respuesta…";
-        case "routine":
-            return "No parece esperar tu respuesta. Si sí la espera, déjala pendiente.";
-        case "planning":
-            return "Preparando una propuesta…";
-        case "ready":
-        case "important":
-            return "Esperando tu respuesta.";
+        case 'judging':
+            return 'Viendo si espera tu respuesta…';
+        case 'routine':
+            return 'No parece esperar tu respuesta. Si sí la espera, déjala pendiente.';
+        case 'planning':
+            return 'Preparando una propuesta…';
+        case 'ready':
+        case 'important':
+            return 'Esperando tu respuesta.';
         default:
-            return resolutionText[alert.resolution ?? ""] ?? "";
+            return resolutionText[alert.resolution ?? ''] ?? '';
     }
 }
 
-const AlertReview: CanvasComponent<AlertReviewProps> = ({
-    index,
-    ...props
-}) => {
+/** The same pills as the OpenUI Button. */
+const primary = 'rounded-full bg-ink px-3.5 py-1.5 font-medium text-bg hover:opacity-90 disabled:opacity-40';
+const secondary = 'rounded-full border border-line px-3.5 py-1.5 hover:bg-soft disabled:opacity-40';
+
+const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => {
     const { runTool } = useCanvas();
     const [alert, setAlert] = useState<Alert>(props.alert);
     const [busy, setBusy] = useState(false);
-    const pending = alert.status === "pending";
-    const closed = alert.state === "resolved" || alert.state === "dismissed";
+    const pending = alert.status === 'pending';
+    const closed = alert.state === 'resolved' || alert.state === 'dismissed';
+    const [sent, setSent] = useState<ActionState | null>(null);
+    const [sendError, setSendError] = useState<string | null>(null);
+    const canSend = pending && props.source_label === 'Slack' && Boolean(props.proposal?.reply?.text);
+
+    /** One tap is the "sí": it goes out when the undo window closes. */
+    const send = async () => {
+        setBusy(true);
+        setSendError(null);
+
+        try {
+            setSent((await postJson<{ action: ActionState }>(`/alerts/${alert.id}/reply`, { timezone: browserTimezone() })).action);
+        } catch (error) {
+            setSendError(error instanceof Error ? error.message : 'No se ha podido enviar.');
+        } finally {
+            setBusy(false);
+        }
+    };
 
     // It changes while on screen: answered from Slack or Gmail, a proposal ready, closed by voice.
     useEffect(() => {
@@ -96,11 +113,8 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
             setAlert(changed);
 
             // The proposal is ready, or the scheduler found time for it: show them whole.
-            if (
-                (changed.state === "ready" && !props.proposal) ||
-                (changed.task?.status ?? null) !== (props.task?.status ?? null)
-            ) {
-                runTool("review_alert", { alert_id: changed.id });
+            if ((changed.state === 'ready' && !props.proposal) || (changed.task?.status ?? null) !== (props.task?.status ?? null)) {
+                runTool('review_alert', { alert_id: changed.id });
             }
         };
 
@@ -110,24 +124,23 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
     }, [props.alert.id, props.proposal, props.task, runTool]);
 
     /** Shown at once; the canvas then comes back as the server left it. */
-    const change = (outcome: "done" | "dismissed" | "reopen") => {
+    const change = (outcome: 'done' | 'dismissed' | 'reopen') => {
         setBusy(true);
         setAlert((current) => ({
             ...current,
-            ...(outcome === "reopen"
+            ...(outcome === 'reopen'
                 ? {
-                      status: "pending",
-                      state: current.proposal ? "ready" : "important",
+                      status: 'pending',
+                      state: current.proposal ? 'ready' : 'important',
                       resolution: null,
                   }
                 : {
-                      status: outcome === "done" ? "resolved" : "dismissed",
-                      state: outcome === "done" ? "resolved" : "dismissed",
-                      resolution:
-                          outcome === "done" ? "marked_done" : "dismissed",
+                      status: outcome === 'done' ? 'resolved' : 'dismissed',
+                      state: outcome === 'done' ? 'resolved' : 'dismissed',
+                      resolution: outcome === 'done' ? 'marked_done' : 'dismissed',
                   }),
         }));
-        runTool("resolve_alert", { alert_id: alert.id, outcome });
+        runTool('resolve_alert', { alert_id: alert.id, outcome });
     };
 
     return (
@@ -137,22 +150,14 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
             source={props.source_label}
             aside={
                 props.alert.external_url && (
-                    <a
-                        href={props.alert.external_url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="text-accent hover:underline"
-                    >
+                    <a href={props.alert.external_url} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">
                         Abrir en {props.source_label}
                     </a>
                 )
             }
         >
             {/* Where it stands and why it matters, in one line: the title already says who and where. */}
-            <div
-                key={alert.state}
-                className="alerts-row-in mb-4 flex items-start gap-2.5"
-            >
+            <div key={alert.state} className="alerts-row-in mb-4 flex items-start gap-2.5">
                 <span className="mt-px flex-none">
                     <StateChip state={alert.state} />
                 </span>
@@ -160,13 +165,11 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
                     {alert.why}
                     {!pending && stateLine(alert) && (
                         <span className="text-muted">
-                            {alert.why ? " · " : ""}
+                            {alert.why ? ' · ' : ''}
                             {stateLine(alert)}
                         </span>
                     )}
-                    {pending && !alert.why && (
-                        <span className="text-muted">{stateLine(alert)}</span>
-                    )}
+                    {pending && !alert.why && <span className="text-muted">{stateLine(alert)}</span>}
                 </p>
             </div>
 
@@ -175,9 +178,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
                     {props.is_email && (
                         <p className="mb-1.5 text-[12.5px] text-muted">
                             <b className="font-medium text-ink">{props.from}</b>
-                            {props.participants.length > 0 && (
-                                <> · con {props.participants.join(", ")}</>
-                            )}
+                            {props.participants.length > 0 && <> · con {props.participants.join(', ')}</>}
                         </p>
                     )}
                     <div className="max-h-[40vh] overflow-auto">
@@ -185,58 +186,54 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
                             <ol className="mb-3 space-y-2 border-l-2 border-line pl-3 text-[12.5px] text-muted">
                                 {props.conversation.map((message, position) => (
                                     <li key={position}>
-                                        <b className="font-medium text-ink/80">
-                                            {message.from}
-                                        </b>{" "}
-                                        <span className="font-mono text-[11px] text-faint">
-                                            {message.when}
-                                        </span>
-                                        <p className="line-clamp-3 whitespace-pre-wrap">
-                                            {message.text}
-                                        </p>
+                                        <b className="font-medium text-ink/80">{message.from}</b>{' '}
+                                        <span className="font-mono text-[11px] text-faint">{message.when}</span>
+                                        <p className="line-clamp-3 whitespace-pre-wrap">{message.text}</p>
                                     </li>
                                 ))}
                             </ol>
                         )}
-                        {!props.is_email && props.conversation.length > 0 && (
-                            <p className="text-[12.5px] font-medium">
-                                {props.from}
-                            </p>
-                        )}
-                        <p className="text-[14px] leading-[1.55] break-words whitespace-pre-wrap">
-                            {props.text}
-                        </p>
+                        {!props.is_email && props.conversation.length > 0 && <p className="text-[12.5px] font-medium">{props.from}</p>}
+                        <p className="text-[14px] leading-[1.55] break-words whitespace-pre-wrap">{props.text}</p>
                     </div>
                 </section>
 
-                <section
-                    aria-label="Propuesta"
-                    className="min-w-0 rounded-xl bg-soft p-4"
-                >
+                <section aria-label="Propuesta" className="grid min-w-0 content-start gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3.5">
                     {props.proposal ? (
                         <>
-                            <p className="text-[14.5px] leading-[1.45] font-medium">
-                                {props.proposal.summary}
-                            </p>
+                            <h4 className="text-[14px] leading-[1.45] font-medium">{props.proposal.summary}</h4>
 
                             {props.proposal.reply && (
-                                <div className="mt-2.5 rounded-lg border border-line bg-surface p-3">
-                                    <p className="text-[11.5px] text-muted">
-                                        {audience[props.proposal.reply.to]}
-                                    </p>
+                                <div className="rounded-lg bg-soft px-3 py-2.5">
+                                    <p className="text-[12px] text-muted">{audience[props.proposal.reply.to]}</p>
                                     <p className="mt-1 max-h-[22vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">
                                         {props.proposal.reply.text}
                                     </p>
                                 </div>
                             )}
 
+                            {sent ? (
+                                <ActionBar initial={sent} verb="enviar" doneLabel="Enviado" linkLabel="Abrir en Slack" />
+                            ) : (
+                                canSend && (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                        <button
+                                            type="button"
+                                            disabled={busy}
+                                            onClick={() => void send()}
+                                            className={`${primary} text-[13px]`}
+                                        >
+                                            {busy ? 'Enviando…' : 'Enviar en Slack'}
+                                        </button>
+                                        <span className="text-[12px] text-muted">o dime qué cambio</span>
+                                        {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
+                                    </div>
+                                )
+                            )}
+
                             {props.proposal.redirect?.text && (
-                                <div className="mt-2.5 rounded-lg border border-line bg-surface p-3">
-                                    <p className="text-[11.5px] text-muted">
-                                        Pasárselo a{" "}
-                                        {props.proposal.redirect.to ??
-                                            "otra persona"}
-                                    </p>
+                                <div className="rounded-lg bg-soft px-3 py-2.5">
+                                    <p className="text-[12px] text-muted">Pasárselo a {props.proposal.redirect.to ?? 'otra persona'}</p>
                                     <p className="mt-1 max-h-[16vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">
                                         {props.proposal.redirect.text}
                                     </p>
@@ -244,105 +241,62 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({
                             )}
 
                             {props.proposal.other_actions.length > 0 && (
-                                <ul className="mt-2.5 space-y-1 text-[13px]">
-                                    {props.proposal.other_actions.map(
-                                        (action) => (
-                                            <li key={action}>+ {action}</li>
-                                        ),
-                                    )}
+                                <ul className="space-y-1 text-[13px]">
+                                    {props.proposal.other_actions.map((action) => (
+                                        <li key={action}>+ {action}</li>
+                                    ))}
                                 </ul>
                             )}
 
-                            {props.proposal.question && (
-                                <p className="mt-2.5 text-[13px] text-accent">
-                                    {props.proposal.question}
-                                </p>
-                            )}
+                            {props.proposal.question && <p className="text-[13px] text-accent">{props.proposal.question}</p>}
                         </>
-                    ) : alert.state === "planning" ? (
-                        <div
-                            className="space-y-2"
-                            aria-label="Preparando la propuesta"
-                        >
+                    ) : alert.state === 'planning' ? (
+                        <div className="space-y-2" aria-label="Preparando la propuesta">
                             <div className="alerts-shimmer h-4 w-4/5 rounded" />
                             <div className="alerts-shimmer h-16 rounded-lg" />
                             <div className="alerts-shimmer h-3 w-1/2 rounded" />
                         </div>
                     ) : (
-                        <p className="text-[13.5px] text-muted">
-                            {pending
-                                ? "Sin propuesta todavía. Dime cómo quieres responder."
-                                : "Sin propuesta."}
-                        </p>
+                        <p className="text-[13.5px] text-muted">{pending ? 'Sin propuesta todavía. Dime cómo quieres responder.' : 'Sin propuesta.'}</p>
                     )}
                 </section>
             </div>
 
             {props.task && (
-                <section
-                    aria-label="Agendado"
-                    className="mt-4 rounded-xl border border-line p-4"
-                >
-                    <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">
-                        Agendador · {props.task.title}
-                    </h4>
+                <section aria-label="Agendado" className="mt-4 rounded-xl border border-line p-4">
+                    <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
                     <AgendaTaskSummary task={props.task} compact />
                 </section>
             )}
 
             {/* Every action in one row: how Slack should treat this kind of message, and what to do with this one. */}
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[12.5px]">
-                {pending && props.source_label === "Slack" && (
-                    <SlackCorrections
-                        className="mr-auto"
-                        onCorrect={(correction) =>
-                            runTool("correct_slack_triage", {
-                                alert_id: alert.id,
-                                correction,
-                            })
-                        }
-                    />
-                )}
-                {busy && (
-                    <span
-                        aria-hidden
-                        className="size-3 animate-spin rounded-full border-[1.5px] border-muted border-t-transparent"
-                    />
-                )}
-                <span className="ml-auto flex gap-2">
-                    {pending ? (
-                        <>
-                            <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => change("dismissed")}
-                                className="rounded-full border border-line px-3 py-1 hover:bg-soft disabled:opacity-50"
-                            >
-                                Descartar
-                            </button>
-                            <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => change("done")}
-                                className="rounded-full bg-ink px-3 py-1 font-medium text-bg hover:opacity-90 disabled:opacity-50"
-                            >
-                                Ya está resuelta
-                            </button>
-                        </>
-                    ) : (
-                        alert.state !== "judging" && (
-                            <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => change("reopen")}
-                                className="rounded-full border border-line px-3 py-1 hover:bg-soft disabled:opacity-50"
-                            >
-                                {closed ? "Reabrir" : "Dejar pendiente"}
-                            </button>
-                        )
+            {!sent && (
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[13px]">
+                    {pending && props.source_label === 'Slack' && (
+                        <SlackCorrections className="mr-auto" onCorrect={(correction) => runTool('correct_slack_triage', { alert_id: alert.id, correction })} />
                     )}
-                </span>
-            </div>
+                    {busy && <span aria-hidden className="size-3 animate-spin rounded-full border-[1.5px] border-muted border-t-transparent" />}
+                    <span className="ml-auto flex gap-2">
+                        {pending ? (
+                            <>
+                                <button type="button" disabled={busy} onClick={() => change('dismissed')} className={secondary}>
+                                    Descartar
+                                </button>
+                                {/* With a reply ready to send, sending is the main thing to do. */}
+                                <button type="button" disabled={busy} onClick={() => change('done')} className={canSend ? secondary : primary}>
+                                    Ya está resuelta
+                                </button>
+                            </>
+                        ) : (
+                            alert.state !== 'judging' && (
+                                <button type="button" disabled={busy} onClick={() => change('reopen')} className={secondary}>
+                                    {closed ? 'Reabrir' : 'Dejar pendiente'}
+                                </button>
+                            )
+                        )}
+                    </span>
+                </div>
+            )}
         </CanvasFrame>
     );
 };

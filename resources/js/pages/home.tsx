@@ -294,7 +294,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
         <>
             <Head title="Inicio" />
 
-            <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
+            <div className="relative grid h-full grid-rows-[auto_minmax(0,1fr)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
                 <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1.5 text-[13px] text-muted md:grid-cols-[1fr_auto_1fr]">
                     <div className="flex min-w-0 items-center gap-3">
                         <Wordmark to="/" />
@@ -346,7 +346,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                     </div>
                 </header>
 
-                <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 py-4 ${canvases.length > 1 ? 'overflow-auto md:flex md:flex-col md:overflow-hidden' : 'overflow-auto'}`}>
+                <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 pt-3 ${canvases.length > 1 ? 'overflow-auto pb-(--dock-room) md:flex md:flex-col md:overflow-hidden md:pb-0' : 'overflow-auto pb-(--dock-room)'}`}>
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
                         !opening && (
@@ -368,7 +368,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                                 }`}
                             >
                                 {canvases.map((canvas, index) => (
-                                    <div key={canvas.id} className={canvases.length > 1 ? 'min-w-0 md:min-h-0 md:overflow-y-auto' : 'min-w-0'}>
+                                    <div key={canvas.id} className={canvases.length > 1 ? 'min-w-0 md:min-h-0 md:overflow-y-auto md:pb-(--dock-room)' : 'min-w-0'}>
                                         <Canvas directive={canvas.directive} index={index + 1} />
                                     </div>
                                 ))}

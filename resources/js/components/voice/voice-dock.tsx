@@ -163,60 +163,60 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
         <section
             ref={dock}
             style={lift > 0 ? { transform: `translateY(-${lift}px)` } : undefined}
-            className="chrome relative mx-auto w-full max-w-[760px] pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-center"
+            className="chrome pointer-events-none absolute inset-x-0 bottom-0 z-20 px-[max(1rem,env(safe-area-inset-left))] pt-6 pb-[max(1rem,env(safe-area-inset-bottom))] text-center"
         >
-            <div
-                aria-hidden
-                className="pointer-events-none absolute -inset-x-4 -top-10 h-10 bg-linear-to-b from-transparent to-bg"
-            />
+            {/* Floats over the canvas: frosted glass that fades in from the top, so what is behind still shows. */}
+            <div aria-hidden className="absolute inset-0 bg-bg/70 [mask-image:linear-gradient(to_bottom,transparent,black_2.5rem)] backdrop-blur-xl" />
 
-            <div className="mb-2.5">
-                <VoiceOrb status={voice.status} />
-            </div>
+            <div className="pointer-events-auto relative mx-auto w-full max-w-[760px]">
+                <div className="mb-1.5">
+                    <VoiceOrb status={voice.status} />
+                </div>
 
-            {agent && (
-                <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink">
-                    <i aria-hidden className="size-1.5 rounded-full bg-accent" />
-                    {agent}
-                </p>
-            )}
-
-            <SaidLine voice={voice} />
-
-            <p aria-live="polite" className="sr-only">
-                {voice.status === 'error' ? voice.error : showsReply ? voice.reply : placeholderReply(voice)}
-            </p>
-
-            <p
-                aria-hidden
-                data-reply
-                className={
-                    'mx-auto mt-1.5 min-h-[30px] max-w-[680px] text-[18px] leading-[1.35] tracking-[-0.015em] text-pretty md:text-[21px] md:leading-[1.4] ' +
-                    (voice.status === 'error' ? 'text-crit' : showsReply ? 'text-ink' : 'text-faint')
-                }
-            >
-                {voice.status === 'error' ? voice.error : showsReply ? typedReply : placeholderReply(voice)}
-            </p>
-
-            <div className="mt-4 flex justify-center">
-                {voice.active ? (
-                    <button
-                        type="button"
-                        onClick={voice.stop}
-                        className="min-h-14 w-full rounded-2xl border border-line bg-surface text-[16px] font-medium text-ink shadow-card hover:bg-soft md:min-h-0 md:w-auto md:rounded-full md:px-4 md:py-1.5 md:text-[13px] md:font-normal md:shadow-none"
-                    >
-                        Terminar
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => void voice.start('voice')}
-                        className="inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-accent text-[17px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:w-auto md:gap-2 md:rounded-full md:px-5 md:py-2 md:text-[14px]"
-                    >
-                        <MicrophoneIcon />
-                        Hablar
-                    </button>
+                {agent && (
+                    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink">
+                        <i aria-hidden className="size-1.5 rounded-full bg-accent" />
+                        {agent}
+                    </p>
                 )}
+
+                <SaidLine voice={voice} />
+
+                <p aria-live="polite" className="sr-only">
+                    {voice.status === 'error' ? voice.error : showsReply ? voice.reply : placeholderReply(voice)}
+                </p>
+
+                <p
+                    aria-hidden
+                    data-reply
+                    className={
+                        'mx-auto mt-1 line-clamp-3 min-h-[26px] max-w-[680px] text-[17px] leading-[1.35] tracking-[-0.015em] text-pretty md:text-[19px] md:leading-[1.4] ' +
+                        (voice.status === 'error' ? 'text-crit' : showsReply ? 'text-ink' : 'text-faint')
+                    }
+                >
+                    {voice.status === 'error' ? voice.error : showsReply ? typedReply : placeholderReply(voice)}
+                </p>
+
+                <div className="mt-2.5 flex justify-center">
+                    {voice.active ? (
+                        <button
+                            type="button"
+                            onClick={voice.stop}
+                            className="min-h-14 w-full rounded-2xl border border-line bg-surface text-[16px] font-medium text-ink shadow-card hover:bg-soft md:min-h-0 md:w-auto md:rounded-full md:px-4 md:py-1.5 md:text-[13px] md:font-normal md:shadow-none"
+                        >
+                            Terminar
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => void voice.start('voice')}
+                            className="inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-accent text-[17px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:w-auto md:gap-2 md:rounded-full md:px-5 md:py-2 md:text-[14px]"
+                        >
+                            <MicrophoneIcon />
+                            Hablar
+                        </button>
+                    )}
+                </div>
             </div>
         </section>
     );

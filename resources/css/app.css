@@ -8,6 +8,8 @@
  * light and dark themes. `data-theme` on <html> forces a theme.
  */
 :root {
+    /* What the floating voice dock covers at the bottom of the canvas; its faded top can sit over content. */
+    --dock-room: calc(var(--voice-dock-height, 9rem) - 1.5rem);
     --bg: #fbfbfa;
     --surface: #ffffff;
     --soft: #f3f3f1;
