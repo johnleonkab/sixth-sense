@@ -5,7 +5,7 @@ namespace App\Voice\Tools\Agenda;
 use App\Models\User;
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Scheduler;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\AgendaTaskView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -64,7 +64,7 @@ class CancelScheduledTask implements VoiceTool
 
         return new ToolResult(
             output: ['status' => $task->status->label(), 'say' => "Quitado: «{$task->title}» ya no está en tu calendario."],
-            canvas: new Canvas('agenda.task', ['task' => $task->toCard($context->timezone()), 'action' => null]),
+            canvas: AgendaTaskView::canvas($user, $task, $context->timezone()),
         );
     }
 }

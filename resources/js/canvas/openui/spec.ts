@@ -262,7 +262,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     const ItemList = defineComponent({
         name: 'ItemList',
         description:
-            'Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante) y ref (cómo se abre, si viene en las filas de una Query). Pulsar uno lo abre. Conserva los n y ref que vengan en los datos.',
+            'Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante), ref (cómo se abre, si viene en las filas de una Query) y actions (botones pequeños bajo el elemento: label y ref). Pulsar uno lo abre. Conserva los n, ref y actions que vengan en los datos.',
         props: z.object({
             items: z.array(
                 z.object({
@@ -275,6 +275,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
                     status: z.string().optional(),
                     highlight: z.boolean().optional(),
                     ref: z.string().optional(),
+                    actions: z.array(z.object({ label: z.string(), ref: z.string() })).optional(),
                 }),
             ),
             empty: z.string().optional(),
@@ -338,6 +339,12 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         params: z.object({ n: z.number(), ref: z.string().optional() }),
     });
 
+    const Do = defineAction({
+        name: 'Do',
+        description: 'Hace lo que dice ref sin pasar por ti: abrir algo, o proponer un cambio que espera el sí. Solo con refs que vengan de los datos o de la vista; nunca te los inventes.',
+        params: z.object({ ref: z.string() }),
+    });
+
     const seriesSchema = z.object({ labels: z.array(z.string()), values: z.array(z.number()) });
 
     const GroupCount = defineFunction({
@@ -386,7 +393,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
             { name: 'Listas que se abren', components: ['ItemList'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
             { name: 'Cambios', components: ['Quote', 'Draft', 'Proposal'], notes: ['Un Proposal por cambio propuesto, al final de la vista, con lo que cambiará encima (Draft para el texto, Quote para lo que responde).'] },
         ],
-        actions: [OpenItem],
+        actions: [OpenItem, Do],
         root: 'View',
     });
 }

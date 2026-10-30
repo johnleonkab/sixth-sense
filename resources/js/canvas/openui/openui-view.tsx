@@ -61,6 +61,16 @@ const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui
             return;
         }
 
+        if (event.type === 'Do') {
+            const does = openRef(event.params.ref as string | undefined);
+
+            if (does) {
+                runTool(does.tool, does.args);
+            }
+
+            return;
+        }
+
         if (event.type === 'open_url') {
             const url = String(event.params.url ?? '');
 

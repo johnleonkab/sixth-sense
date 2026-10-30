@@ -6,7 +6,7 @@ use App\Alerts\Intents\AutonomyLevel;
 use App\Alerts\Intents\SlackAction;
 use App\Alerts\Intents\SlackAutonomy;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\SlackViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -69,7 +69,7 @@ class LowerSlackAutonomy implements VoiceTool
 
         return new ToolResult(
             output: ['level' => $level->value, 'label' => $action->label()],
-            canvas: new Canvas('slack.autonomy', $page),
+            canvas: SlackViews::autonomy($user, $page),
         );
     }
 }

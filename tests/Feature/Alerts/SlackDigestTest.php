@@ -22,17 +22,23 @@ test('messages left aside since yesterday are shown and each open is counted', f
         'timezone' => 'Europe/Madrid',
     ]);
 
-    $open()
+    $digest = $open()
         ->assertOk()
-        ->assertJsonPath('canvas.view', 'slack.digest')
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.props.title', '2 dejados pasar desde ayer')
-        ->assertJsonPath('canvas.props.items.0.excerpt', 'para que lo sepas')
-        ->assertJsonPath('canvas.props.items.0.action_label', 'Solo para saber')
-        ->assertJsonPath('canvas.props.items.0.who', 'Julián Soto')
-        ->assertJsonPath('canvas.props.items.0.reason', 'Anuncio del canal, para que lo sepas.')
-        ->assertJsonPath('canvas.props.items.1.excerpt', 'el anuncio de ayer')
-        ->assertJsonPath('canvas.props.items.1.action_label', 'Ignorar')
+        ->assertJsonPath('canvas.props.items.0.tool', 'show_slack_conversation')
         ->assertJsonPath('output.total', 2);
+
+    // Each one opens its conversation, and its three corrections propose a rule without the assistant.
+    $decision = $user->slackTriageDecisions()->where('action', 'notice')->sole();
+
+    expect($digest->json('canvas.props.ui'))
+        ->toContain('title: "para que lo sepas"')
+        ->toContain('eyebrow: "Julián Soto · ')
+        ->toContain('snippet: "Anuncio del canal, para que lo sepas."')
+        ->toContain("{label: \"No hace falta\", ref: \"correct:{$decision->id}:not_important\"}")
+        ->toContain('title: "el anuncio de ayer"')
+        ->toBeValidOpenUi();
 
     $open();
 

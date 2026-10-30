@@ -8,6 +8,7 @@ use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Scheduler;
 use App\Scheduling\SchedulingRequest;
 use App\Scheduling\Urgency;
+use App\Voice\OpenUi\Views\AgendaTaskView;
 use App\Voice\Tools\Calendar\CalendarCanvas;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
@@ -99,10 +100,7 @@ class ScheduleTaskTool implements VoiceTool
                     default => $task->error,
                 },
             ], fn (mixed $value): bool => $value !== null),
-            canvas: new Canvas('agenda.task', [
-                'task' => $task->toCard($context->timezone()),
-                'action' => $task->pendingAction?->toState(),
-            ]),
+            canvas: AgendaTaskView::canvas($user, $task, $context->timezone()),
             beside: $task->status === AgendaTaskStatus::Conflict ? $this->calendarBeside($user, $task, $context) : null,
         );
     }

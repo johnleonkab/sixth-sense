@@ -269,10 +269,10 @@ test('with no composed view on screen there is nothing to save', function () {
         ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'No hay ninguna vista'));
 });
 
-test('an item from a query opens only an alert review or a day of the calendar', function () {
+test('a ref in a view runs only the tools on its list: reading, proposing, or being more careful', function () {
     $script = <<<'JS'
         const { openRef } = await import('./resources/js/canvas/openui/refs.ts');
-        console.log(JSON.stringify(['alert:42', 'day:2026-10-31', 'mcp_call:x', 'alert:', undefined].map((ref) => openRef(ref))));
+        console.log(JSON.stringify(['alert:42', 'day:2026-10-31', 'mcp_call:x', 'alert:', undefined, 'correct:7:not_important', 'correct:7:send_now', 'autonomy-lower:reply:draft'].map((ref) => openRef(ref))));
         JS;
 
     $output = shell_exec('cd '.escapeshellarg(base_path()).' && node --input-type=module -e '.escapeshellarg($script).' 2>&1');
@@ -283,6 +283,9 @@ test('an item from a query opens only an alert review or a day of the calendar',
         null,
         null,
         null,
+        ['tool' => 'correct_slack_triage', 'args' => ['decision_id' => 7, 'correction' => 'not_important']],
+        null,
+        ['tool' => 'lower_slack_autonomy', 'args' => ['action' => 'reply', 'level' => 'draft']],
     ], (string) $output);
 })->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');
 

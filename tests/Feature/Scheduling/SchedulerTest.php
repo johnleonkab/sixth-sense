@@ -243,21 +243,28 @@ function runAgendaTool(string $tool, array $arguments): TestResponse
 
 test('by voice: it says when, and why that urgency, and it can be undone', function () {
     $booked = runAgendaTool('schedule_task', ['what' => 'Revisar el PRD del prepago', 'effort_minutes' => 30])
-        ->assertJsonPath('canvas.view', 'agenda.task')
-        ->assertJsonPath('canvas.props.task.status', 'scheduled')
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('output.when', 'miércoles 14 de octubre, 10:00')
         ->assertJsonPath('output.urgency', 'Esta semana')
         ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.')
         ->assertJsonPath('beside', null);
 
-    runAgendaTool('cancel_scheduled_task', ['task_id' => $booked->json('output.task_id')])
-        ->assertJsonPath('canvas.props.task.status', 'cancelled')
+    // Taking it off the calendar is a button on the view, without the assistant.
+    expect($booked->json('canvas.props.ui'))
+        ->toContain('Chips(["Agendada", "Esta semana", "30 min"])')
+        ->toContain('Button("Quitar del calendario", @Do("task-cancel:'.$booked->json('output.task_id').'"), "tertiary")')
+        ->toBeValidOpenUi();
+
+    $cancelled = runAgendaTool('cancel_scheduled_task', ['task_id' => $booked->json('output.task_id')])
         ->assertJsonPath('output.say', 'Quitado: «Revisar el PRD del prepago» ya no está en tu calendario.');
+
+    expect($cancelled->json('canvas.props.ui'))->toContain('Chips(["Cancelada"')->not->toContain('Quitar del calendario');
 });
 
 test('when nothing fits, the day stays beside the task so the person can decide', function () {
     runAgendaTool('schedule_task', ['what' => 'Contestar a riesgos', 'effort_minutes' => 300, 'urgency' => 'today'])
-        ->assertJsonPath('canvas.props.task.status', 'conflict')
+        ->assertJsonPath('output.status', fn (string $status): bool => $status !== '')
+        ->assertJsonPath('canvas.props.ui', fn (string $ui): bool => str_contains($ui, 'Chips(["Sin hueco"'))
         ->assertJsonPath('beside.view', 'calendar.day')
         ->assertJsonPath('beside.props.from', '2026-10-14');
 });

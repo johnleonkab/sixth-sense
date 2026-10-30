@@ -351,7 +351,18 @@ function Proposal({ props }: Props<{ action: number; verb?: string; done?: strin
     return <ActionBar initial={state} verb={verb} doneLabel={props.done ?? 'Hecho'} countdownLabel={verb === 'enviar' ? undefined : `Se va a ${verb}`} />;
 }
 
-type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean; ref?: string };
+type Item = {
+    n: number;
+    title: string;
+    eyebrow?: string;
+    snippet?: string;
+    match?: string;
+    meta?: string;
+    status?: string;
+    highlight?: boolean;
+    ref?: string;
+    actions?: { label: string; ref: string }[];
+};
 
 /** Filter tabs: the chosen one is a $variable, and the queries that use it load again. */
 function Tabs({ props }: Props<{ options: { value: string; label: string }[]; value: unknown }>) {
@@ -440,6 +451,18 @@ function ItemList({ props }: Props<{ items: Item[]; empty?: string }>) {
                             {item.snippet && (
                                 <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">
                                     <Snippet text={item.snippet} match={item.match} />
+                                </span>
+                            )}
+                            {item.actions && item.actions.length > 0 && (
+                                // Its own buttons do their thing, not open the item.
+                                <span className="mt-1.5 block" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                                    <UiButtons className="-ml-2.5 gap-0.5">
+                                        {item.actions.map((action) => (
+                                            <UiButton key={action.ref} variant="tertiary" size="small" onClick={() => void trigger(action.label, undefined, { type: 'Do', params: { ref: action.ref } })}>
+                                                {action.label}
+                                            </UiButton>
+                                        ))}
+                                    </UiButtons>
                                 </span>
                             )}
                         </span>

@@ -4,7 +4,7 @@ namespace App\Voice\Tools\Slack;
 
 use App\Alerts\Intents\SlackAutonomy;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\SlackViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -47,7 +47,7 @@ class ShowSlackAutonomy implements VoiceTool
                 'board' => $page['board'],
                 'shown_on_screen' => true,
             ],
-            canvas: new Canvas('slack.autonomy', $page),
+            canvas: SlackViews::autonomy($user, $page),
         );
     }
 }

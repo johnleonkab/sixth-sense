@@ -76,6 +76,21 @@ test('a category rises to act only after yes and the sample clears the bar', fun
         ]);
 });
 
+test('by voice, each level says what it means, and raising shows the bar that waits for the yes', function () {
+    $user = User::factory()->create();
+    autonomyDecisions($user, 'redirect', 30, 21);
+    $user->slackAutonomyLevels()->create(['action' => SlackAction::Reply, 'level' => AutonomyLevel::Act]);
+
+    $raise = $this->actingAs($user)->postJson(route('voice.tools.run', 'propose_slack_autonomy'), ['arguments' => ['action' => 'redirect'], 'timezone' => 'Europe/Madrid'])
+        ->assertJsonPath('canvas.view', 'openui.view');
+
+    expect($raise->json('canvas.props.ui'))
+        ->toContain('Hacer: Lo envío yo, con unos segundos para deshacer.')
+        ->toContain('Button("Bajar a «Proponer»", @Do("autonomy-lower:reply:draft"), "tertiary")')
+        ->toContain('Proposal('.$raise->json('output.pending_action_id').', "subir", "Nivel subido")')
+        ->toBeValidOpenUi();
+});
+
 test('a rise that slips under the bar before yes does not land', function () {
     $user = User::factory()->create();
     autonomyDecisions($user, 'redirect', 30, 21);

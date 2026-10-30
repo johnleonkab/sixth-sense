@@ -23,7 +23,7 @@ Para mostrar en pantalla datos que no tienen una vista propia (resultados de un 
 ## Component Signatures
 
 Arguments marked with ? are optional. Sub-components can be inline or referenced; prefer references for better streaming.
-Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@Run, @ToAssistant, @OpenUrl, @Set, @Reset, @OpenItem).
+Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@Run, @ToAssistant, @OpenUrl, @Set, @Reset, @OpenItem, @Do).
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
@@ -50,7 +50,7 @@ DonutChart(title?: string, labels: string[], values: number[], unit?: string, hi
 Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.
 
 ### Listas que se abren
-ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante) y ref (cómo se abre, si viene en las filas de una Query). Pulsar uno lo abre. Conserva los n y ref que vengan en los datos.
+ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string, actions?: {label: string, ref: string}[]}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante), ref (cómo se abre, si viene en las filas de una Query) y actions (botones pequeños bajo el elemento: label y ref). Pulsar uno lo abre. Conserva los n, ref y actions que vengan en los datos.
 Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
 
 ### Cambios
@@ -136,6 +136,7 @@ Available steps:
 - @Set(variable: $variable, value: any) — Set a $variable to a specific value
 - @Reset(variable: $variable) — Reset $variables to their declared defaults; pass several to reset each (e.g. @Reset($title, $priority) restores $title="" and $priority="medium")
 - @OpenItem(n: number, ref?: string) — Abre el elemento con ese número de una ItemList de la vista.
+- @Do(ref: string) — Hace lo que dice ref sin pasar por ti: abrir algo, o proponer un cambio que espera el sí. Solo con refs que vengan de los datos o de la vista; nunca te los inventes.
 
 Example — mutation + refresh + reset (PREFERRED pattern):
 ```

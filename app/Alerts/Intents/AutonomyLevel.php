@@ -21,6 +21,18 @@ enum AutonomyLevel: string
         };
     }
 
+    /**
+     * What this level means for the person, in one sentence.
+     */
+    public function explanation(): string
+    {
+        return match ($this) {
+            self::Watch => 'Solo te aviso y te explico por qué; tú decides qué hacer.',
+            self::Draft => 'Te dejo el borrador listo; lo envías tú con un toque o con un «sí».',
+            self::Act => 'Lo envío yo, con unos segundos para deshacer.',
+        };
+    }
+
     public function rank(): int
     {
         return match ($this) {

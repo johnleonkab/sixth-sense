@@ -5,7 +5,7 @@ namespace App\Voice\Tools\Slack;
 use App\Alerts\Intents\SlackAction;
 use App\Alerts\Intents\SlackAutonomy;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\SlackViews;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -66,10 +66,7 @@ class ProposeSlackAutonomy implements VoiceTool
                 'label' => $pending->label,
                 'needs_confirmation' => true,
             ],
-            canvas: new Canvas('slack.autonomy', [
-                ...$page,
-                'action' => $pending->toState(),
-            ]),
+            canvas: SlackViews::autonomy($user, $page, $pending),
         );
     }
 }

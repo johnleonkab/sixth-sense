@@ -209,6 +209,8 @@ class SlackAutonomy
                 'can_lower' => $current !== AutonomyLevel::Watch,
                 'lower_level' => $current === AutonomyLevel::Act ? AutonomyLevel::Draft->value : AutonomyLevel::Watch->value,
                 'can_raise' => $target !== null,
+                'raise_level' => $target?->value,
+                'explanation' => $current->explanation(),
                 'raise_reason' => $target === null && $current !== AutonomyLevel::Act ? $this->blocked($user, $action) : null,
             ];
         }
