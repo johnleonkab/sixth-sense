@@ -1,15 +1,17 @@
 import { Renderer } from '@openuidev/react-lang';
 import type { ActionEvent } from '@openuidev/react-lang';
+import { useCallback, useEffect } from 'react';
 
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import { openUiLibrary } from '@/canvas/openui/library';
+import { LiveItemsContext, openRef, setLiveItems } from '@/canvas/openui/refs';
+import type { OpenableItem } from '@/canvas/openui/refs';
 import { datasetNames } from '@/canvas/openui/spec';
 import type { CanvasComponent } from '@/canvas/types';
 import { browserTimezone, postJson } from '@/lib/http';
 
-/** How to open the item numbered n of the view's lists: a tool and its arguments. */
-export type OpenableItem = { n: number; title: string; tool: string; args: Record<string, unknown> };
+export type { OpenableItem };
 
 export type OpenUiViewProps = {
     title: string;
@@ -42,10 +44,13 @@ const savedDate = (iso: string) => new Intl.DateTimeFormat('es-ES', { day: 'nume
 
 const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui, items, saved_as: savedAs, saved_at: savedAt }) => {
     const { tell, runTool } = useCanvas();
+    const reportItems = useCallback((shown: OpenableItem[]) => setLiveItems(index, shown.length > 0 ? shown : null), [index]);
+
+    useEffect(() => () => setLiveItems(index, null), [index]);
 
     const act = (event: ActionEvent) => {
         if (event.type === 'OpenItem') {
-            const item = items?.find((candidate) => candidate.n === Number(event.params.n));
+            const item = openRef(event.params.ref as string | undefined) ?? items?.find((candidate) => candidate.n === Number(event.params.n));
 
             if (item) {
                 runTool(item.tool, item.args);
@@ -80,7 +85,9 @@ const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui
                     Guardada como «{savedAs}»{savedAt && ` · datos del ${savedDate(savedAt)}`}
                 </p>
             )}
-            <Renderer response={ui} library={openUiLibrary} isStreaming={false} onAction={act} toolProvider={toolProvider} />
+            <LiveItemsContext.Provider value={reportItems}>
+                <Renderer response={ui} library={openUiLibrary} isStreaming={false} onAction={act} toolProvider={toolProvider} />
+            </LiveItemsContext.Provider>
         </CanvasFrame>
     );
 };

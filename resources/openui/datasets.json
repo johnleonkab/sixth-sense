@@ -111,20 +111,34 @@
     },
     {
         "name": "alerts",
-        "description": "Avisos como filas (source, actor, title, why, status, received). status: pending para los pendientes, all para los de los últimos days días.",
+        "description": "Avisos como filas, los más recientes primero. status: pending (por defecto, los que esperan respuesta), all, addressed (resueltos o descartados) o routine (sin importancia). Para listarlos: ItemList con n, ref, headline, context, when, proposal, closed y pending (highlight).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "status": {
                     "type": "string",
                     "enum": [
+                        "all",
                         "pending",
-                        "all"
+                        "addressed",
+                        "routine"
+                    ]
+                },
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "gmail",
+                        "slack",
+                        "calendar"
                     ]
                 },
                 "days": {
                     "type": "number",
-                    "description": "Con all, cuántos días atrás (por defecto 7, como mucho 90)."
+                    "description": "Solo los de los últimos N días (como mucho 90)."
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Cuántos, como mucho 500."
                 }
             }
         },
@@ -136,6 +150,12 @@
                     "items": {
                         "type": "object",
                         "properties": {
+                            "n": {
+                                "type": "number"
+                            },
+                            "ref": {
+                                "type": "string"
+                            },
                             "source": {
                                 "type": "string"
                             },
@@ -153,6 +173,24 @@
                             },
                             "received": {
                                 "type": "string"
+                            },
+                            "headline": {
+                                "type": "string"
+                            },
+                            "context": {
+                                "type": "string"
+                            },
+                            "when": {
+                                "type": "string"
+                            },
+                            "proposal": {
+                                "type": "string"
+                            },
+                            "closed": {
+                                "type": "string"
+                            },
+                            "pending": {
+                                "type": "boolean"
                             }
                         }
                     }

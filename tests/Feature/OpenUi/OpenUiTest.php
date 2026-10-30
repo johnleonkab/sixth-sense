@@ -263,3 +263,20 @@ test('with no composed view on screen there is nothing to save', function () {
         ->postJson(route('voice.tools.run', 'save_view'), ['arguments' => ['name' => 'Mi lunes']])
         ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'No hay ninguna vista'));
 });
+
+test('an item from a query opens only an alert review or a day of the calendar', function () {
+    $script = <<<'JS'
+        const { openRef } = await import('./resources/js/canvas/openui/refs.ts');
+        console.log(JSON.stringify(['alert:42', 'day:2026-10-31', 'mcp_call:x', 'alert:', undefined].map((ref) => openRef(ref))));
+        JS;
+
+    $output = shell_exec('cd '.escapeshellarg(base_path()).' && node --input-type=module -e '.escapeshellarg($script).' 2>&1');
+
+    expect(json_decode((string) $output, true))->toBe([
+        ['tool' => 'review_alert', 'args' => ['alert_id' => 42]],
+        ['tool' => 'show_calendar', 'args' => ['start_date' => '2026-10-31']],
+        null,
+        null,
+        null,
+    ], (string) $output);
+})->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');

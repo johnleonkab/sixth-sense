@@ -1,4 +1,4 @@
-import { action, createLibrary, defineAction, defineComponent, defineFunction } from '@openuidev/react-lang';
+import { action, createLibrary, defineAction, defineComponent, defineFunction, reactive } from '@openuidev/react-lang';
 import type { ComponentRenderer, Library } from '@openuidev/react-lang';
 import { z } from 'zod/v4';
 
@@ -28,7 +28,8 @@ export type BlockName =
     | 'List'
     | 'Button'
     | 'ItemList'
-    | 'Chips';
+    | 'Chips'
+    | 'Tabs';
 
 /** What the grouping functions return: chart-ready labels and values, in the same order. */
 export type Series = { labels: string[]; values: number[] };
@@ -214,7 +215,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     const ItemList = defineComponent({
         name: 'ItemList',
         description:
-            'Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status y highlight (sin leer, importante). Pulsar uno lo abre. Conserva los n que vengan en los datos.',
+            'Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante) y ref (cómo se abre, si viene en las filas de una Query). Pulsar uno lo abre. Conserva los n y ref que vengan en los datos.',
         props: z.object({
             items: z.array(
                 z.object({
@@ -226,6 +227,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
                     meta: z.string().optional(),
                     status: z.string().optional(),
                     highlight: z.boolean().optional(),
+                    ref: z.string().optional(),
                 }),
             ),
             empty: z.string().optional(),
@@ -242,7 +244,17 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Chips'),
     });
 
-    const leaves = [Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
+    const Tabs = defineComponent({
+        name: 'Tabs',
+        description: 'Pestañas para filtrar: cada opción tiene value y label, y la elegida se guarda en una $variable que las Query usan en sus argumentos.',
+        props: z.object({
+            options: z.array(z.object({ value: z.string(), label: z.string() })),
+            value: reactive(z.string()),
+        }),
+        component: render('Tabs'),
+    });
+
+    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -276,7 +288,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     const OpenItem = defineAction({
         name: 'OpenItem',
         description: 'Abre el elemento con ese número de una ItemList de la vista.',
-        params: z.object({ n: z.number() }),
+        params: z.object({ n: z.number(), ref: z.string().optional() }),
     });
 
     const seriesSchema = z.object({ labels: z.array(z.string()), values: z.array(z.number()) });
@@ -314,11 +326,11 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 
     return createLibrary({
-        components: [View, Row, Card, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips],
+        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips],
         functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
-            { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Image', 'Document', 'Button'] },
+            { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Tabs', 'Image', 'Document', 'Button'] },
             {
                 name: 'Datos',
                 components: ['Metric', 'Table', 'BarChart', 'LineChart', 'DonutChart'],

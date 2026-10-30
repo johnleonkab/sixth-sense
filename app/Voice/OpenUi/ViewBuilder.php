@@ -50,18 +50,44 @@ class ViewBuilder
     }
 
     /**
-     * Add a block to the view (or keep it for a Row or Card, with $top false).
+     * Add a block to the view (or keep it for a Row or Card, with $top false),
+     * or only while $when holds.
      *
      * @param  list<mixed>  $arguments
      */
-    public function add(string $block, array $arguments, bool $top = true): Ref
+    public function add(string $block, array $arguments, bool $top = true, ?Ref $when = null): Ref
     {
         $ref = new Ref(lcfirst($block).(++$this->count));
-        $this->statements[] = "{$ref->name} = ".OpenUi::call($block, $arguments);
+        $call = OpenUi::call($block, $arguments);
+        $this->statements[] = "{$ref->name} = ".($when ? "{$when->name} ? {$call} : null" : $call);
 
         if ($top) {
             $this->children[] = $ref;
         }
+
+        return $ref;
+    }
+
+    /**
+     * A $variable the view's tabs and buttons change, and its queries read.
+     */
+    public function variable(string $name, string|int $default): Ref
+    {
+        $this->statements[] = "\${$name} = ".OpenUi::value($default);
+
+        return new Ref("\${$name}");
+    }
+
+    /**
+     * The rows of a dataset, asked for while the view is on screen: again
+     * when an argument's $variable changes, and every $refresh seconds.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    public function query(string $dataset, array $arguments, ?int $refresh = null): Ref
+    {
+        $ref = new Ref('query'.(++$this->count));
+        $this->statements[] = "{$ref->name} = ".OpenUi::call('Query', [$dataset, $arguments, ['rows' => []], $refresh]);
 
         return $ref;
     }

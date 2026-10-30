@@ -1,7 +1,8 @@
-import { useTriggerAction } from '@openuidev/react-lang';
-import { useState } from 'react';
+import { useIsQueryLoading, useStateField, useTriggerAction } from '@openuidev/react-lang';
+import { useContext, useEffect, useState } from 'react';
 import type { ComponentRenderProps } from '@openuidev/react-lang';
 
+import { LiveItemsContext, openRef } from '@/canvas/openui/refs';
 import { buildLibrary, top } from '@/canvas/openui/spec';
 
 /**
@@ -296,7 +297,29 @@ function Button({ props }: Props<{ label: string; action?: unknown }>) {
     );
 }
 
-type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean };
+type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean; ref?: string };
+
+/** Filter tabs: the chosen one is a $variable, and the queries that use it load again. */
+function Tabs({ props }: Props<{ options: { value: string; label: string }[]; value: unknown }>) {
+    const field = useStateField<string>('tabs', props.value as string);
+
+    return (
+        <div role="tablist" aria-label="Filtrar" className="flex flex-wrap gap-1.5">
+            {props.options.map((option) => (
+                <button
+                    key={option.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={field.value === option.value}
+                    onClick={() => field.setValue(option.value)}
+                    className={`rounded-full px-3 py-1 text-[12.5px] transition-colors ${field.value === option.value ? 'bg-ink text-bg' : 'border border-line hover:bg-soft'}`}
+                >
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 /** The snippet with where the search matched marked, as search results showed it. */
 function Snippet({ text, match }: { text: string; match?: string }) {
@@ -318,16 +341,31 @@ function Snippet({ text, match }: { text: string; match?: string }) {
 /** Numbered so the person can say "abre el 2"; a click opens it without asking the model. */
 function ItemList({ props }: Props<{ items: Item[]; empty?: string }>) {
     const trigger = useTriggerAction();
+    const loading = useIsQueryLoading();
+    const report = useContext(LiveItemsContext);
+    const items = Array.isArray(props.items) ? props.items : [];
+    const shown = JSON.stringify(items.map((item) => [item.n, item.title, item.ref]));
 
-    if (props.items.length === 0) {
-        return <p className="text-[13px] text-muted">{props.empty ?? 'No hay nada que enseñar.'}</p>;
+    // Items from a Query change while the view is open: say which are there now, for "abre el 2".
+    useEffect(() => {
+        report?.(
+            items.flatMap((item) => {
+                const opens = openRef(item.ref);
+
+                return opens ? [{ n: item.n, title: item.title, ...opens }] : [];
+            }),
+        );
+    }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (items.length === 0) {
+        return <p className="text-[13px] text-muted">{loading ? 'Cargando…' : (props.empty ?? 'No hay nada que enseñar.')}</p>;
     }
 
-    const open = (item: Item) => void trigger(`Abre el ${item.n}`, undefined, { type: 'OpenItem', params: { n: item.n } });
+    const open = (item: Item) => void trigger(`Abre el ${item.n}`, undefined, { type: 'OpenItem', params: { n: item.n, ref: item.ref } });
 
     return (
-        <ol className="-mx-2.5">
-            {props.items.map((item) => (
+        <ol className={`-mx-2.5 transition-opacity ${loading ? 'opacity-60' : ''}`}>
+            {items.map((item) => (
                 <li key={item.n} className="border-t border-line first:border-t-0">
                     <div
                         role="button"
@@ -374,4 +412,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips });

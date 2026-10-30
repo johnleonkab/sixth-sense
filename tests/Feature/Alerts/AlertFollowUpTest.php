@@ -211,7 +211,21 @@ test('the history keeps everything, a page at a time, and can show only what was
         ->assertJsonCount(1, 'items')
         ->assertJsonPath('items.0.resolution', 'replied');
 
-    runAlertTool('show_alert_history', [])
-        ->assertJsonPath('canvas.view', 'alerts.history')
+    $history = runAlertTool('show_alert_history', ['filter' => 'addressed'])
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('output.pending', 32);
+
+    // The tabs and "Cargar más" change $variables the query reads: no turn of the assistant.
+    expect($history->json('canvas.props.ui'))
+        ->toContain('$status = "addressed"')
+        ->toContain('Query("alerts", {status: $status, limit: $limit}, {rows: []}, 60)')
+        ->toContain('Button("Cargar más", @Set($limit, $limit + 30))')
+        ->toBeValidOpenUi();
+
+    $rows = fn (array $arguments) => $this->actingAs($this->user)->postJson(route('canvas.query', 'alerts'), ['arguments' => $arguments])->assertOk()->json('rows');
+
+    expect($rows(['status' => 'all', 'limit' => 30]))->toHaveCount(30)
+        ->and($rows(['status' => 'all', 'limit' => 60]))->toHaveCount(33)
+        ->and($rows(['status' => 'addressed']))->toHaveCount(1)
+        ->and($rows(['status' => 'addressed'])[0])->toMatchArray(['closed' => 'Resuelta', 'pending' => false, 'ref' => "alert:{$this->email->id}"]);
 });

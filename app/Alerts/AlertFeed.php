@@ -3,9 +3,10 @@
 namespace App\Alerts;
 
 use App\Models\InboxItem;
-use Carbon\CarbonImmutable;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * What the screen lists: everything that came in lately (important or not,
@@ -32,11 +33,7 @@ class AlertFeed
      */
     public function history(User $user, string $filter = 'all', ?string $before = null): array
     {
-        $items = $user->inboxItems()
-            ->where(fn (Builder $items) => $items->whereNull('resolution')->orWhere('resolution', '!=', 'superseded'))
-            ->when($filter === 'pending', fn (Builder $items) => $items->where('status', AlertStatus::Pending))
-            ->when($filter === 'addressed', fn (Builder $items) => $items->whereIn('status', [AlertStatus::Resolved, AlertStatus::Dismissed]))
-            ->when($filter === 'routine', fn (Builder $items) => $items->where('triage', Triage::Routine))
+        $items = $this->filtered($user, $filter)
             ->when($before !== null, function (Builder $items) use ($before): void {
                 // "time|id": what came before it, and what came at the same moment with a lower id.
                 [$time, $id] = array_pad(explode('|', $before, 2), 2, PHP_INT_MAX);
@@ -44,7 +41,6 @@ class AlertFeed
                     ->where('received_at', '<', CarbonImmutable::parse($time))
                     ->orWhere(fn (Builder $same) => $same->where('received_at', CarbonImmutable::parse($time))->where('id', '<', (int) $id)));
             })
-            ->orderByDesc('id')
             ->limit(self::HISTORY_PAGE + 1)
             ->get();
 
@@ -55,6 +51,21 @@ class AlertFeed
             'items' => $page->map(fn (InboxItem $item): array => $item->toAlert())->values()->all(),
             'next' => $items->count() > self::HISTORY_PAGE ? $last->received_at->utc()->toIso8601String().'|'.$last->id : null,
         ];
+    }
+
+    /**
+     * The person's alerts under one of the history filters, newest first.
+     *
+     * @return HasMany<InboxItem, User>
+     */
+    public function filtered(User $user, string $filter): HasMany
+    {
+        return $user->inboxItems()
+            ->where(fn (Builder $items) => $items->whereNull('resolution')->orWhere('resolution', '!=', 'superseded'))
+            ->when($filter === 'pending', fn (Builder $items) => $items->where('status', AlertStatus::Pending))
+            ->when($filter === 'addressed', fn (Builder $items) => $items->whereIn('status', [AlertStatus::Resolved, AlertStatus::Dismissed]))
+            ->when($filter === 'routine', fn (Builder $items) => $items->where('triage', Triage::Routine))
+            ->orderByDesc('id');
     }
 
     /**

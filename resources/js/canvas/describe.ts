@@ -1,4 +1,5 @@
 import type { CanvasDirective } from '@/canvas/types';
+import { liveItems } from '@/canvas/openui/refs';
 import { viewerStatus } from '@/canvas/viewers';
 
 /** Long content (a document's blocks, an email's body) is left out: the ids are enough to open it again. */
@@ -13,8 +14,9 @@ const MAX_PROGRAM = 3000;
  * A composed view: its program, and what each numbered item is, so "abre el 2"
  * and "quita los leídos" both work from what is on screen.
  */
-function describeView(props: Record<string, unknown>): string {
-    const items = Array.isArray(props.items) ? (props.items as { n: number; title: string; args?: unknown }[]) : [];
+function describeView(props: Record<string, unknown>, index: number): string {
+    // A list that queries its rows says what it shows now; otherwise, what Laravel listed.
+    const items = liveItems(index) ?? (Array.isArray(props.items) ? (props.items as { n: number; title: string; args?: unknown }[]) : []);
 
     return JSON.stringify({
         title: props.title,
@@ -61,7 +63,7 @@ export function describeCanvases(directives: CanvasDirective[]): string | null {
     return directives
         .map((directive, position) => {
             const status = viewerStatus(position + 1);
-            const props = directive.view === 'openui.view' ? describeView(directive.props) : JSON.stringify(compact(directive.props, 0)).slice(0, MAX_PER_CANVAS);
+            const props = directive.view === 'openui.view' ? describeView(directive.props, position + 1) : JSON.stringify(compact(directive.props, 0)).slice(0, MAX_PER_CANVAS);
 
             return `${position + 1}. ${directive.view}${status ? ` (${status})` : ''}: ${props}`;
         })

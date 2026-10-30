@@ -29,15 +29,37 @@ test('the assistant finds what waits for an answer, newest first, with its propo
         ->assertJsonPath('output.alerts.0.received', 'hace 2 minutos')
         ->assertJsonPath('output.alerts.1.subject', 'Antiguo')
         ->assertJsonPath('canvas.view', 'openui.view')
-        ->assertJsonPath('canvas.props.title', '2 pendientes de responder')
+        ->assertJsonPath('canvas.props.title', '2 pendientes de responder');
+
+    // On screen it asks for them again every minute, so it stays current.
+    expect($response->json('canvas.props.ui'))
+        ->toContain('Query("alerts", {status: "pending", limit: 5}, {rows: []}, 60)')
+        ->toContain('ref: a.ref')
+        ->toBeValidOpenUi();
+
+    $this->actingAs($user)
+        ->postJson(route('canvas.query', 'alerts'), ['arguments' => ['status' => 'pending', 'limit' => 5], 'timezone' => 'Europe/Madrid'])
+        ->assertJsonCount(2, 'rows')
+        ->assertJsonPath('rows.0.n', 1)
+        ->assertJsonPath('rows.0.headline', 'Necesita la firma antes del viernes.')
+        ->assertJsonPath('rows.0.context', 'Gmail · Andrés Vela · Contrato')
+        ->assertJsonPath('rows.0.proposal', '→ Responder a Andrés que lo firmas el jueves.')
+        ->assertJsonPath('rows.0.pending', true)
+        ->assertJsonPath('rows.1.title', 'Antiguo');
+});
+
+test('a search shows the alerts it found, each opening its review', function () {
+    $user = User::factory()->create();
+    InboxItem::factory()->for($user)->create(['actor_name' => 'Julián Soto', 'why' => 'Pregunta si llegáis al lanzamiento.']);
+
+    $response = $this->actingAs($user)
+        ->postJson(route('voice.tools.run', 'list_alerts'), ['arguments' => ['query' => 'julian']])
         ->assertJsonPath('canvas.props.items.0.n', 1)
         ->assertJsonPath('canvas.props.items.0.tool', 'review_alert');
 
     expect($response->json('canvas.props.ui'))
-        ->toContain('title: "Necesita la firma antes del viernes."')
-        ->toContain('eyebrow: "Gmail · Andrés Vela · Contrato"')
-        ->toContain('snippet: "→ Responder a Andrés que lo firmas el jueves."')
-        ->toContain('highlight: true')
+        ->toContain('title: "Pregunta si llegáis al lanzamiento."')
+        ->not->toContain('Query(')
         ->toBeValidOpenUi();
 });
 

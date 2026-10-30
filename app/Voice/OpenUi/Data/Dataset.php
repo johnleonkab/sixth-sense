@@ -32,15 +32,15 @@ interface Dataset
     public function rules(): array;
 
     /**
-     * The fields every row has: name and type (text, number or date).
+     * The fields every row has: name and type (text, number, date or boolean).
      *
-     * @return array<string, 'text'|'number'|'date'>
+     * @return array<string, 'text'|'number'|'date'|'boolean'>
      */
     public function fields(): array;
 
     /**
      * @param  array<string, mixed>  $arguments  Already validated.
-     * @return list<array<string, string|int|float|null>>
+     * @return list<array<string, string|int|float|bool|null>>
      */
     public function rows(User $user, array $arguments, string $timezone): array;
 }

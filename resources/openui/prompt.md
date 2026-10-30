@@ -27,14 +27,15 @@ Props typed `ActionExpression` accept one @step, or Action([@steps...]) for seve
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
-Card(title?: string, children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
+Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
 List(items: string[], ordered?: boolean) — Una lista de puntos cortos.
 Chips(items: string[]) — Etiquetas pequeñas en fila: los filtros de una búsqueda o categorías.
+Tabs(options: {value: string, label: string}[], value: $binding<string>) — Pestañas para filtrar: cada opción tiene value y label, y la elegida se guarda en una $variable que las Query usan en sus argumentos.
 Image(url: string, caption?: string) — Una imagen por su URL https, con un pie opcional.
 Document(title: string, url: string, kind?: "pdf" | "doc" | "sheet" | "page" | "link", note?: string) — Un documento o archivo enlazado (PDF, Doc, página, hoja). Muestra título y un botón para abrirlo.
 Button(label: string, action?: ActionExpression) — Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace.
@@ -48,7 +49,7 @@ DonutChart(title?: string, labels: string[], values: number[], unit?: string, hi
 Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.
 
 ### Listas que se abren
-ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status y highlight (sin leer, importante). Pulsar uno lo abre. Conserva los n que vengan en los datos.
+ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante) y ref (cómo se abre, si viene en las filas de una Query). Pulsar uno lo abre. Conserva los n y ref que vengan en los datos.
 Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
 
 ## Built-in Functions
@@ -127,7 +128,7 @@ Available steps:
 - @OpenUrl(url: string) — Navigate to a URL
 - @Set(variable: $variable, value: any) — Set a $variable to a specific value
 - @Reset(variable: $variable) — Reset $variables to their declared defaults; pass several to reset each (e.g. @Reset($title, $priority) restores $title="" and $priority="medium")
-- @OpenItem(n: number) — Abre el elemento con ese número de una ItemList de la vista.
+- @OpenItem(n: number, ref?: string) — Abre el elemento con ese número de una ItemList de la vista.
 
 Example — mutation + refresh + reset (PREFERRED pattern):
 ```
@@ -225,8 +226,8 @@ Use these with Query() for read operations or Mutation() for write operations. T
   Issues de Jira como filas (key, summary, type, status, status_category, priority, assignee, updated). Con jql, los de esa consulta; con text, los que lo mencionan en los proyectos de las reglas.
 - analytics_rows(property: string, metrics: string[], dimensions?: string[], start_date?: string, end_date?: string) → {rows?: object[]}
   Un informe de Google Analytics 4 como filas: un campo por dimensión y por métrica (mismos nombres que analytics_report). property por nombre, cuenta o id.
-- alerts(status?: "pending" | "all", days?: number) → {rows?: {source?: string, actor?: string, title?: string, why?: string, status?: string, received?: string}[]}
-  Avisos como filas (source, actor, title, why, status, received). status: pending para los pendientes, all para los de los últimos days días.
+- alerts(status?: "all" | "pending" | "addressed" | "routine", source?: "gmail" | "slack" | "calendar", days?: number, limit?: number) → {rows?: {n?: number, ref?: string, source?: string, actor?: string, title?: string, why?: string, status?: string, received?: string, headline?: string, context?: string, when?: string, proposal?: string, closed?: string, pending?: boolean}[]}
+  Avisos como filas, los más recientes primero. status: pending (por defecto, los que esperan respuesta), all, addressed (resueltos o descartados) o routine (sin importancia). Para listarlos: ItemList con n, ref, headline, context, when, proposal, closed y pending (highlight).
 
 ### Default values for Query results
 

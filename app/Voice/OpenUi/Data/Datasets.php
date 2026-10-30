@@ -58,7 +58,7 @@ class Datasets
                         'type' => 'array',
                         'items' => [
                             'type' => 'object',
-                            'properties' => array_map(fn (string $type): array => ['type' => $type === 'number' ? 'number' : 'string'], $dataset->fields()),
+                            'properties' => array_map(fn (string $type): array => ['type' => in_array($type, ['number', 'boolean'], true) ? $type : 'string'], $dataset->fields()),
                         ],
                     ],
                 ],

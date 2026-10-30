@@ -6,7 +6,7 @@ use App\Alerts\AlertFeed;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\AlertsListView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -16,8 +16,6 @@ use App\Voice\Tools\VoiceTool;
  */
 class ShowAlertHistory implements VoiceTool
 {
-    public function __construct(private AlertFeed $feed) {}
-
     public function name(): string
     {
         return 'show_alert_history';
@@ -45,7 +43,6 @@ class ShowAlertHistory implements VoiceTool
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult
     {
         $filter = $arguments['filter'] ?? 'all';
-        $page = $this->feed->history($user, $filter);
         $items = $user->inboxItems();
 
         return new ToolResult(
@@ -55,7 +52,7 @@ class ShowAlertHistory implements VoiceTool
                 'addressed_today' => (clone $items)->whereIn('status', [AlertStatus::Resolved, AlertStatus::Dismissed])->where('resolved_at', '>=', now($context->timezone())->startOfDay())->count(),
                 'unimportant_today' => (clone $items)->where('triage', Triage::Routine)->where('received_at', '>=', now($context->timezone())->startOfDay())->count(),
             ],
-            canvas: new Canvas('alerts.history', ['filter' => $filter, ...$page], layout: 'wide'),
+            canvas: AlertsListView::history($user, $filter),
         );
     }
 }
