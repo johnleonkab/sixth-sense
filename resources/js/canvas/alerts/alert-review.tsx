@@ -84,9 +84,18 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const closed = alert.state === 'resolved' || alert.state === 'dismissed';
     const [sent, setSent] = useState<ActionState[] | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
-    const relay = props.proposal?.redirect?.text && props.proposal.redirect.to ? props.proposal.redirect : null;
-    const canSend = pending && props.source_label === 'Slack' && Boolean(props.proposal?.reply?.text || relay);
-    const sendLabel = props.proposal?.reply?.text && relay ? 'Enviar los dos' : relay ? `Enviar a ${relay.to}` : 'Enviar en Slack';
+    const slack = props.source_label === 'Slack';
+    const relay = slack && props.proposal?.redirect?.text && props.proposal.redirect.to ? props.proposal.redirect : null;
+    const canSend = pending && (slack || props.is_email) && Boolean(props.proposal?.reply?.text || relay);
+    const sendLabel = props.is_email
+        ? props.proposal?.reply?.to === 'all'
+            ? 'Responder a todos'
+            : 'Enviar respuesta'
+        : props.proposal?.reply?.text && relay
+          ? 'Enviar los dos'
+          : relay
+            ? `Enviar a ${relay.to}`
+            : 'Enviar en Slack';
 
     /** One tap is the "sí": it goes out when the undo window closes. */
     const send = async () => {
@@ -227,7 +236,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                     {sent.map((action) => (
                                         <div key={action.id}>
                                             <p className="text-[12px] text-muted">{action.label}</p>
-                                            <ActionBar initial={action} verb="enviar" doneLabel="Enviado" linkLabel="Abrir en Slack" />
+                                            <ActionBar initial={action} verb="enviar" doneLabel="Enviado" linkLabel={props.is_email ? 'Abrir en Gmail' : 'Abrir en Slack'} />
                                         </div>
                                     ))}
                                 </div>

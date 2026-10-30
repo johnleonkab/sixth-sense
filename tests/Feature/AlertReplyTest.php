@@ -5,6 +5,10 @@ use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
+use App\Connectors\Mail\FakeMailbox;
+use App\Connectors\Mail\FakeOutbox;
+use App\Connectors\Mail\Mailbox;
+use App\Connectors\Mail\Outbox;
 use App\Models\InboxItem;
 use App\Models\PendingAction;
 use App\Models\User;
@@ -61,4 +65,22 @@ test('only a pending Slack alert of the person, with a reply proposed, can be se
     $this->actingAs($this->user)->postJson(route('alerts.reply', $other))->assertNotFound();
 
     expect($this->chats->sent)->toBe([]);
+});
+
+test('one tap sends the proposed email reply, to everyone when that is the proposal', function () {
+    $this->app->instance(Mailbox::class, new FakeMailbox);
+    $this->app->instance(Outbox::class, $outbox = new FakeOutbox);
+    $email = InboxItem::factory()->for($this->user)->create([
+        'source' => AlertSource::Gmail,
+        'external_id' => 'demo.2',
+        'proposal' => ['summary' => 'Responder a todos.', 'reply' => ['to' => 'all', 'text' => 'Ok, lo firmo.']],
+    ]);
+
+    $this->actingAs($this->user)->postJson(route('alerts.reply', $email), ['timezone' => 'Europe/Madrid'])
+        ->assertOk()
+        ->assertJsonPath('actions.0.type', 'mail.send');
+
+    expect(PendingAction::sole()->status)->toBe(ActionStatus::Executed)
+        ->and($outbox->sent[0]->mode)->toBe('reply_all')
+        ->and($outbox->sent[0]->body)->toStartWith('Ok, lo firmo.');
 });
