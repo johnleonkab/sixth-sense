@@ -84,3 +84,38 @@ test('one tap sends the proposed email reply, to everyone when that is the propo
         ->and($outbox->sent[0]->mode)->toBe('reply_all')
         ->and($outbox->sent[0]->body)->toStartWith('Ok, lo firmo.');
 });
+
+test('a reaction is proposed instead of an ok, and becomes the emoji in its thread while the account may not react', function () {
+    $this->alert->update(['proposal' => [
+        'summary' => 'Reaccionar y pasárselo a Lucía.',
+        'reply' => null,
+        'reaction' => ['name' => '+1', 'emoji' => '👍'],
+        'redirect' => ['to' => 'Lucía', 'text' => 'Lucía, ¿cerramos la migración?'],
+    ]]);
+
+    $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert))->assertOk()->assertJsonPath('actions.0.type', 'chat.react');
+
+    expect($this->chats->reactions)->toBe([['ref' => 'demo:C01:1001.000400', 'reaction' => '+1']])
+        ->and($this->chats->sent[0]->toLabel)->toBe('Lucía Romero');
+
+    $this->chats->sent = [];
+    $this->chats->mayReact = false;
+    PendingAction::query()->delete();
+
+    $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert))->assertOk()->assertJsonPath('actions.0.type', 'chat.send');
+
+    expect($this->chats->sent[0]->text)->toBe('👍')
+        ->and($this->chats->sent[0]->threadRef)->toBe('demo:C01:1001.000100');
+});
+
+test('reacting by voice waits for the yes', function () {
+    $proposal = $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'propose_slack_reaction'), ['arguments' => ['message_id' => 'demo:C01:1001.000400', 'reaction' => 'white_check_mark']])
+        ->assertJsonPath('canvas.view', 'openui.view');
+
+    expect($this->chats->reactions)->toBe([]);
+
+    $this->actingAs($this->user)->postJson(route('actions.confirm', $proposal->json('output.pending_action_id')))->assertOk();
+
+    expect($this->chats->reactions)->toBe([['ref' => 'demo:C01:1001.000400', 'reaction' => 'white_check_mark']]);
+});

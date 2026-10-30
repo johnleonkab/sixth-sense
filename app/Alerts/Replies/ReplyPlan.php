@@ -2,6 +2,8 @@
 
 namespace App\Alerts\Replies;
 
+use App\Connectors\Chat\ChatReactions;
+
 /**
  * How the reply engine proposes to resolve an alert.
  */
@@ -16,6 +18,7 @@ final readonly class ReplyPlan
      * @param  ?string  $question  What the engine could not decide and the person should say.
      * @param  ?array{title: string, effort_minutes: ?int, deadline: ?string, people: list<string>}  $task  Work the person has to do themselves, beyond answering (for the scheduler).
      * @param  ?array{to: string, text: string}  $relay  A message to pass on to someone else, when the person is asked to ("dile a Alba…").
+     * @param  ?string  $reaction  In Slack, a reaction (ChatReactions::NAMES) that answers instead of writing back.
      */
     public function __construct(
         public string $summary,
@@ -25,10 +28,11 @@ final readonly class ReplyPlan
         public ?array $task = null,
         public ?string $learned = null,
         public ?array $relay = null,
+        public ?string $reaction = null,
     ) {}
 
     /**
-     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, task: ?array<string, mixed>, redirect: ?array{to: string, text: string}}
+     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, task: ?array<string, mixed>, redirect: ?array{to: string, text: string}, reaction: ?array{name: string, emoji: string}}
      */
     public function toArray(): array
     {
@@ -39,6 +43,7 @@ final readonly class ReplyPlan
             'question' => $this->question,
             'task' => $this->task,
             'redirect' => $this->relay,
+            'reaction' => $this->reaction ? ['name' => $this->reaction, 'emoji' => ChatReactions::emoji($this->reaction)] : null,
         ];
     }
 }

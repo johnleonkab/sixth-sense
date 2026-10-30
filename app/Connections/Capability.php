@@ -23,6 +23,7 @@ enum Capability: string
     case SlackSearch = 'slack.search';
     case SlackFiles = 'slack.files';
     case SlackSend = 'slack.send';
+    case SlackReact = 'slack.react';
     case NotionRead = 'notion.read';
     case NotionEdit = 'notion.edit';
     case NotionComment = 'notion.comment';
@@ -48,7 +49,8 @@ enum Capability: string
             self::SlackRead,
             self::SlackSearch,
             self::SlackFiles,
-            self::SlackSend => Provider::Slack,
+            self::SlackSend,
+            self::SlackReact => Provider::Slack,
             self::NotionRead,
             self::NotionEdit,
             self::NotionComment => Provider::Notion,
@@ -87,6 +89,7 @@ enum Capability: string
             self::SlackSearch => ['search:read'],
             self::SlackFiles => ['files:read'],
             self::SlackSend => ['chat:write', 'im:write'],
+            self::SlackReact => ['reactions:write'],
             // Notion has no OAuth scopes: what a connection may do is set on the connection itself.
             self::NotionRead, self::NotionEdit, self::NotionComment => [],
             self::JiraRead => ['read:jira-work', 'read:jira-user'],
@@ -121,6 +124,7 @@ enum Capability: string
             self::SlackSearch => 'Buscar mensajes',
             self::SlackFiles => 'Abrir archivos',
             self::SlackSend => 'Enviar mensajes',
+            self::SlackReact => 'Reaccionar a mensajes',
             self::NotionRead => 'Leer páginas y comentarios',
             self::NotionEdit => 'Crear y editar páginas',
             self::NotionComment => 'Comentar páginas',
@@ -141,7 +145,7 @@ enum Capability: string
      */
     public function writes(): bool
     {
-        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::NotionEdit, self::NotionComment, self::JiraWrite, self::JiraComment, self::GithubWrite], true);
+        return in_array($this, [self::DocsEdit, self::DocsComment, self::GmailSend, self::CalendarWrite, self::SlackSend, self::SlackReact, self::NotionEdit, self::NotionComment, self::JiraWrite, self::JiraComment, self::GithubWrite], true);
     }
 
     /**

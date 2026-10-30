@@ -66,6 +66,7 @@ use App\Voice\Tools\Slack\LowerSlackAutonomy;
 use App\Voice\Tools\Slack\OpenSlackFile;
 use App\Voice\Tools\Slack\ProposeSlackAutonomy;
 use App\Voice\Tools\Slack\ProposeSlackMessage;
+use App\Voice\Tools\Slack\ProposeSlackReaction;
 use App\Voice\Tools\Slack\SearchSlackMessages;
 use App\Voice\Tools\Slack\ShowSlackAutonomy;
 use App\Voice\Tools\Slack\ShowSlackConversation;
@@ -139,6 +140,7 @@ class Toolbox
         ProposeNotionEdit::class,
         ProposeNotionComment::class,
         ProposeSlackMessage::class,
+        ProposeSlackReaction::class,
         ControlViewer::class,
         GetActionStatus::class,
         ListAlerts::class,

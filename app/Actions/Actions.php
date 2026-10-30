@@ -11,6 +11,7 @@ use App\Actions\Handlers\ChangeSense;
 use App\Actions\Handlers\ChangeWiki;
 use App\Actions\Handlers\CommentDocument;
 use App\Actions\Handlers\EditDocument;
+use App\Actions\Handlers\ReactToChatMessage;
 use App\Actions\Handlers\ReplyDocumentComment;
 use App\Actions\Handlers\ScheduleAgendaTask;
 use App\Actions\Handlers\SendChatMessage;
@@ -44,6 +45,7 @@ class Actions
         'mail.send' => SendEmail::class,
         'calendar.change' => ChangeCalendar::class,
         'chat.send' => SendChatMessage::class,
+        'chat.react' => ReactToChatMessage::class,
         'notion.create' => ChangeWiki::class,
         'notion.edit' => ChangeWiki::class,
         'notion.comment' => ChangeWiki::class,

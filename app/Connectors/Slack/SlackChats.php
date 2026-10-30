@@ -906,6 +906,22 @@ class SlackChats implements Chats
      *
      * @return array{?ConnectedAccount, string}
      */
+    public function canReact(User $user, string $messageRef): bool
+    {
+        return $this->resolve($user, $messageRef, Capability::SlackReact)[0] !== null;
+    }
+
+    public function react(User $user, string $messageRef, string $reaction): void
+    {
+        [$account, $channel] = $this->resolve($user, $messageRef, Capability::SlackReact);
+
+        if ($account === null) {
+            throw new RuntimeException('Esta cuenta de Slack no tiene permiso para reaccionar. Actívalo en Configuración y vuelve a conectarla.');
+        }
+
+        $this->slack->post($account, 'reactions.add', ['channel' => $channel, 'timestamp' => self::tsOf($messageRef), 'name' => $reaction]);
+    }
+
     private function resolve(User $user, string $ref, Capability $capability): array
     {
         [$accountId, $id] = array_pad(explode(':', $ref, 2), 2, '');

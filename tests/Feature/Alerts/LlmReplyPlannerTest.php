@@ -92,3 +92,12 @@ test('asked to pass something on, it acknowledges and drafts the message for tha
         ->and($plan->toArray()['redirect'])->toBe(['to' => 'Alba', 'text' => 'Alba, ¿por qué se está tardando tanto con la config de obeach?'])
         ->and($this->model->calls[0]['system'])->toContain('«dile a Alba»');
 });
+
+test('in Slack a reaction can answer instead of writing back, never in an email', function () {
+    planAnswers(['summary' => 'Reaccionar.', 'reply_to' => 'none', 'reply_text' => '', 'other_actions' => [], 'question' => '', 'reaction' => '+1']);
+
+    $slack = new AlertBrief(source: AlertSource::Slack, where: '#producto', from: 'Marta Ruiz', subject: null, text: 'Ya tienes acceso', receivedAt: CarbonImmutable::parse('2026-10-08 09:00'));
+
+    expect($this->planner->plan($this->user, $slack)->toArray()['reaction'])->toBe(['name' => '+1', 'emoji' => '👍'])
+        ->and($this->planner->plan($this->user, $this->brief)->reaction)->toBeNull();
+});

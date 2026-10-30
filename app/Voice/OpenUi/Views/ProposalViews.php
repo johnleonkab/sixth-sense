@@ -30,6 +30,18 @@ class ProposalViews
     }
 
     /**
+     * A reaction to a Slack message, instead of writing back.
+     */
+    public static function reaction(User $user, PendingAction $action, string $emoji): Canvas
+    {
+        $view = new ViewBuilder($action->label);
+        $view->add('Draft', ['Reacción · borrador', $emoji]);
+        $view->proposal($action, 'reaccionar', 'Reacción añadida');
+
+        return $view->canvas($user, 'Slack', 'focus');
+    }
+
+    /**
      * A comment, or a reply to one, signed by the person: what it answers
      * and the draft.
      *

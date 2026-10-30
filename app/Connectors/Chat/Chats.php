@@ -89,4 +89,14 @@ interface Chats
      * Send as the user. Returns the sent message's ref.
      */
     public function send(User $user, OutgoingChatMessage $message): string;
+
+    /**
+     * Whether the account a message came from may react to it.
+     */
+    public function canReact(User $user, string $messageRef): bool;
+
+    /**
+     * React to a message as the user, with one of ChatReactions::NAMES.
+     */
+    public function react(User $user, string $messageRef, string $reaction): void;
 }

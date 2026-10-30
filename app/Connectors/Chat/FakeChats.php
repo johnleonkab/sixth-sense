@@ -114,6 +114,22 @@ class FakeChats implements Chats
         return 'demo:sent:'.count($this->sent);
     }
 
+    /** @var list<array{ref: string, reaction: string}> */
+    public array $reactions = [];
+
+    /** Whether the demo account may react, for tests of the fallback to a text reply. */
+    public bool $mayReact = true;
+
+    public function canReact(User $user, string $messageRef): bool
+    {
+        return $this->mayReact && str_starts_with($messageRef, 'demo:');
+    }
+
+    public function react(User $user, string $messageRef, string $reaction): void
+    {
+        $this->reactions[] = ['ref' => $messageRef, 'reaction' => $reaction];
+    }
+
     /**
      * @return array<string, ChatPerson>
      */

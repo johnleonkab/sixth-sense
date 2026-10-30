@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Actions\Actions;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Connectors\Chat\ChatReactions;
+use App\Connectors\Chat\Chats;
 use App\Models\InboxItem;
 use App\Models\PendingAction;
+use App\Models\User;
 use App\Voice\Tools\Toolbox;
 use App\Voice\Tools\ToolContext;
 use Carbon\CarbonImmutable;
@@ -16,16 +19,18 @@ use Illuminate\Support\Str;
 
 /**
  * Send what an alert proposes, with one tap: the tap is the "sí". The reply
- * (in its Slack thread or conversation, or to the email's sender or everyone
- * on it) and, in Slack, the message to pass on to someone else, go out once
- * the undo window closes, as every confirmed action does.
+ * (in its Slack thread or conversation, a reaction, or to the email's sender
+ * or everyone on it) and, in Slack, the message to pass on to someone else,
+ * go out once the undo window closes, as every confirmed action does.
  */
 class AlertReplyController extends Controller
 {
+    public function __construct(private Chats $chats) {}
+
     public function __invoke(Request $request, int $item, Toolbox $toolbox, Actions $actions): JsonResponse
     {
         $alert = $request->user()->inboxItems()->findOrFail($item);
-        $messages = $alert->status === AlertStatus::Pending ? $this->messages($alert) : [];
+        $messages = $alert->status === AlertStatus::Pending ? $this->messages($request->user(), $alert) : [];
 
         abort_if($messages === [], 422, 'Este aviso no tiene nada que enviar.');
 
@@ -56,9 +61,10 @@ class AlertReplyController extends Controller
      *
      * @return list<array{string, array<string, mixed>}>
      */
-    private function messages(InboxItem $alert): array
+    private function messages(User $user, InboxItem $alert): array
     {
         $reply = $alert->proposal['reply'] ?? null;
+        $reaction = $alert->proposal['reaction']['name'] ?? null;
         $redirect = $alert->proposal['redirect'] ?? null;
         $messages = [];
 
@@ -75,6 +81,11 @@ class AlertReplyController extends Controller
             $messages[] = ['propose_slack_message', ['text' => $reply['text'], ...in_array($reply['to'] ?? 'thread', ['conversation', 'all'], true)
                 ? ['to' => Str::beforeLast($alert->external_id, ':')]
                 : ['reply_to' => $alert->external_id]]];
+        } elseif (isset(ChatReactions::NAMES[$reaction ?? ''])) {
+            // A reaction, or the emoji in its thread while the account may not react.
+            $messages[] = $this->chats->canReact($user, $alert->external_id)
+                ? ['propose_slack_reaction', ['message_id' => $alert->external_id, 'reaction' => $reaction]]
+                : ['propose_slack_message', ['text' => ChatReactions::emoji($reaction), 'reply_to' => $alert->external_id]];
         }
 
         if (filled($redirect['text'] ?? null) && filled($redirect['to'] ?? null)) {

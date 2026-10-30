@@ -22,6 +22,8 @@ type Proposal = {
     other_actions: string[];
     question: string | null;
     redirect?: { to: string | null; text: string } | null;
+    /** In Slack, a reaction instead of writing back. */
+    reaction?: { name: string; emoji: string } | null;
     /** What the search found, for the person: never part of what is sent. */
     context?: string | null;
 };
@@ -86,16 +88,21 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const [sendError, setSendError] = useState<string | null>(null);
     const slack = props.source_label === 'Slack';
     const relay = slack && props.proposal?.redirect?.text && props.proposal.redirect.to ? props.proposal.redirect : null;
-    const canSend = pending && (slack || props.is_email) && Boolean(props.proposal?.reply?.text || relay);
+    const reaction = slack && !props.proposal?.reply?.text ? (props.proposal?.reaction ?? null) : null;
+    const canSend = pending && (slack || props.is_email) && Boolean(props.proposal?.reply?.text || relay || reaction);
     const sendLabel = props.is_email
         ? props.proposal?.reply?.to === 'all'
             ? 'Responder a todos'
             : 'Enviar respuesta'
-        : props.proposal?.reply?.text && relay
-          ? 'Enviar los dos'
-          : relay
-            ? `Enviar a ${relay.to}`
-            : 'Enviar en Slack';
+        : reaction && relay
+          ? `Reaccionar ${reaction.emoji} y enviar a ${relay.to}`
+          : reaction
+            ? `Reaccionar con ${reaction.emoji}`
+            : props.proposal?.reply?.text && relay
+              ? 'Enviar los dos'
+              : relay
+                ? `Enviar a ${relay.to}`
+                : 'Enviar en Slack';
 
     /** One tap is the "sí": it goes out when the undo window closes. */
     const send = async () => {
@@ -219,6 +226,15 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                     <p className="mt-1 max-h-[22vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">
                                         {props.proposal.reply.text}
                                     </p>
+                                </div>
+                            )}
+
+                            {reaction && (
+                                <div className="flex items-center gap-2.5 rounded-lg bg-soft px-3 py-2.5">
+                                    <span aria-hidden className="text-[20px] leading-none">
+                                        {reaction.emoji}
+                                    </span>
+                                    <p className="text-[13px] text-muted">Reaccionar a su mensaje, sin escribir nada</p>
                                 </div>
                             )}
 

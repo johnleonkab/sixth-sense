@@ -5,6 +5,7 @@ namespace App\Alerts\Replies;
 use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Alerts\AlertSource;
+use App\Connectors\Chat\ChatReactions;
 use App\Models\User;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -30,6 +31,7 @@ class LlmReplyPlanner implements ReplyPlanner
                 'question' => ['type' => 'STRING'],
                 'relay_to' => ['type' => 'STRING'],
                 'relay_text' => ['type' => 'STRING'],
+                'reaction' => ['type' => 'STRING'],
                 'learned' => ['type' => 'STRING'],
                 'manual_task' => [
                     'type' => 'OBJECT',
@@ -43,7 +45,7 @@ class LlmReplyPlanner implements ReplyPlanner
                     'required' => ['needed', 'title', 'effort_minutes', 'deadline', 'people'],
                 ],
             ],
-            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'relay_to', 'relay_text', 'learned', 'manual_task'],
+            'required' => ['summary', 'reply_to', 'reply_text', 'other_actions', 'question', 'relay_to', 'relay_text', 'reaction', 'learned', 'manual_task'],
         ], 0.3, AiGenerationContext::forUser($user));
 
         if (blank($answer['summary'] ?? null)) {
@@ -68,6 +70,7 @@ class LlmReplyPlanner implements ReplyPlanner
             ] : null,
             learned: filled($answer['learned'] ?? null) ? Str::limit(trim((string) $answer['learned']), 240) : null,
             relay: $relayTo !== '' && $relayText !== '' ? ['to' => Str::limit($relayTo, 80), 'text' => Str::limit($relayText, 2000)] : null,
+            reaction: $brief->source === AlertSource::Slack && isset(ChatReactions::NAMES[$answer['reaction'] ?? '']) ? $answer['reaction'] : null,
         );
     }
 
@@ -78,6 +81,8 @@ class LlmReplyPlanner implements ReplyPlanner
             : ($brief->source === AlertSource::Gmail
             ? 'reply_to: "sender" (solo a quien lo envió) o "all" (a todos los del email). Elige "all" solo si los demás deben enterarse.'
             : 'reply_to: "thread" (en el hilo del mensaje) o "conversation" (en el canal o mensaje directo, sin hilo). En un mensaje directo sin hilos, "conversation".');
+
+        $reactions = implode(', ', array_keys(ChatReactions::NAMES));
 
         return <<<TEXT
             Eres el motor de respuestas de {$user->name}. Le llega un mensaje que espera su respuesta y tú piensas cómo resolverlo,
@@ -94,9 +99,11 @@ class LlmReplyPlanner implements ReplyPlanner
               revisar un documento, avisar a alguien). Vacío si no hace falta nada más.
             - relay_to y relay_text: si le piden que le pase algo a otra persona («dile a Alba», «avísale a Pablo», «pásaselo a
               Marta»), relay_to es el nombre de esa persona y relay_text el mensaje para ella, escrito como él, con lo que haya que
-              transmitirle sacado de la conversación (a menudo lo que él mismo dijo justo antes). Entonces reply_text es solo un
-              acuse breve a quien lo pidió («Ok, se lo digo.»). No preguntes qué transmitir si la conversación ya lo dice.
-              Vacíos si no hay que pasarle nada a nadie.
+              transmitirle sacado de la conversación (a menudo lo que él mismo dijo justo antes). A quien lo pidió le basta un
+              acuse: en Slack, una reacción (reaction); en email, un reply_text breve («Ok, se lo digo.»). No preguntes qué
+              transmitir si la conversación ya lo dice. Vacíos si no hay que pasarle nada a nadie.
+            - reaction: solo en Slack, cuando basta con reaccionar en vez de escribir (un «ok», «visto», «gracias», o el acuse de
+              un encargo): {$reactions}. Entonces reply_to = "none" y reply_text vacío. Vacío si hay que escribir algo.
             - question: lo que él tendría que decidir antes de enviarlo, en una pregunta corta; vacío si nada.
             - learned: un dato corto que merezca recordarse la próxima vez (quién pide qué, un plazo, dónde está el documento).
               Vacío si la investigación no aporta nada nuevo. No repitas el borrador.
