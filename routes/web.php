@@ -3,6 +3,7 @@
 use App\Http\Controllers\AlertFeedController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\CanvasQueryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\PendingActionController;
@@ -87,6 +88,8 @@ Route::middleware('auth')->group(function () {
         Route::get('{meeting}', [MeetingController::class, 'show'])->whereNumber('meeting')->name('show');
         Route::post('{meeting}/prepare', [MeetingController::class, 'prepare'])->whereNumber('meeting')->name('prepare');
     });
+
+    Route::post('canvas/query/{dataset}', CanvasQueryController::class)->middleware('throttle:60,1')->name('canvas.query');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('/', '/settings/connections')->name('index');

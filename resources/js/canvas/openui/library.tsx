@@ -1,7 +1,8 @@
 import { useTriggerAction } from '@openuidev/react-lang';
+import { useState } from 'react';
 import type { ComponentRenderProps } from '@openuidev/react-lang';
 
-import { buildLibrary } from '@/canvas/openui/spec';
+import { buildLibrary, top } from '@/canvas/openui/spec';
 
 /**
  * How each OpenUI block looks on the canvas: the same tokens, type and
@@ -136,6 +137,103 @@ function LineChart({ props }: Props<{ title?: string; labels: string[]; values: 
             <div className="flex justify-between text-[11.5px] text-faint">
                 <span>{props.labels[0]}</span>
                 <span>{props.labels[props.labels.length - 1]}</span>
+            </div>
+        </figure>
+    );
+}
+
+const SERIES = 6;
+
+const format = (value: number) => value.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+
+/**
+ * Parts of a whole: at most six segments (the rest folds into "Otros"), each
+ * a validated series colour in fixed order, a 2px gap between them, the total
+ * in the middle and a legend with value and share, so colour is never the
+ * only way to tell them apart. With highlight, one segment in the first
+ * series colour and the rest in grey.
+ */
+function DonutChart({ props }: Props<{ title?: string; labels: string[]; values: number[]; unit?: string; highlight?: string }>) {
+    const [active, setActive] = useState<number | null>(null);
+    const pairs = props.labels.map((label, index) => ({ label, value: Math.max(0, props.values[index] ?? 0) })).filter((pair) => pair.value > 0);
+    const folded = top({ labels: pairs.map((pair) => pair.label), values: pairs.map((pair) => pair.value) }, SERIES);
+    const total = folded.values.reduce((sum, value) => sum + value, 0);
+
+    if (total === 0) {
+        return <p className="text-[13px] text-muted">{props.title ? `${props.title}: ` : ''}sin datos.</p>;
+    }
+
+    const emphasis = props.highlight !== undefined && folded.labels.includes(props.highlight);
+    const colour = (index: number) =>
+        emphasis ? (folded.labels[index] === props.highlight ? 'var(--color-series-1)' : 'var(--color-muted)') : `var(--color-series-${index + 1})`;
+    const radius = 48;
+    const circumference = 2 * Math.PI * radius;
+    const gap = folded.values.length > 1 ? 2 : 0;
+    const share = (value: number) => Math.round((value / total) * 100);
+    let start = 0;
+
+    return (
+        <figure className="grid gap-3">
+            {props.title && <figcaption className="text-[13px] font-medium">{props.title}</figcaption>}
+            <div className="grid items-center gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+                <svg
+                    viewBox="0 0 120 120"
+                    className="mx-auto size-[150px]"
+                    role="img"
+                    aria-label={`${props.title ?? 'Reparto'}: ${folded.labels.map((label, index) => `${label} ${share(folded.values[index])}%`).join(', ')}`}
+                >
+                    <g transform="rotate(-90 60 60)">
+                        {folded.values.map((value, index) => {
+                            const length = (value / total) * circumference;
+                            const dash = Math.max(0.5, length - gap);
+                            const offset = -start;
+                            start += length;
+
+                            return (
+                                <circle
+                                    key={folded.labels[index]}
+                                    cx="60"
+                                    cy="60"
+                                    r={radius}
+                                    fill="none"
+                                    stroke={colour(index)}
+                                    strokeOpacity={emphasis && folded.labels[index] !== props.highlight ? 0.45 : active === null || active === index ? 1 : 0.35}
+                                    strokeWidth="16"
+                                    strokeDasharray={`${dash} ${circumference - dash}`}
+                                    strokeDashoffset={offset}
+                                    onMouseEnter={() => setActive(index)}
+                                    onMouseLeave={() => setActive(null)}
+                                >
+                                    <title>{`${folded.labels[index]}: ${format(value)}${props.unit ? ` ${props.unit}` : ''} (${share(value)} %)`}</title>
+                                </circle>
+                            );
+                        })}
+                    </g>
+                    <text x="60" y="58" textAnchor="middle" className="fill-ink text-[17px] font-medium tabular-nums">
+                        {format(active === null ? total : folded.values[active])}
+                    </text>
+                    <text x="60" y="74" textAnchor="middle" className="fill-muted text-[9px]">
+                        {active === null ? (props.unit ?? 'total') : `${share(folded.values[active])} %`}
+                    </text>
+                </svg>
+                <ul className="grid gap-1.5 text-[13px]">
+                    {folded.labels.map((label, index) => (
+                        <li
+                            key={label}
+                            onMouseEnter={() => setActive(index)}
+                            onMouseLeave={() => setActive(null)}
+                            className={`grid grid-cols-[10px_minmax(0,1fr)_auto_3.2rem] items-center gap-2 ${active !== null && active !== index ? 'opacity-60' : ''}`}
+                        >
+                            <span aria-hidden className="size-2.5 rounded-[3px]" style={{ background: colour(index) }} />
+                            <span className="truncate">{label}</span>
+                            <span className="tabular-nums">
+                                {format(folded.values[index])}
+                                {props.unit ? ` ${props.unit}` : ''}
+                            </span>
+                            <span className="text-right text-muted tabular-nums">{share(folded.values[index])} %</span>
+                        </li>
+                    ))}
+                </ul>
             </div>
         </figure>
     );
@@ -276,4 +374,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button, ItemList, Chips });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips });

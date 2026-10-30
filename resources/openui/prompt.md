@@ -9,17 +9,27 @@ Para mostrar en pantalla datos que no tienen una vista propia (resultados de un 
 5. EVERY variable (except root) MUST be referenced by at least one other variable. Unreferenced variables are silently dropped and will NOT render. Always include defined variables in their parent's children/items array.
 6. Arguments are POSITIONAL (order matters, not names). Write `SomeComp([children], "row", "l")` NOT `SomeComp([children], direction: "row", gap: "l")` — colon syntax is NOT supported and silently breaks
 7. Optional arguments can be omitted from the end
+8. Declare mutable state with `$varName = defaultValue`. Components marked with `$binding` can read/write these. Undeclared $variables are auto-created with null default.
+9. String concatenation: `"text" + $var + "more"`
+10. Dot member access: `query.field` reads a field; on arrays it extracts that field from every element
+11. Index access: `arr[0]`, `data[index]`
+12. Arithmetic operators: +, -, *, /, % (work on numbers; + is string concat when either side is a string)
+13. Comparison: ==, !=, >, <, >=, <=
+14. Logical: &&, ||, ! (prefix)
+15. Ternary: `condition ? valueIfTrue : valueIfFalse`
+16. Parentheses for grouping: `(a + b) * c`
 - Strings use double quotes with backslash escaping
 
 ## Component Signatures
 
 Arguments marked with ? are optional. Sub-components can be inline or referenced; prefer references for better streaming.
-Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@ToAssistant, @OpenUrl, @OpenItem).
+Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@Run, @ToAssistant, @OpenUrl, @Set, @Reset, @OpenItem).
+Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
-Card(title?: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
+Card(title?: string, children: (Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
@@ -34,10 +44,77 @@ Metric(label: string, value: string, change?: string, hint?: string) — Una cif
 Table(columns: string[], rows: (string | number)[][]) — Una tabla: cabeceras y filas de celdas (texto o número). Para comparar o listar registros.
 BarChart(title?: string, labels: string[], values: number[], unit?: string) — Barras horizontales para comparar cantidades entre categorías. labels y values en el mismo orden.
 LineChart(title?: string, labels: string[], values: number[], unit?: string) — Una línea para ver una tendencia en el tiempo. labels (fechas) y values en el mismo orden.
+DonutChart(title?: string, labels: string[], values: number[], unit?: string, highlight?: string) — Un donut para ver qué parte del total es cada categoría, de un vistazo. Solo para partes de un todo y como mucho 6 partes (el resto va a «Otros» solo). Muestra el total en el centro y una leyenda con valor y %. highlight: la etiqueta a destacar, y el resto en gris. No sirve para comparar valores parecidos: para eso, BarChart.
+Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.
 
 ### Listas que se abren
 ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status y highlight (sin leer, importante). Pulsar uno lo abre. Conserva los n que vengan en los datos.
 Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
+
+## Built-in Functions
+
+Data functions prefixed with `@` to distinguish from components. These are the ONLY functions available — do NOT invent new ones.
+Use @-prefixed built-in functions (@Count, @Sum, @Avg, @Min, @Max, @Round) on Query results. Do NOT hardcode computed values.
+
+@Count(array: any[]) → number — Returns array length
+@First(array: any[]) → any — Returns first element of array
+@Last(array: any[]) → any — Returns last element of array
+@Sum(numbers: number[]) → number — Sum of numeric array
+@Avg(numbers: number[]) → number — Average of numeric array
+@Min(numbers: number[]) → number — Minimum value in array
+@Max(numbers: number[]) → number — Maximum value in array
+@Sort(array: any[], field: string, direction?: "asc" | "desc") → any[] — Sort array by field. Direction: "asc" (default) or "desc"
+@Filter(array: any[], field: string, operator: "==" | "!=" | ">" | "<" | ">=" | "<=" | "contains", value: any) → any[] — Filter array by field value
+@Round(number: number, decimals?: number) → number — Round to N decimal places (default 0)
+@Abs(number: number) → number — Absolute value
+@Floor(number: number) → number — Round down to nearest integer
+@Ceil(number: number) → number — Round up to nearest integer
+@Each(array: any[], varName: string, template: any) — Evaluate template for each element. varName is the loop variable — use it ONLY inside the template expression (inline). Do NOT create a separate statement for the template.
+@GroupCount(rows: any[], field: string) → {labels: string[], values: number[]} — Cuenta las filas por un campo: {labels, values}, el grupo mayor primero. Para DonutChart o BarChart.
+@GroupSum(rows: any[], field: string, value: string) → {labels: string[], values: number[]} — Suma un campo numérico (value) por otro campo (field): {labels, values}, el mayor primero.
+@Top(series: {labels: string[], values: number[]}, n: number) → {labels: string[], values: number[]} — Los n primeros grupos de un {labels, values}, y el resto junto en «Otros».
+@ByDay(rows: any[], field: string, value?: string) → {labels: string[], values: number[]} — Filas por día de un campo de fecha (o la suma de value por día), del más antiguo al más reciente: {labels, values}. Para LineChart.
+
+Builtins compose — output of one is input to the next:
+`@Count(@Filter(data.rows, "field", "==", "val"))` for KPIs/chart values, `@Round(@Avg(data.rows.score), 1)`, `@Each(data.rows, "item", Comp(item.field))` for per-item rendering.
+Array pluck: `data.rows.field` extracts a field from every row → use with @Sum, @Avg, charts, tables.
+
+IMPORTANT @Each rule: The loop variable (e.g. "item") is ONLY available inside the @Each template expression. Always inline the template — do NOT extract it to a separate statement.
+CORRECT: `list = @Each(rows, "t", Comp(t.name))`
+WRONG: `item = Comp(t.name)` then `list = @Each(rows, "t", item)`, because t is undefined in item.
+
+## Query — Live Data Fetching
+
+Fetch data from available tools. Returns defaults instantly, swaps in real data when it arrives.
+
+```
+metrics = Query("tool_name", {arg1: value, arg2: $binding}, {defaultField: 0, defaultData: []}, refreshInterval?)
+```
+
+- First arg: tool name (string)
+- Second arg: arguments object (may reference $bindings — re-fetches automatically on change)
+- Third arg: default data (rendered immediately before fetch resolves)
+- Fourth arg (optional): refresh interval in seconds (e.g. 30 for auto-refresh every 30s)
+- Use dot access on results: metrics.totalEvents, metrics.data.day (array pluck)
+- Query results must use regular identifiers: `metrics = Query(...)`, NOT `$metrics = Query(...)`
+- Manual refresh: `Button("Refresh", Action([@Run(query1), @Run(query2)]), "secondary")` — re-fetches the listed queries
+- Refresh all queries: create Action with @Run for each query
+
+## Mutation — Write Operations
+
+Execute state-changing tool calls (create, update, delete). Unlike Query (auto-fetches on render), Mutation fires only on button click via Action.
+
+```
+result = Mutation("tool_name", {arg1: $binding, arg2: "value"})
+```
+
+- First arg: tool name (string)
+- Second arg: arguments object (evaluated with current $binding values at click time)
+- result.status: "idle" | "loading" | "success" | "error"
+- result.data: tool response on success
+- result.error: error message on failure
+- Mutation results use regular identifiers: `result = Mutation(...)`, NOT `$result`
+- Show loading state: `result.status == "loading" ? TextContent("Saving...") : null`
 
 ## Action — Button Behavior
 
@@ -45,9 +122,20 @@ An action wires a button click to operations. Pass one @-prefixed step bare, e.g
 Buttons without an action automatically send their label to the assistant (equivalent to @ToAssistant(label)).
 
 Available steps:
+- @Run(ref: Query | Mutation) — Execute a Mutation or re-fetch a Query (ref must be a declared Query/Mutation)
 - @ToAssistant(message: string, context?: any) — Send a message to the assistant (for conversational buttons like "Tell me more", "Explain this"). The optional context is any value (object, array, string, number) passed to the assistant as hidden data, e.g. @ToAssistant("Show details", {orderId: 42})
 - @OpenUrl(url: string) — Navigate to a URL
+- @Set(variable: $variable, value: any) — Set a $variable to a specific value
+- @Reset(variable: $variable) — Reset $variables to their declared defaults; pass several to reset each (e.g. @Reset($title, $priority) restores $title="" and $priority="medium")
 - @OpenItem(n: number) — Abre el elemento con ese número de una ItemList de la vista.
+
+Example — mutation + refresh + reset (PREFERRED pattern):
+```
+$binding = "default"
+result = Mutation("tool_name", {field: $binding})
+data = Query("tool_name", {}, {rows: []})
+onSubmit = Action([@Run(result), @Run(data), @Reset($binding)])
+```
 
 Example — simple nav:
 ```
@@ -55,6 +143,99 @@ viewBtn = Button("View", @OpenUrl("https://example.com"))
 ```
 
 - An action can be assigned to a variable or inlined: Button("Go", onSubmit) and Button("Go", Action([...])) both work
+- If a @Run(mutation) step fails, remaining steps are skipped (halt on failure)
+- @Run(queryRef) re-fetches the query (fire-and-forget, cannot fail)
+
+## Interactive Filters
+
+To let the user filter data with a dropdown:
+1. Declare a $variable with a default: `$dateRange = "14"`
+2. Create a Select with name, items, and binding: `Select("dateRange", [SelectItem("7", "Last 7 days"), ...], null, null, $dateRange)`
+3. Wrap in FormControl for a label: `FormControl("Date Range", Select(...))`
+4. Pass $dateRange in Query args: `Query("tool", {dateRange: $dateRange}, {defaults})`
+5. When the user changes the Select, $dateRange updates and the Query automatically re-fetches
+
+FILTER WIRING RULE: If a $binding filter is visible in the UI, EVERY relevant Query MUST reference that $binding in its args. Never show a filter dropdown while hardcoding the query args.
+
+Rules for $variables:
+- $variables hold simple values (strings or numbers), NOT arrays or objects
+- $variables must be bound to a Select/Input component via the value argument (last positional arg) to be interactive
+- Queries must use regular identifiers (NOT $variables): `metrics = Query(...)` not `$metrics = Query(...)`
+- **Auto-declare**: You do NOT need to explicitly declare $variables. If you use `$foo` without declaring it, the parser auto-creates `$foo = null`. You can still declare explicitly to set a default: `$days = "14"`
+
+## Forms
+
+Simple form — no $bindings needed. Field values are managed internally by the Form via the name prop:
+```
+contactForm = Form("contact", submitBtn, [nameField, emailField])
+nameField = FormControl("Name", Input("name", "Your name", "text", {required: true}))
+emailField = FormControl("Email", Input("email", "your@email.com", "email", {required: true, email: true}))
+submitBtn = Button("Submit")
+```
+
+Use $bindings when you need to read field values elsewhere (in Action context, Query args, or conditionals). They are auto-declared:
+```
+$role = "engineer"
+contactForm = Form("contact", submitBtn, [nameField, emailField, roleField])
+nameField = FormControl("Name", Input("name", "Enter your name", "text", {required: true}, $name))
+emailField = FormControl("Email", Input("email", "Enter your email", "email", {required: true, email: true}, $email))
+roleField = FormControl("Role", Select("role", [SelectItem("engineer", "Engineer"), SelectItem("designer", "Designer"), SelectItem("pm", "PM")], null, {required: true}, $role))
+submitBtn = Button("Submit")
+```
+
+For form + mutation patterns (create, refresh, reset), see the Action section example above.
+
+IMPORTANT: Always add validation rules to form fields used with Mutations. Use OBJECT syntax: {required: true, email: true, minLength: 8}. The renderer shows error messages automatically and blocks submit when validation fails.
+
+## Data Workflow
+
+When tools are available, follow this workflow:
+1. FIRST: Call the most relevant tool to inspect the real data shape before generating code
+2. Use Query() for READ operations (data that should stay live) — NEVER hardcode tool results as literal arrays or objects
+3. Use Mutation() for WRITE operations (create, update, delete) — triggered by button clicks via @Run(mutationRef)
+4. Use the real data from step 1 as condensed Query defaults (3-5 rows) so the UI renders immediately
+5. Use @-prefixed builtins (@Count, @Filter, @Sort, @Sum) on Query results for KPIs and aggregations — the runtime evaluates these live on every refresh
+6. Hardcoded arrays are ONLY for static display data (labels, options) where no tool exists
+
+WRONG — you called a tool and got data back, but you inlined the results:
+```
+openCount = 2
+item1 = SomeComp("first item title")
+item2 = SomeComp("second item title")
+list = SomeList([item1, item2])
+chart = SomeChart(["A", "B"], [12, 8])
+```
+This is static — it shows stale data and won't update. Creating item1, item2, item3... manually is ALWAYS wrong when a tool exists.
+
+RIGHT — use Query() for live data, Mutation() for writes, @builtins to derive values:
+```
+data = Query("tool_name", {}, {rows: []})
+openCount = @Count(@Filter(data.rows, "field", "==", "value"))
+list = @Each(data.rows, "item", SomeComp(item.title, item.field))
+createResult = Mutation("create_tool", {title: $title})
+submitBtn = Button("Create", Action([@Run(createResult), @Run(data), @Reset($title)]))
+```
+Everything derives from the Query — when data refreshes, the entire dashboard updates automatically.
+
+## Available Tools
+
+Use these with Query() for read operations or Mutation() for write operations. The LLM decides which is appropriate based on the tool's purpose.
+
+- jira_issues(jql?: string, text?: string, limit?: number) → {rows?: {key?: string, summary?: string, type?: string, status?: string, status_category?: string, priority?: string, assignee?: string, updated?: string}[]}
+  Issues de Jira como filas (key, summary, type, status, status_category, priority, assignee, updated). Con jql, los de esa consulta; con text, los que lo mencionan en los proyectos de las reglas.
+- analytics_rows(property: string, metrics: string[], dimensions?: string[], start_date?: string, end_date?: string) → {rows?: object[]}
+  Un informe de Google Analytics 4 como filas: un campo por dimensión y por métrica (mismos nombres que analytics_report). property por nombre, cuenta o id.
+- alerts(status?: "pending" | "all", days?: number) → {rows?: {source?: string, actor?: string, title?: string, why?: string, status?: string, received?: string}[]}
+  Avisos como filas (source, actor, title, why, status, received). status: pending para los pendientes, all para los de los últimos days días.
+
+### Default values for Query results
+
+Use these shapes as minimal Query defaults:
+- jira_issues: `{"rows":[]}`
+- analytics_rows: `{"rows":[]}`
+- alerts: `{"rows":[]}`
+
+CRITICAL: Use ONLY the tools listed above in Query() and Mutation() calls. Do NOT invent or guess tool names. If the user asks for functionality that doesn't match any available tool, use realistic mock data instead of fabricating a tool call.
 
 ## Hoisting & Streaming (CRITICAL)
 
@@ -64,8 +245,10 @@ During streaming, the output is re-parsed on every chunk. Undefined references a
 
 **Recommended statement order for optimal streaming:**
 1. `root = View(...)` — UI shell appears immediately
-2. Component definitions — fill in as they stream
-3. Data values — leaf content last
+2. $variable declarations — state ready for bindings
+3. Query statements — defaults resolve immediately so components render with data
+4. Component definitions — fill in with data already available
+5. Data values — leaf content last
 
 Always write the root = View(...) statement first so the UI shell appears immediately, even before child data has streamed in.
 
@@ -85,9 +268,14 @@ top = Table(["Página", "Vistas"], [["/precios", 412], ["/blog", 220]])
 Before finishing, walk your output and verify:
 1. root = View(...) is the FIRST line (for optimal streaming).
 2. Every referenced name is defined. Every defined name (other than root) is reachable from root.
+3. Every Query result is referenced by at least one component.
+4. Every $binding appears in at least one component or expression.
+5. Every visible filter $binding appears in at least one Query args object.
 
 - Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.
 - Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.
 - Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.
 - Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.
 - Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.
+- No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.
+- Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.

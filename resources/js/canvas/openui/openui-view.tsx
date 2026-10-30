@@ -4,7 +4,9 @@ import type { ActionEvent } from '@openuidev/react-lang';
 import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import { openUiLibrary } from '@/canvas/openui/library';
+import { datasetNames } from '@/canvas/openui/spec';
 import type { CanvasComponent } from '@/canvas/types';
+import { browserTimezone, postJson } from '@/lib/http';
 
 /** How to open the item numbered n of the view's lists: a tool and its arguments. */
 export type OpenableItem = { n: number; title: string; tool: string; args: Record<string, unknown> };
@@ -27,6 +29,15 @@ export type OpenUiViewProps = {
  * A button asks the assistant something or opens an https link; an item of
  * a list opens with the tool Laravel said opens it, without the model.
  */
+/**
+ * Query() runs these in the browser: each asks Laravel for the rows of one
+ * read-only dataset, with the signed-in person's access. Nothing else can be
+ * called from a view.
+ */
+const toolProvider = Object.fromEntries(
+    datasetNames.map((name) => [name, (args: Record<string, unknown>) => postJson(`/canvas/query/${encodeURIComponent(name)}`, { arguments: args, timezone: browserTimezone() })]),
+);
+
 const savedDate = (iso: string) => new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui, items, saved_as: savedAs, saved_at: savedAt }) => {
@@ -69,7 +80,7 @@ const OpenUiView: CanvasComponent<OpenUiViewProps> = ({ index, title, source, ui
                     Guardada como «{savedAs}»{savedAt && ` · datos del ${savedDate(savedAt)}`}
                 </p>
             )}
-            <Renderer response={ui} library={openUiLibrary} isStreaming={false} onAction={act} />
+            <Renderer response={ui} library={openUiLibrary} isStreaming={false} onAction={act} toolProvider={toolProvider} />
         </CanvasFrame>
     );
 };

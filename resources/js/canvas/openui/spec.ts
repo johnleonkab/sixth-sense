@@ -1,6 +1,8 @@
-import { action, createLibrary, defineAction, defineComponent } from '@openuidev/react-lang';
+import { action, createLibrary, defineAction, defineComponent, defineFunction } from '@openuidev/react-lang';
 import type { ComponentRenderer, Library } from '@openuidev/react-lang';
 import { z } from 'zod/v4';
+
+import datasets from '../../../openui/datasets.json' with { type: 'json' };
 
 /**
  * The building blocks the assistant may compose a canvas from, with OpenUI.
@@ -11,7 +13,86 @@ import { z } from 'zod/v4';
  */
 export type Renderers = Partial<Record<BlockName, ComponentRenderer<any>>>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type BlockName = 'View' | 'Row' | 'Card' | 'Text' | 'Metric' | 'Table' | 'BarChart' | 'LineChart' | 'Image' | 'Document' | 'List' | 'Button' | 'ItemList' | 'Chips';
+export type BlockName =
+    | 'View'
+    | 'Row'
+    | 'Card'
+    | 'Text'
+    | 'Metric'
+    | 'Table'
+    | 'BarChart'
+    | 'LineChart'
+    | 'DonutChart'
+    | 'Image'
+    | 'Document'
+    | 'List'
+    | 'Button'
+    | 'ItemList'
+    | 'Chips';
+
+/** What the grouping functions return: chart-ready labels and values, in the same order. */
+export type Series = { labels: string[]; values: number[] };
+
+/** The datasets a view may Query(), written by `php artisan openui:datasets`. */
+export const datasetNames: string[] = datasets.map((dataset) => dataset.name);
+
+type Row = Record<string, unknown>;
+
+const text = (value: unknown): string => (value === null || value === undefined || value === '' ? '(sin valor)' : String(value));
+const number = (value: unknown): number => (typeof value === 'number' ? value : Number(value) || 0);
+
+/** Count rows by a field, the largest group first. */
+export function groupCount(rows: Row[], field: string): Series {
+    const totals = new Map<string, number>();
+
+    for (const row of rows) {
+        totals.set(text(row[field]), (totals.get(text(row[field])) ?? 0) + 1);
+    }
+
+    return sorted(totals);
+}
+
+/** Add up a numeric field by another field, the largest group first. */
+export function groupSum(rows: Row[], field: string, value: string): Series {
+    const totals = new Map<string, number>();
+
+    for (const row of rows) {
+        totals.set(text(row[field]), (totals.get(text(row[field])) ?? 0) + number(row[value]));
+    }
+
+    return sorted(totals);
+}
+
+/** The first n groups, and the rest folded into "Otros". */
+export function top(series: Series, n: number): Series {
+    if (series.labels.length <= n) {
+        return series;
+    }
+
+    const rest = series.values.slice(n - 1).reduce((sum, value) => sum + value, 0);
+
+    return { labels: [...series.labels.slice(0, n - 1), 'Otros'], values: [...series.values.slice(0, n - 1), rest] };
+}
+
+/** Rows per day (or the sum of a field per day), oldest first, for a line. Days are YYYY-MM-DD. */
+export function byDay(rows: Row[], field: string, value?: string): Series {
+    const totals = new Map<string, number>();
+
+    for (const row of rows) {
+        const day = text(row[field]).slice(0, 10);
+        totals.set(day, (totals.get(day) ?? 0) + (value ? number(row[value]) : 1));
+    }
+
+    const days = [...totals.keys()].filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day)).sort();
+
+    return { labels: days, values: days.map((day) => totals.get(day) ?? 0) };
+}
+
+function sorted(totals: Map<string, number>): Series {
+    const entries = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+
+    return { labels: entries.map(([label]) => label), values: entries.map(([, value]) => value) };
+}
 
 const nothing: ComponentRenderer<any> = () => null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -72,6 +153,20 @@ export function buildLibrary(renderers: Renderers = {}): Library {
             unit: z.string().optional(),
         }),
         component: render('LineChart'),
+    });
+
+    const DonutChart = defineComponent({
+        name: 'DonutChart',
+        description:
+            'Un donut para ver qué parte del total es cada categoría, de un vistazo. Solo para partes de un todo y como mucho 6 partes (el resto va a «Otros» solo). Muestra el total en el centro y una leyenda con valor y %. highlight: la etiqueta a destacar, y el resto en gris. No sirve para comparar valores parecidos: para eso, BarChart.',
+        props: z.object({
+            title: z.string().optional(),
+            labels: z.array(z.string()),
+            values: z.array(z.number()),
+            unit: z.string().optional(),
+            highlight: z.string().optional(),
+        }),
+        component: render('DonutChart'),
     });
 
     const Image = defineComponent({
@@ -147,7 +242,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Chips'),
     });
 
-    const leaves = [Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
+    const leaves = [Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -184,12 +279,51 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         params: z.object({ n: z.number() }),
     });
 
+    const seriesSchema = z.object({ labels: z.array(z.string()), values: z.array(z.number()) });
+
+    const GroupCount = defineFunction({
+        name: 'GroupCount',
+        description: 'Cuenta las filas por un campo: {labels, values}, el grupo mayor primero. Para DonutChart o BarChart.',
+        params: z.object({ rows: z.array(z.any()), field: z.string() }),
+        returns: seriesSchema,
+        fn: ({ rows, field }) => groupCount(rows, field),
+    });
+
+    const GroupSum = defineFunction({
+        name: 'GroupSum',
+        description: 'Suma un campo numérico (value) por otro campo (field): {labels, values}, el mayor primero.',
+        params: z.object({ rows: z.array(z.any()), field: z.string(), value: z.string() }),
+        returns: seriesSchema,
+        fn: ({ rows, field, value }) => groupSum(rows, field, value),
+    });
+
+    const Top = defineFunction({
+        name: 'Top',
+        description: 'Los n primeros grupos de un {labels, values}, y el resto junto en «Otros».',
+        params: z.object({ series: seriesSchema, n: z.number() }),
+        returns: seriesSchema,
+        fn: ({ series, n }) => top(series, n),
+    });
+
+    const ByDay = defineFunction({
+        name: 'ByDay',
+        description: 'Filas por día de un campo de fecha (o la suma de value por día), del más antiguo al más reciente: {labels, values}. Para LineChart.',
+        params: z.object({ rows: z.array(z.any()), field: z.string(), value: z.string().optional() }),
+        returns: seriesSchema,
+        fn: ({ rows, field, value }) => byDay(rows, field, value),
+    });
+
     return createLibrary({
-        components: [View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button, ItemList, Chips],
+        components: [View, Row, Card, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, ItemList, Chips],
+        functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
             { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Image', 'Document', 'Button'] },
-            { name: 'Datos', components: ['Metric', 'Table', 'BarChart', 'LineChart'] },
+            {
+                name: 'Datos',
+                components: ['Metric', 'Table', 'BarChart', 'LineChart', 'DonutChart'],
+                notes: ['Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.'],
+            },
             { name: 'Listas que se abren', components: ['ItemList'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
         ],
         actions: [OpenItem],
@@ -203,6 +337,9 @@ export function buildLibrary(renderers: Renderers = {}): Library {
  */
 export function viewPrompt(): string {
     return buildLibrary().prompt({
+        tools: datasets,
+        toolCalls: true,
+        bindings: true,
         preamble:
             'Para mostrar en pantalla datos que no tienen una vista propia (resultados de un servidor MCP, analítica, comparativas, archivos, imágenes), llama a show_view con una interfaz escrita en OpenUI Lang. Lo dicho en voz sigue siendo corto: el detalle va en la vista. Textos en español.',
         additionalRules: [
@@ -211,6 +348,8 @@ export function viewPrompt(): string {
             'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
             'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
             'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.',
+            'No uses Mutation: desde una vista no se escribe nada. Para cambiar algo, usa las herramientas que lo proponen y esperan el sí.',
+            'Para gráficos y cifras de Jira, Analytics o avisos, pide los datos con Query a esos datasets y calcula con @GroupCount, @GroupSum, @Top, @ByDay, @Count o @Sum: nunca escribas a mano cifras que salgan de ahí. Así la vista se actualiza al volver a abrirla.',
         ],
         examples: [
             [

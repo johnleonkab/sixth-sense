@@ -1,0 +1,166 @@
+[
+    {
+        "name": "jira_issues",
+        "description": "Issues de Jira como filas (key, summary, type, status, status_category, priority, assignee, updated). Con jql, los de esa consulta; con text, los que lo mencionan en los proyectos de las reglas.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "jql": {
+                    "type": "string",
+                    "description": "Consulta JQL."
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Texto a buscar."
+                },
+                "limit": {
+                    "type": "number",
+                    "description": "Como mucho 100."
+                }
+            }
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "summary": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            },
+                            "status_category": {
+                                "type": "string"
+                            },
+                            "priority": {
+                                "type": "string"
+                            },
+                            "assignee": {
+                                "type": "string"
+                            },
+                            "updated": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
+    },
+    {
+        "name": "analytics_rows",
+        "description": "Un informe de Google Analytics 4 como filas: un campo por dimensión y por métrica (mismos nombres que analytics_report). property por nombre, cuenta o id.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "property": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "end_date": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "property",
+                "metrics"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": []
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
+    },
+    {
+        "name": "alerts",
+        "description": "Avisos como filas (source, actor, title, why, status, received). status: pending para los pendientes, all para los de los últimos days días.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "all"
+                    ]
+                },
+                "days": {
+                    "type": "number",
+                    "description": "Con all, cuántos días atrás (por defecto 7, como mucho 90)."
+                }
+            }
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source": {
+                                "type": "string"
+                            },
+                            "actor": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "why": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            },
+                            "received": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "annotations": {
+            "readOnlyHint": true
+        }
+    }
+]
