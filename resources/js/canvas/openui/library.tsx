@@ -165,7 +165,7 @@ function DonutChart({ props }: Props<{ title?: string; labels: string[]; values:
 
     const emphasis = props.highlight !== undefined && folded.labels.includes(props.highlight);
     const colour = (index: number) =>
-        emphasis ? (folded.labels[index] === props.highlight ? 'var(--color-series-1)' : 'var(--color-muted)') : `var(--color-series-${index + 1})`;
+        emphasis ? (folded.labels[index] === props.highlight ? 'var(--series-1)' : 'var(--muted)') : `var(--series-${index + 1})`;
     const radius = 48;
     const circumference = 2 * Math.PI * radius;
     const gap = folded.values.length > 1 ? 2 : 0;
