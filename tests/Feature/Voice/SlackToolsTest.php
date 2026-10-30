@@ -52,9 +52,12 @@ test('people can be looked up for their email', function () {
 });
 
 test('searching shows numbered messages, or only answers by voice', function () {
-    runSlackTool('search_slack_messages', ['text' => 'reembolso', 'from' => 'Pablo'])
-        ->assertJsonPath('canvas.view', 'slack.results')
+    $response = runSlackTool('search_slack_messages', ['text' => 'reembolso', 'from' => 'Pablo'])
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.items.0.tool', 'show_slack_conversation')
         ->assertJsonPath('output.total', 3);
+
+    expect($response->json('canvas.props.ui'))->toContain('Chips(["«reembolso»", "de Pablo"])')->toContain('match: "reembolso"')->toBeValidOpenUi();
 
     runSlackTool('search_slack_messages', ['text' => 'reembolso', 'show_on_screen' => false])->assertJsonPath('canvas', null);
 });

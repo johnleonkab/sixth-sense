@@ -24,10 +24,13 @@ function confirmJira(TestResponse $proposal): void
 }
 
 test('issues are found and shown numbered', function () {
-    runJiraTool('search_jira', ['text' => 'pasarela'])
-        ->assertJsonPath('canvas.view', 'jira.list')
+    $response = runJiraTool('search_jira', ['text' => 'pasarela'])
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.items.0', ['n' => 1, 'title' => 'CPD-405 Integrar la pasarela de pago', 'tool' => 'open_jira_issue', 'args' => ['issue' => 'demo:CPD-405']])
         ->assertJsonPath('output.issues.0.key', 'CPD-405')
         ->assertJsonPath('output.issues.0.issue_id', 'demo:CPD-405');
+
+    expect($response->json('canvas.props.ui'))->toContain('eyebrow: "CPD-405 · Story", status: "In Progress"')->toBeValidOpenUi();
 });
 
 test('an issue opens with its dependencies and its comments, numbered', function () {

@@ -1,4 +1,4 @@
-import { action, createLibrary, defineComponent } from '@openuidev/react-lang';
+import { action, createLibrary, defineAction, defineComponent } from '@openuidev/react-lang';
 import type { ComponentRenderer, Library } from '@openuidev/react-lang';
 import { z } from 'zod/v4';
 
@@ -11,7 +11,7 @@ import { z } from 'zod/v4';
  */
 export type Renderers = Partial<Record<BlockName, ComponentRenderer<any>>>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type BlockName = 'View' | 'Row' | 'Card' | 'Text' | 'Metric' | 'Table' | 'BarChart' | 'LineChart' | 'Image' | 'Document' | 'List' | 'Button';
+export type BlockName = 'View' | 'Row' | 'Card' | 'Text' | 'Metric' | 'Table' | 'BarChart' | 'LineChart' | 'Image' | 'Document' | 'List' | 'Button' | 'ItemList' | 'Chips';
 
 const nothing: ComponentRenderer<any> = () => null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -20,10 +20,10 @@ export function buildLibrary(renderers: Renderers = {}): Library {
 
     const Text = defineComponent({
         name: 'Text',
-        description: 'Un párrafo corto. muted para notas secundarias.',
+        description: 'Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).',
         props: z.object({
             text: z.string(),
-            tone: z.enum(['default', 'muted']).optional(),
+            tone: z.enum(['default', 'muted', 'warn']).optional(),
         }),
         component: render('Text'),
     });
@@ -116,7 +116,38 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Button'),
     });
 
-    const leaves = [Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, Image.ref, Document.ref, List.ref, Button.ref];
+    const ItemList = defineComponent({
+        name: 'ItemList',
+        description:
+            'Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status y highlight (sin leer, importante). Pulsar uno lo abre. Conserva los n que vengan en los datos.',
+        props: z.object({
+            items: z.array(
+                z.object({
+                    n: z.number(),
+                    title: z.string(),
+                    eyebrow: z.string().optional(),
+                    snippet: z.string().optional(),
+                    match: z.string().optional(),
+                    meta: z.string().optional(),
+                    status: z.string().optional(),
+                    highlight: z.boolean().optional(),
+                }),
+            ),
+            empty: z.string().optional(),
+        }),
+        component: render('ItemList'),
+    });
+
+    const Chips = defineComponent({
+        name: 'Chips',
+        description: 'Etiquetas pequeñas en fila: los filtros de una búsqueda o categorías.',
+        props: z.object({
+            items: z.array(z.string()),
+        }),
+        component: render('Chips'),
+    });
+
+    const leaves = [Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, Image.ref, Document.ref, List.ref, Button.ref, ItemList.ref, Chips.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -147,8 +178,21 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('View'),
     });
 
+    const OpenItem = defineAction({
+        name: 'OpenItem',
+        description: 'Abre el elemento con ese número de una ItemList de la vista.',
+        params: z.object({ n: z.number() }),
+    });
+
     return createLibrary({
-        components: [View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button],
+        components: [View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button, ItemList, Chips],
+        componentGroups: [
+            { name: 'Estructura', components: ['View', 'Row', 'Card'] },
+            { name: 'Contenido', components: ['Text', 'List', 'Chips', 'Image', 'Document', 'Button'] },
+            { name: 'Datos', components: ['Metric', 'Table', 'BarChart', 'LineChart'] },
+            { name: 'Listas que se abren', components: ['ItemList'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
+        ],
+        actions: [OpenItem],
         root: 'View',
     });
 }
@@ -163,6 +207,7 @@ export function viewPrompt(): string {
             'Para mostrar en pantalla datos que no tienen una vista propia (resultados de un servidor MCP, analítica, comparativas, archivos, imágenes), llama a show_view con una interfaz escrita en OpenUI Lang. Lo dicho en voz sigue siendo corto: el detalle va en la vista. Textos en español.',
         additionalRules: [
             'Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.',
+            'Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.',
             'Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.',
             'Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.',
             'Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.',

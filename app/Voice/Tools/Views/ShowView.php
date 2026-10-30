@@ -3,6 +3,7 @@
 namespace App\Voice\Tools\Views;
 
 use App\Models\User;
+use App\Voice\OpenUi\OpenUi;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
@@ -53,12 +54,15 @@ class ShowView implements VoiceTool
             return ToolResult::error('La vista tiene que empezar por root = View("título", [...]).');
         }
 
+        // A rewritten list keeps opening its items: those of the last view
+        // Laravel built, by the number the person sees.
         return new ToolResult(
             output: ['shown_on_screen' => true],
             canvas: new Canvas('openui.view', [
                 'title' => $arguments['title'],
                 'source' => $arguments['source'] ?? 'Vista',
                 'ui' => $arguments['ui'],
+                'items' => str_contains($arguments['ui'], 'ItemList(') ? OpenUi::lastItems($user) : [],
             ], 'wide'),
         );
     }

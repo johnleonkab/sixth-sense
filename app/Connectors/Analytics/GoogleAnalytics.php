@@ -27,16 +27,20 @@ class GoogleAnalytics
      * Every GA4 property the person's Google accounts can read.
      *
      * @return list<array{property: string, name: string, account: string, account_id: int}>
+     *
+     * @throws RuntimeException when no account could list them, with Google's reason.
      */
     public function properties(User $user): array
     {
         $properties = [];
+        $refused = null;
 
         foreach ($user->accountsWith(Capability::AnalyticsRead) as $account) {
             $response = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(15)->get(self::ADMIN_URL, ['pageSize' => 200]);
 
             if ($response->failed()) {
-                report(new RuntimeException("Analytics Admin API failed with HTTP {$response->status()}."));
+                $refused = $this->refusal($response->json('error.details.0.reason'), $response->json('error.message'), $response->status());
+                report(new RuntimeException("Analytics Admin API failed with HTTP {$response->status()}: ".$response->json('error.message')));
 
                 continue;
             }
@@ -53,7 +57,23 @@ class GoogleAnalytics
             }
         }
 
+        if ($properties === [] && $refused !== null) {
+            throw new RuntimeException($refused);
+        }
+
         return $properties;
+    }
+
+    /**
+     * Google's reason, in words the person can act on.
+     */
+    private function refusal(mixed $reason, mixed $message, int $status): string
+    {
+        return match (true) {
+            $reason === 'SERVICE_DISABLED' => 'La API de Google Analytics Admin no está activada en el proyecto de Google Cloud de sixth-sense. Hay que activarla en la consola de Google Cloud y esperar unos minutos.',
+            $reason === 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' => 'La cuenta de Google no ha dado el permiso «Ver Google Analytics». Se da en Configuración, Conexiones.',
+            default => 'Google Analytics ha rechazado la petición: '.(is_string($message) && $message !== '' ? $message : "HTTP {$status}"),
+        };
     }
 
     /**

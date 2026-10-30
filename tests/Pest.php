@@ -34,6 +34,27 @@ expect()->extend('toBeOne', function () {
 });
 
 /*
+ * An OpenUI Lang program Laravel wrote is valid for the canvas library: the
+ * real parser reads it with no errors. Skipped where Node is not installed.
+ */
+expect()->extend('toBeValidOpenUi', function () {
+    $node = trim((string) shell_exec('command -v node'));
+
+    if ($node === '') {
+        return $this;
+    }
+
+    $file = tempnam(sys_get_temp_dir(), 'openui-');
+    file_put_contents($file, (string) $this->value);
+    exec(escapeshellarg($node).' '.escapeshellarg(base_path('scripts/openui-check.mts')).' '.escapeshellarg($file).' 2>&1', $output, $status);
+    unlink($file);
+
+    expect($status)->toBe(0, "OpenUI Lang no válido:\n".implode("\n", $output)."\n\n".$this->value);
+
+    return $this;
+});
+
+/*
 |--------------------------------------------------------------------------
 | Functions
 |--------------------------------------------------------------------------

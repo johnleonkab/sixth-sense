@@ -4,7 +4,7 @@ namespace App\Voice\Tools\Docs;
 
 use App\Files\FindAcross;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\FileResultsView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -77,12 +77,13 @@ class FindFiles implements VoiceTool
                     : null,
                 'shown_on_screen' => true,
             ],
-            canvas: new Canvas('files.results', [
-                'title' => $found['widened'] ? 'Últimos archivos' : count($files).' '.($files === [] ? 'archivos' : (count($files) === 1 ? 'archivo' : 'archivos')),
-                'widened' => $found['widened'],
-                'queries' => $arguments['queries'],
-                'files' => array_map(fn (array $file, int $index): array => [...$file, 'number' => $index + 1], $files, array_keys($files)),
-            ], 'wide'),
+            canvas: FileResultsView::canvas(
+                $user,
+                $found['widened'] ? 'Últimos archivos' : count($files).' '.(count($files) === 1 ? 'archivo' : 'archivos'),
+                $arguments['queries'],
+                $files,
+                $found['widened'],
+            ),
         );
     }
 }

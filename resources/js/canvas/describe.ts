@@ -6,6 +6,24 @@ const LEFT_OUT = new Set(['blocks', 'body', 'html', 'segments', 'runs', 'action'
 
 const MAX_PER_CANVAS = 1500;
 
+/** A composed view is sent whole (up to this), so the assistant can change it instead of asking again. */
+const MAX_PROGRAM = 3000;
+
+/**
+ * A composed view: its program, and what each numbered item is, so "abre el 2"
+ * and "quita los leídos" both work from what is on screen.
+ */
+function describeView(props: Record<string, unknown>): string {
+    const items = Array.isArray(props.items) ? (props.items as { n: number; title: string; args?: unknown }[]) : [];
+
+    return JSON.stringify({
+        title: props.title,
+        source: props.source,
+        items: items.slice(0, 20).map((item) => ({ n: item.n, title: item.title, ...(item.args && typeof item.args === 'object' ? item.args : {}) })),
+        program: String(props.ui ?? '').slice(0, MAX_PROGRAM),
+    });
+}
+
 function compact(value: unknown, depth: number): unknown {
     if (typeof value === 'string') {
         return value.length > 120 ? `${value.slice(0, 120)}…` : value;
@@ -43,7 +61,7 @@ export function describeCanvases(directives: CanvasDirective[]): string | null {
     return directives
         .map((directive, position) => {
             const status = viewerStatus(position + 1);
-            const props = JSON.stringify(compact(directive.props, 0)).slice(0, MAX_PER_CANVAS);
+            const props = directive.view === 'openui.view' ? describeView(directive.props) : JSON.stringify(compact(directive.props, 0)).slice(0, MAX_PER_CANVAS);
 
             return `${position + 1}. ${directive.view}${status ? ` (${status})` : ''}: ${props}`;
         })

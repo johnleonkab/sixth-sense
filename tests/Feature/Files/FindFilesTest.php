@@ -143,3 +143,23 @@ test('a doc image with a safe address is kept for the screen', function () {
     expect($document->blocks[0])->toBe(['type' => 'image', 'src' => 'https://lh3.googleusercontent.com/a.png'])
         ->and($document->blocks[1]['runs'][0]['text'])->toBe('Debajo');
 });
+
+test('the files found are a numbered view whose items open in Drive or Notion', function () {
+    Http::fake(['*' => Http::response(['files' => [[
+        'id' => 'doc1',
+        'name' => 'Flujo de prepago',
+        'mimeType' => 'application/vnd.google-apps.document',
+        'modifiedTime' => '2026-10-07T08:00:00Z',
+        'webViewLink' => 'https://docs.google.com/document/d/doc1/edit',
+    ]]])]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'find_files'), ['arguments' => ['queries' => ['prepago']], 'timezone' => 'Europe/Madrid'])
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.source', 'Drive · Notion');
+
+    $tools = collect($response->json('canvas.props.items'))->pluck('tool')->unique()->sort()->values()->all();
+
+    expect($tools)->toBe(['open_document', 'open_notion_page'])
+        ->and($response->json('canvas.props.ui'))->toContain('Text("«prepago»", "muted")')->toBeValidOpenUi();
+});

@@ -6,7 +6,8 @@
         "build": "vite build",
         "dev": "vite",
         "types": "tsc -p .",
-        "openui:prompt": "node scripts/openui-prompt.mts"
+        "openui:prompt": "node scripts/openui-prompt.mts",
+        "openui:check": "node scripts/openui-check.mts"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

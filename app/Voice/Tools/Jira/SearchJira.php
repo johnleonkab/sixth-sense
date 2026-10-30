@@ -5,7 +5,7 @@ namespace App\Voice\Tools\Jira;
 use App\Connectors\Issues\IssueSummary;
 use App\Connectors\Issues\IssueTracker;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\JiraListView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -61,11 +61,7 @@ class SearchJira implements VoiceTool
                 'note' => $found === [] ? 'No hay issues que encajen.' : null,
             ]),
             canvas: ($arguments['show_on_screen'] ?? true) && $found !== []
-                ? new Canvas('jira.list', [
-                    'title' => filled($arguments['text'] ?? null) ? "Jira: «{$arguments['text']}»" : 'Jira',
-                    'jql' => $arguments['jql'] ?? null,
-                    'issues' => array_map(fn (IssueSummary $issue, int $index): array => [...$issue->toArray($context->timezone()), 'number' => $index + 1], $found, array_keys($found)),
-                ], layout: 'wide')
+                ? JiraListView::canvas($user, filled($arguments['text'] ?? null) ? "Jira: «{$arguments['text']}»" : 'Jira', $arguments['jql'] ?? null, $found)
                 : null,
         );
     }

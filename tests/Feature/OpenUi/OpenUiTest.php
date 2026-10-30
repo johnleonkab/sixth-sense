@@ -7,10 +7,12 @@ use App\Models\PendingAction;
 use App\Models\User;
 use App\Voice\AssistantProfile;
 use App\Voice\OpenUi\OpenUi;
+use App\Voice\Tools\Analytics\ShowAnalyticsReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\ExpectationFailedException;
 
 beforeEach(function () {
     Http::preventStrayRequests();
@@ -164,8 +166,59 @@ test('with several Analytics properties and none named, the voice is asked to ch
 
     $this->actingAs($this->user)
         ->postJson(route('voice.tools.run', 'analytics_report'), ['arguments' => []])
-        ->assertJsonPath('output.choose_property', ['Web (CoverManager)', 'App (CoverManager)'])
+        ->assertJsonPath('output.choose_property', ['Web (cuenta CoverManager)', 'App (cuenta CoverManager)'])
         ->assertJsonPath('canvas', null);
 
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'runReport'));
+});
+
+test('when Google refuses to list the Analytics properties, the voice is told why', function () {
+    ConnectedAccount::factory()->for($this->user)->create();
+    Http::fake(['analyticsadmin.googleapis.com/*' => Http::response(['error' => [
+        'code' => 403,
+        'status' => 'PERMISSION_DENIED',
+        'message' => 'Google Analytics Admin API has not been used in project 1 before or it is disabled.',
+        'details' => [['reason' => 'SERVICE_DISABLED']],
+    ]], 403)]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'analytics_report'), ['arguments' => []])
+        ->assertJsonPath('output.error', fn (string $error): bool => str_contains($error, 'no está activada'));
+});
+
+test('a property is found however the person names it: property, account, both or id', function (string $wanted, ?string $expected) {
+    $properties = [
+        ['property' => 'properties/560992337', 'name' => 'Zenchef / CoverManager (Tickets)', 'account' => 'Zenchef / CM Tickets / Experiences', 'account_id' => 1],
+        ['property' => 'properties/111111111', 'name' => 'Zenchef / CoverManager (Restaurantes)', 'account' => 'Zenchef / CoverManager', 'account_id' => 1],
+        ['property' => 'properties/222222222', 'name' => 'Web corporativa', 'account' => 'CoverManager', 'account_id' => 1],
+    ];
+
+    $found = ShowAnalyticsReport::closest($properties, $wanted);
+
+    expect($expected === null ? $found : array_column($found, 'property'))->toBe($expected === null ? [] : [$expected]);
+})->with([
+    'property' => ['Zenchef / CoverManager (Tickets)', 'properties/560992337'],
+    'account' => ['Zenchef / CM Tickets / Experiences', 'properties/560992337'],
+    'both' => ['Zenchef / CoverManager (Tickets) (Zenchef / CM Tickets / Experiences)', 'properties/560992337'],
+    'spoken' => ['zenchef tickets', 'properties/560992337'],
+    'id' => ['560992337', 'properties/560992337'],
+    'another' => ['la web corporativa', 'properties/222222222'],
+    'nothing alike' => ['tienda online', null],
+]);
+
+test('the program check fails on OpenUI Lang the canvas library cannot read', function () {
+    expect(fn () => expect("root = View(\"Hoy\", [x])\nx = Nope(\"a\")")->toBeValidOpenUi())->toThrow(ExpectationFailedException::class);
+
+    expect("root = View(\"Hoy\", [x])\nx = ItemList([{n: 1, title: \"Uno\", highlight: true}], \"Nada\")")->toBeValidOpenUi();
+})->skip(fn (): bool => trim((string) shell_exec('command -v node')) === '', 'Node is not installed.');
+
+test('a list Laravel built keeps opening its items when the assistant rewrites the view', function () {
+    $search = $this->actingAs($this->user)->postJson(route('voice.tools.run', 'show_view'), ['arguments' => ['title' => 'x', 'ui' => 'root = View("x", [])']]);
+    expect($search->json('canvas.props.items'))->toBe([]);
+
+    OpenUi::rememberItems($this->user, [['n' => 2, 'title' => 'CPD-405', 'tool' => 'open_jira_issue', 'args' => ['issue' => 'demo:CPD-405']]]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('voice.tools.run', 'show_view'), ['arguments' => ['title' => 'Solo en curso', 'ui' => "root = View(\"Solo en curso\", [l])\nl = ItemList([{n: 2, title: \"Integrar la pasarela\"}])"]])
+        ->assertJsonPath('canvas.props.items.0.args.issue', 'demo:CPD-405');
 });

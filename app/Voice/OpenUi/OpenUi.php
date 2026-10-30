@@ -2,6 +2,9 @@
 
 namespace App\Voice\OpenUi;
 
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+
 /**
  * Views composed from the OpenUI blocks of resources/js/canvas/openui/spec.ts.
  * The prompt the voice follows is generated from those same blocks by
@@ -21,8 +24,9 @@ class OpenUi
     }
 
     /**
-     * One OpenUI Lang value: a string, number, boolean, null, list or a
-     * reference to another statement (Ref).
+     * One OpenUI Lang value: a string, number, boolean, null, list, object
+     * (an array with keys; nulls are left out) or a reference to another
+     * statement (Ref).
      */
     public static function value(mixed $value): string
     {
@@ -32,9 +36,37 @@ class OpenUi
             is_int($value), is_float($value) => (string) (is_float($value) ? round($value, 2) : $value),
             is_bool($value) => $value ? 'true' : 'false',
             $value === null => 'null',
-            is_array($value) => '['.implode(', ', array_map(self::value(...), $value)).']',
+            is_array($value) && array_is_list($value) => '['.implode(', ', array_map(self::value(...), $value)).']',
+            is_array($value) => self::object(array_filter($value, fn (mixed $item): bool => $item !== null)),
             default => json_encode((string) $value, JSON_UNESCAPED_UNICODE),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    private static function object(array $value): string
+    {
+        return '{'.implode(', ', array_map(fn (string $key, mixed $item): string => "{$key}: ".self::value($item), array_keys($value), $value)).'}';
+    }
+
+    /**
+     * The items a user's last composed view can open, so a view the
+     * assistant rewrites keeps them.
+     *
+     * @param  list<array{n: int, title: string, tool: string, args: array<string, mixed>}>  $items
+     */
+    public static function rememberItems(User $user, array $items): void
+    {
+        Cache::put("openui-items:{$user->id}", $items, now()->addHours(12));
+    }
+
+    /**
+     * @return list<array{n: int, title: string, tool: string, args: array<string, mixed>}>
+     */
+    public static function lastItems(User $user): array
+    {
+        return Cache::get("openui-items:{$user->id}", []);
     }
 
     /**

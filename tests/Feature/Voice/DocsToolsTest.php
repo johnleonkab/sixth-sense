@@ -23,13 +23,17 @@ function runDocsTool(string $tool, array $arguments): TestResponse
 }
 
 test('documents are listed with owner, creation and last edit', function () {
-    runDocsTool('show_document_results', ['owner' => 'Marta'])
-        ->assertJsonPath('canvas.view', 'docs.results')
+    $response = runDocsTool('show_document_results', ['owner' => 'Marta'])
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.layout', 'wide')
-        ->assertJsonPath('canvas.props.results.0.title', 'Flujo de prepago v4 — PRD')
-        ->assertJsonPath('canvas.props.results.0.owner.name', 'Marta Ruiz')
-        ->assertJsonPath('canvas.props.results.0.modified_by.name', 'Marta Ruiz')
+        ->assertJsonPath('canvas.props.source', 'Docs')
+        ->assertJsonPath('canvas.props.items.0', ['n' => 1, 'title' => 'Flujo de prepago v4 — PRD', 'tool' => 'open_document', 'args' => ['document' => $this->prd]])
         ->assertJsonPath('output.results.0.document_id', $this->prd);
+
+    expect($response->json('canvas.props.ui'))->toContain('Chips(["de Marta"])')
+        ->toContain('title: "Flujo de prepago v4 — PRD", eyebrow: "Marta Ruiz"')
+        ->toContain('· Marta Ruiz"')
+        ->toBeValidOpenUi();
 });
 
 test('a document opens large and its exact text goes to the assistant', function () {

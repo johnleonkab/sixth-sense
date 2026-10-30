@@ -22,8 +22,10 @@ function confirmProposal(TestResponse $proposal): void
 
 test('pages are found by title and shown numbered', function () {
     runNotionTool('search_notion', ['query' => 'lanzamiento'])
-        ->assertJsonPath('canvas.view', 'notion.results')
-        ->assertJsonPath('canvas.props.pages.0.number', 1)
+        ->assertJsonPath('canvas.view', 'openui.view')
+        ->assertJsonPath('canvas.props.items.0.n', 1)
+        ->assertJsonPath('canvas.props.items.0.args', ['page' => FakeWiki::LAUNCH])
+        ->assertJsonPath('canvas.props.ui', fn (string $ui): bool => str_contains($ui, 'eyebrow: "en Producto"'))
         ->assertJsonPath('output.pages.0.page_id', FakeWiki::LAUNCH)
         ->assertJsonPath('output.pages.0.in', 'Producto');
 });

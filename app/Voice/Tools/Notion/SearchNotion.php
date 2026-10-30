@@ -5,7 +5,7 @@ namespace App\Voice\Tools\Notion;
 use App\Connectors\Wiki\Wiki;
 use App\Connectors\Wiki\WikiPageSummary;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\NotionResultsView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -59,10 +59,7 @@ class SearchNotion implements VoiceTool
                 'note' => $pages === [] ? 'No hay páginas con ese título, o no se compartieron con sixth-sense al conectar Notion.' : null,
             ],
             canvas: ($arguments['show_on_screen'] ?? true) && $pages !== []
-                ? new Canvas('notion.results', [
-                    'title' => filled($arguments['query'] ?? null) ? "Notion: «{$arguments['query']}»" : 'Notion: últimas editadas',
-                    'pages' => array_map(fn (WikiPageSummary $page, int $index): array => [...$page->toArray($context->timezone()), 'number' => $index + 1], $pages, array_keys($pages)),
-                ])
+                ? NotionResultsView::canvas($user, filled($arguments['query'] ?? null) ? "Notion: «{$arguments['query']}»" : 'Notion: últimas editadas', $pages, $context->timezone())
                 : null,
         );
     }

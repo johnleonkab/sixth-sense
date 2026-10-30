@@ -30,7 +30,11 @@ function Card({ props, renderNode }: Props<{ title?: string; children: unknown[]
     );
 }
 
-function Text({ props }: Props<{ text: string; tone?: 'default' | 'muted' }>) {
+function Text({ props }: Props<{ text: string; tone?: 'default' | 'muted' | 'warn' }>) {
+    if (props.tone === 'warn') {
+        return <p className="rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">{props.text}</p>;
+    }
+
     return <p className={`text-[14px] leading-[1.55] ${props.tone === 'muted' ? 'text-muted' : ''}`}>{props.text}</p>;
 }
 
@@ -194,4 +198,82 @@ function Button({ props }: Props<{ label: string; action?: unknown }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button });
+type Item = { n: number; title: string; eyebrow?: string; snippet?: string; match?: string; meta?: string; status?: string; highlight?: boolean };
+
+/** The snippet with where the search matched marked, as search results showed it. */
+function Snippet({ text, match }: { text: string; match?: string }) {
+    const at = match ? text.toLowerCase().indexOf(match.toLowerCase()) : -1;
+
+    if (!match || at < 0) {
+        return <>{text}</>;
+    }
+
+    return (
+        <>
+            {text.slice(0, at)}
+            <mark className="rounded-[3px] bg-hl px-0.5 text-ink">{text.slice(at, at + match.length)}</mark>
+            {text.slice(at + match.length)}
+        </>
+    );
+}
+
+/** Numbered so the person can say "abre el 2"; a click opens it without asking the model. */
+function ItemList({ props }: Props<{ items: Item[]; empty?: string }>) {
+    const trigger = useTriggerAction();
+
+    if (props.items.length === 0) {
+        return <p className="text-[13px] text-muted">{props.empty ?? 'No hay nada que enseñar.'}</p>;
+    }
+
+    const open = (item: Item) => void trigger(`Abre el ${item.n}`, undefined, { type: 'OpenItem', params: { n: item.n } });
+
+    return (
+        <ol className="-mx-2.5">
+            {props.items.map((item) => (
+                <li key={item.n} className="border-t border-line first:border-t-0">
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => open(item)}
+                        onKeyDown={(event) => event.key === 'Enter' && open(item)}
+                        className="grid cursor-pointer grid-cols-[26px_minmax(0,1fr)_auto] items-start gap-3 rounded-[10px] px-2.5 py-2.5 hover:bg-soft"
+                    >
+                        <span
+                            className={`mt-px grid size-[22px] place-items-center rounded-full border font-mono text-[11px] ${item.highlight ? 'border-accent bg-accent text-accent-ink' : 'border-line text-muted'}`}
+                            aria-label={`Elemento ${item.n}`}
+                        >
+                            {item.n}
+                        </span>
+                        <span className="min-w-0">
+                            {item.eyebrow && <span className="block truncate text-[12px] text-muted">{item.eyebrow}</span>}
+                            <span className={`block truncate text-[14px] ${item.highlight ? 'font-semibold' : ''}`}>{item.title}</span>
+                            {item.snippet && (
+                                <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">
+                                    <Snippet text={item.snippet} match={item.match} />
+                                </span>
+                            )}
+                        </span>
+                        <span className="flex flex-col items-end gap-1 text-right">
+                            {item.status && <span className="rounded-full bg-soft px-2 py-0.5 text-[11.5px] whitespace-nowrap">{item.status}</span>}
+                            {item.meta && <span className="text-[11.5px] whitespace-nowrap text-faint">{item.meta}</span>}
+                        </span>
+                    </div>
+                </li>
+            ))}
+        </ol>
+    );
+}
+
+function Chips({ props }: Props<{ items: string[] }>) {
+    return (
+        <ul aria-label="Filtros" className="-mt-1 flex flex-wrap gap-1.5">
+            {props.items.map((item, index) => (
+                <li key={index} className="rounded-full bg-soft px-2.5 py-0.5 text-[12px]">
+                    {item}
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+export const openUiLibrary = buildLibrary({ View, Row, Card, Text, Metric, Table, BarChart, LineChart, Image, Document, List, Button, ItemList, Chips });

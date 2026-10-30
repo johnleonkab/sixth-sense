@@ -25,11 +25,13 @@ test('"an email where Marta mentioned the prepayment" finds it and says where', 
         ->assertJsonPath('output.results.0.number', 1)
         ->assertJsonPath('output.results.0.email_id', 'demo.1')
         ->assertJsonPath('output.results.0.match', 'Hola John, He subido a Figma la versión nueva del flujo de «prepago». El cambio grande está en el paso 3: el cliente ve el importe total antes de elegir…')
-        ->assertJsonPath('canvas.view', 'mail.results')
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.props.title', '1 email')
-        ->assertJsonPath('canvas.props.search', ['from' => 'Marta', 'pattern' => 'pre-?pago'])
-        ->assertJsonPath('canvas.props.results.0.excerpt.match', 'prepago')
-        ->assertJsonPath('canvas.props.results.0.from', ['name' => 'Marta Ruiz', 'email' => 'marta@covermanager.test']);
+        ->assertJsonPath('canvas.props.items.0.tool', 'open_email')
+        ->assertJsonPath('canvas.props.items.0.args', ['email_id' => 'demo.1', 'highlight' => 'pre-?pago'])
+        ->assertJsonPath('canvas.props.ui', fn (string $ui): bool => str_contains($ui, 'Chips(["de Marta", "/pre-?pago/"])')
+            && str_contains($ui, 'match: "prepago"')
+            && str_contains($ui, 'eyebrow: "Marta Ruiz"'));
 });
 
 test('the pattern finds what was said in the body, not only the subject', function () {

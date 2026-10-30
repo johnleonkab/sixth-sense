@@ -14,20 +14,30 @@ Para mostrar en pantalla datos que no tienen una vista propia (resultados de un 
 ## Component Signatures
 
 Arguments marked with ? are optional. Sub-components can be inline or referenced; prefer references for better streaming.
-Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@ToAssistant, @OpenUrl).
+Props typed `ActionExpression` accept one @step, or Action([@steps...]) for several. See the Action section for available steps (@ToAssistant, @OpenUrl, @OpenItem).
 
-View(title: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
-Card(title?: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | Row)[]) — Agrupa bloques bajo un título.
-Text(text: string, tone?: "default" | "muted") — Un párrafo corto. muted para notas secundarias.
+### Estructura
+View(title: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric o Button.
+Card(title?: string, children: (Text | Metric | Table | BarChart | LineChart | Image | Document | List | Button | ItemList | Chips | Row)[]) — Agrupa bloques bajo un título.
+
+### Contenido
+Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
+List(items: string[], ordered?: boolean) — Una lista de puntos cortos.
+Chips(items: string[]) — Etiquetas pequeñas en fila: los filtros de una búsqueda o categorías.
+Image(url: string, caption?: string) — Una imagen por su URL https, con un pie opcional.
+Document(title: string, url: string, kind?: "pdf" | "doc" | "sheet" | "page" | "link", note?: string) — Un documento o archivo enlazado (PDF, Doc, página, hoja). Muestra título y un botón para abrirlo.
+Button(label: string, action?: ActionExpression) — Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace.
+
+### Datos
 Metric(label: string, value: string, change?: string, hint?: string) — Una cifra clave con su etiqueta, y opcionalmente el cambio ("+12%") y una nota.
 Table(columns: string[], rows: (string | number)[][]) — Una tabla: cabeceras y filas de celdas (texto o número). Para comparar o listar registros.
 BarChart(title?: string, labels: string[], values: number[], unit?: string) — Barras horizontales para comparar cantidades entre categorías. labels y values en el mismo orden.
 LineChart(title?: string, labels: string[], values: number[], unit?: string) — Una línea para ver una tendencia en el tiempo. labels (fechas) y values en el mismo orden.
-Image(url: string, caption?: string) — Una imagen por su URL https, con un pie opcional.
-Document(title: string, url: string, kind?: "pdf" | "doc" | "sheet" | "page" | "link", note?: string) — Un documento o archivo enlazado (PDF, Doc, página, hoja). Muestra título y un botón para abrirlo.
-List(items: string[], ordered?: boolean) — Una lista de puntos cortos.
-Button(label: string, action?: ActionExpression) — Un botón. Sin acción, le dice su texto al asistente. Con @ToAssistant("…") le pide algo concreto; con @OpenUrl("…") abre un enlace.
+
+### Listas que se abren
+ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status y highlight (sin leer, importante). Pulsar uno lo abre. Conserva los n que vengan en los datos.
+Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
 
 ## Action — Button Behavior
 
@@ -37,6 +47,7 @@ Buttons without an action automatically send their label to the assistant (equiv
 Available steps:
 - @ToAssistant(message: string, context?: any) — Send a message to the assistant (for conversational buttons like "Tell me more", "Explain this"). The optional context is any value (object, array, string, number) passed to the assistant as hidden data, e.g. @ToAssistant("Show details", {orderId: 42})
 - @OpenUrl(url: string) — Navigate to a URL
+- @OpenItem(n: number) — Abre el elemento con ese número de una ItemList de la vista.
 
 Example — simple nav:
 ```
@@ -76,6 +87,7 @@ Before finishing, walk your output and verify:
 2. Every referenced name is defined. Every defined name (other than root) is reachable from root.
 
 - Como mucho 12 bloques: la pantalla es para mirar de un vistazo, no un informe.
+- Si en pantalla hay una vista (openui.view) y piden cambiarla (filtrar, ordenar, quitar o añadir algo), llama a show_view con su programa completo ya cambiado, partiendo del que hay en pantalla; conserva los n de cada elemento de una ItemList para que se sigan pudiendo abrir.
 - Usa Metric para 1 a 4 cifras clave, LineChart para series en el tiempo, BarChart para comparar categorías y Table para el detalle.
 - Solo URLs https que vengan de los datos; no inventes enlaces ni imágenes.
 - Añade como mucho 3 Button con lo siguiente que el usuario querría pedir.

@@ -2,9 +2,8 @@
 
 namespace App\Voice\Tools\Docs;
 
-use App\Connectors\Docs\DocumentSummary;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\DocumentResultsView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -34,28 +33,7 @@ class ShowDocumentResults implements VoiceTool
 
         return new ToolResult(
             output: [...$this->summary($result, $search, $context), 'shown_on_screen' => true],
-            canvas: new Canvas('docs.results', [
-                'title' => match (true) {
-                    $count === 0 => 'Ningún documento',
-                    $count === 1 => '1 documento',
-                    default => "{$count} documentos",
-                },
-                'search' => $search->describe(),
-                'accounts' => $result->accounts,
-                'failed_accounts' => $result->failedAccounts,
-                'may_have_more' => $result->mayHaveMore,
-                'results' => array_map(fn (DocumentSummary $document, int $index): array => [
-                    'number' => $index + 1,
-                    'ref' => $document->ref,
-                    'title' => $document->title,
-                    'owner' => $document->owner,
-                    'created_at' => $document->createdAt->setTimezone($context->timezone())->toIso8601String(),
-                    'modified_at' => $document->modifiedAt->setTimezone($context->timezone())->toIso8601String(),
-                    'modified_by' => $document->lastModifiedBy,
-                    'account' => $document->account,
-                    'url' => $document->url,
-                ], $result->documents, array_keys($result->documents)),
-            ], layout: 'wide'),
+            canvas: DocumentResultsView::canvas($user, $search, $result, $context->timezone()),
         );
     }
 }

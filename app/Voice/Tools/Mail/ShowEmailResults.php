@@ -2,12 +2,9 @@
 
 namespace App\Voice\Tools\Mail;
 
-use App\Connectors\Mail\FoundMessage;
 use App\Connectors\Mail\InvalidMailPattern;
-use App\Connectors\Mail\MailSearch;
-use App\Connectors\Mail\MailSearchResult;
 use App\Models\User;
-use App\Voice\Tools\Canvas;
+use App\Voice\OpenUi\Views\MailResultsView;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
@@ -44,37 +41,7 @@ class ShowEmailResults implements VoiceTool
 
         return new ToolResult(
             output: [...$this->summary($result, $search, $context), 'shown_on_screen' => true],
-            canvas: $this->canvas($result, $search, $context),
+            canvas: MailResultsView::canvas($user, $search, $result, $context->timezone()),
         );
-    }
-
-    private function canvas(MailSearchResult $result, MailSearch $search, ToolContext $context): Canvas
-    {
-        $count = count($result->messages);
-
-        return new Canvas('mail.results', [
-            'title' => match (true) {
-                $count === 0 => 'Ningún email',
-                $count === 1 => '1 email',
-                default => "{$count} emails",
-            },
-            'search' => $search->describe(),
-            'timezone' => $context->timezone(),
-            'accounts' => $result->accounts,
-            'failed_accounts' => $result->failedAccounts,
-            'may_have_more' => $result->mayHaveMore,
-            'scanned' => $result->scanned,
-            'results' => array_map(fn (FoundMessage $found, int $index): array => [
-                'number' => $index + 1,
-                'ref' => $found->message->ref,
-                'from' => $found->message->from?->toArray(),
-                'subject' => $found->message->subject,
-                'date' => $found->message->date->setTimezone($context->timezone())->toIso8601String(),
-                'snippet' => $found->message->snippet,
-                'excerpt' => $found->excerpt,
-                'unread' => $found->message->unread,
-                'account' => $found->message->account,
-            ], $result->messages, array_keys($result->messages)),
-        ]);
     }
 }
