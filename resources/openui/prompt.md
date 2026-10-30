@@ -18,9 +18,9 @@ Props typed `ActionExpression` accept one @step, or Action([@steps...]) for seve
 Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
 
 ### Estructura
-View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
-Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
-Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Quote | Draft | Proposal | Row)[]) — Agrupa bloques bajo un título.
+View(title: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal | Row | Card)[]) — La vista entera: un título y sus bloques, de arriba abajo.
+Row(children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal)[]) — Pone sus hijos uno al lado del otro (se apilan en el móvil). Ideal para 2 a 4 Metric; para botones, Buttons.
+Card(title?: string, children: (Tabs | Text | Metric | Table | BarChart | LineChart | DonutChart | Image | Document | List | Button | Buttons | ItemList | Chips | Timeline | Quote | Draft | Proposal | Row)[]) — Agrupa bloques bajo un título.
 
 ### Contenido
 Text(text: string, tone?: "default" | "muted" | "warn") — Un párrafo corto. muted para notas secundarias, warn para un aviso (algo que no se pudo leer).
@@ -42,6 +42,7 @@ Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar ca
 
 ### Listas que se abren
 ItemList(items: {n: number, title: string, eyebrow?: string, snippet?: string, match?: string, meta?: string, status?: string, highlight?: boolean, ref?: string, actions?: {label: string, ref: string}[]}[], empty?: string) — Una lista numerada de cosas que se pueden abrir (emails, issues, páginas, archivos, mensajes). Cada elemento: n (su número, el que la persona dice: «abre el 2»), title, y opcionalmente eyebrow (línea pequeña de arriba: remitente, clave, tipo), snippet, match (palabras del snippet a resaltar), meta (fecha, responsable), status, highlight (sin leer, importante), ref (cómo se abre, si viene en las filas de una Query) y actions (botones pequeños bajo el elemento: label y ref). Pulsar uno lo abre. Conserva los n, ref y actions que vengan en los datos.
+Timeline(days: {label: string, events: {time: string, title: string, detail?: string, color?: string, declined?: boolean, ref?: string, documents?: {title: string, url: string}[]}[]}[], empty?: string) — Eventos por día, de arriba abajo: cada día con su label ("Lunes 26 de octubre") y sus eventos (time "10:00–10:30" o "Todo el día", title, y opcionalmente detail con quién y dónde, color del calendario en #hex, declined si lo rechazó, ref para abrirlo y documents con title y url).
 Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.
 
 ### Cambios

@@ -6,6 +6,7 @@ use App\Connectors\Calendar\CalendarEvent;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\EventQuery;
 use App\Models\User;
+use App\Voice\OpenUi\Views\CalendarAgendaView;
 use App\Voice\Tools\Canvas;
 use Carbon\CarbonImmutable;
 
@@ -25,8 +26,12 @@ final class CalendarCanvas
         );
         $reading = $this->reader->read($user, $query);
 
+        if (! $query->isSingleDay()) {
+            return CalendarAgendaView::canvas($user, $this->title($query, $now), $reading, $query);
+        }
+
         return new Canvas(
-            view: $query->isSingleDay() ? 'calendar.day' : 'calendar.agenda',
+            view: 'calendar.day',
             props: [
                 'title' => $this->title($query, $now),
                 'from' => $query->from->toDateString(),

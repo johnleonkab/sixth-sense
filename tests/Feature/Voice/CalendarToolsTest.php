@@ -66,9 +66,15 @@ test('showing a single day draws the day timeline', function () {
 });
 
 test('showing a range or a search draws the agenda', function (array $arguments, string $title) {
-    runVoiceTool('show_calendar', $arguments)
-        ->assertJsonPath('canvas.view', 'calendar.agenda')
+    $agenda = runVoiceTool('show_calendar', $arguments)
+        ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('canvas.props.title', $title);
+
+    // Grouped by day, each event opening its day.
+    expect($agenda->json('canvas.props.ui'))
+        ->toContain('{label: "Jueves 8 de octubre", events: [')
+        ->toContain('{time: "09:30–09:45", title: "Daily de producto", detail: "Marta, Pablo", ref: "day:2026-10-08"}')
+        ->toBeValidOpenUi();
 })->with([
     'a week' => [['start_date' => '2026-10-05', 'end_date' => '2026-10-11'], 'Del 5 al 11 de octubre'],
     'a search' => [['start_date' => '2026-10-08', 'title' => 'daily'], 'Mañana, 8 de octubre'],

@@ -6,6 +6,7 @@ use App\Connectors\Calendar\CalendarEvent;
 use App\Connectors\Calendar\CalendarReading;
 use App\Connectors\Calendar\EventQuery;
 use App\Models\User;
+use App\Voice\OpenUi\Views\CalendarAgendaView;
 use App\Voice\Tools\Canvas;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
@@ -43,14 +44,19 @@ class ShowCalendar implements VoiceTool
 
         return new ToolResult(
             output: [...$this->summary($reading, $query), 'shown_on_screen' => true],
-            canvas: $this->canvas($reading, $query, $context),
+            canvas: $this->canvas($user, $reading, $query, $context),
         );
     }
 
-    private function canvas(CalendarReading $reading, EventQuery $query, ToolContext $context): Canvas
+    private function canvas(User $user, CalendarReading $reading, EventQuery $query, ToolContext $context): Canvas
     {
+        // Several days, or a search: grouped by day. One day keeps its time grid.
+        if (! $query->isSingleDay() || $query->isFiltered()) {
+            return CalendarAgendaView::canvas($user, $this->title($query, $context), $reading, $query);
+        }
+
         return new Canvas(
-            view: $query->isSingleDay() && ! $query->isFiltered() ? 'calendar.day' : 'calendar.agenda',
+            view: 'calendar.day',
             props: [
                 'title' => $this->title($query, $context),
                 'from' => $query->from->toDateString(),

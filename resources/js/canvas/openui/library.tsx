@@ -303,6 +303,69 @@ function Buttons({ props, renderNode }: Props<{ buttons: unknown[] }>) {
     return <UiButtons>{renderNode(props.buttons)}</UiButtons>;
 }
 
+type TimelineEvent = { time: string; title: string; detail?: string; color?: string; declined?: boolean; ref?: string; documents?: { title: string; url: string }[] };
+
+/** Only a calendar's own colour (#hex) tints the line; anything else is ignored. */
+const hex = (color?: string): string | undefined => (color && /^#[0-9a-f]{3,8}$/i.test(color) ? color : undefined);
+
+/** Events by day, as the agenda shows them: the time, what, with whom, and the calendar's colour. */
+function Timeline({ props }: Props<{ days: { label: string; events: TimelineEvent[] }[]; empty?: string }>) {
+    const trigger = useTriggerAction();
+    const days = Array.isArray(props.days) ? props.days.filter((day) => Array.isArray(day.events) && day.events.length > 0) : [];
+
+    if (days.length === 0) {
+        return <p className="text-[13px] text-muted">{props.empty ?? 'No hay nada en el calendario.'}</p>;
+    }
+
+    return (
+        <div className="flex flex-col gap-5">
+            {days.map((day) => (
+                <section key={day.label}>
+                    <h4 className="mb-1.5 text-[12px] font-medium text-muted">{day.label}</h4>
+                    <ul>
+                        {day.events.map((event, position) => {
+                            const opens = event.ref ? () => void trigger(event.title, undefined, { type: 'Do', params: { ref: event.ref } }) : undefined;
+
+                            return (
+                                <li
+                                    key={`${event.time}-${position}`}
+                                    className={`grid grid-cols-[86px_minmax(0,1fr)] gap-3 rounded-r-lg border-l-2 py-2 pl-2.5 ${hex(event.color) ? '' : 'border-transparent'} ${opens ? 'cursor-pointer hover:bg-soft' : ''}`}
+                                    style={hex(event.color) ? { borderColor: hex(event.color) } : undefined}
+                                    onClick={opens}
+                                    {...(opens ? { role: 'button', tabIndex: 0, onKeyDown: (key: { key: string }) => key.key === 'Enter' && opens() } : {})}
+                                >
+                                    <span className="pt-px font-mono text-[11.5px] text-muted tabular-nums">{event.time}</span>
+                                    <div className="min-w-0">
+                                        <p className={`truncate text-[13.5px] ${event.declined ? 'text-faint line-through' : ''}`}>{event.title}</p>
+                                        {event.detail && <p className="truncate text-[12px] text-muted">{event.detail}</p>}
+                                        {event.documents && event.documents.length > 0 && (
+                                            <span className="mt-1.5 flex flex-wrap gap-1.5" onClick={(click) => click.stopPropagation()}>
+                                                {event.documents
+                                                    .filter((document) => https(document.url))
+                                                    .map((document) => (
+                                                        <a
+                                                            key={document.url}
+                                                            href={document.url}
+                                                            target="_blank"
+                                                            rel="noreferrer noopener"
+                                                            className="rounded-full bg-soft px-2.5 py-0.5 text-[12px] hover:text-accent"
+                                                        >
+                                                            {document.title} ↗
+                                                        </a>
+                                                    ))}
+                                            </span>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </section>
+            ))}
+        </div>
+    );
+}
+
 function Quote({ props }: Props<{ text: string; author?: string }>) {
     return (
         <blockquote className="border-l-2 border-line pl-3 text-[13.5px] text-muted">
@@ -489,4 +552,4 @@ function Chips({ props }: Props<{ items: string[] }>) {
     );
 }
 
-export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Quote, Draft, Proposal });
+export const openUiLibrary = buildLibrary({ View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Quote, Draft, Proposal });

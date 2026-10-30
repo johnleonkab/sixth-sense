@@ -33,7 +33,8 @@ export type BlockName =
     | 'Tabs'
     | 'Proposal'
     | 'Quote'
-    | 'Draft';
+    | 'Draft'
+    | 'Timeline';
 
 /** What the grouping functions return: chart-ready labels and values, in the same order. */
 export type Series = { labels: string[]; values: number[] };
@@ -218,6 +219,32 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Button'),
     });
 
+    const Timeline = defineComponent({
+        name: 'Timeline',
+        description:
+            'Eventos por día, de arriba abajo: cada día con su label ("Lunes 26 de octubre") y sus eventos (time "10:00–10:30" o "Todo el día", title, y opcionalmente detail con quién y dónde, color del calendario en #hex, declined si lo rechazó, ref para abrirlo y documents con title y url).',
+        props: z.object({
+            days: z.array(
+                z.object({
+                    label: z.string(),
+                    events: z.array(
+                        z.object({
+                            time: z.string(),
+                            title: z.string(),
+                            detail: z.string().optional(),
+                            color: z.string().optional(),
+                            declined: z.boolean().optional(),
+                            ref: z.string().optional(),
+                            documents: z.array(z.object({ title: z.string(), url: z.string() })).optional(),
+                        }),
+                    ),
+                }),
+            ),
+            empty: z.string().optional(),
+        }),
+        component: render('Timeline'),
+    });
+
     const Quote = defineComponent({
         name: 'Quote',
         description: 'Un texto citado tal cual: el fragmento de un documento o lo que dijo alguien (author).',
@@ -302,7 +329,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
         component: render('Tabs'),
     });
 
-    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref, Quote.ref, Draft.ref, Proposal.ref];
+    const leaves = [Tabs.ref, Text.ref, Metric.ref, Table.ref, BarChart.ref, LineChart.ref, DonutChart.ref, Image.ref, Document.ref, List.ref, Button.ref, Buttons.ref, ItemList.ref, Chips.ref, Timeline.ref, Quote.ref, Draft.ref, Proposal.ref];
 
     const Row = defineComponent({
         name: 'Row',
@@ -380,7 +407,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
     });
 
     return createLibrary({
-        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Quote, Draft, Proposal],
+        components: [View, Row, Card, Tabs, Text, Metric, Table, BarChart, LineChart, DonutChart, Image, Document, List, Button, Buttons, ItemList, Chips, Timeline, Quote, Draft, Proposal],
         functions: [GroupCount, GroupSum, Top, ByDay],
         componentGroups: [
             { name: 'Estructura', components: ['View', 'Row', 'Card'] },
@@ -390,7 +417,7 @@ export function buildLibrary(renderers: Renderers = {}): Library {
                 components: ['Metric', 'Table', 'BarChart', 'LineChart', 'DonutChart'],
                 notes: ['Elige por la pregunta: partes de un todo (6 o menos) → DonutChart; comparar cantidades → BarChart; evolución en el tiempo → LineChart; 1 a 4 cifras → Metric; detalle → Table.'],
             },
-            { name: 'Listas que se abren', components: ['ItemList'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
+            { name: 'Listas que se abren', components: ['ItemList', 'Timeline'], notes: ['Úsala para resultados de búsqueda y listas de issues, emails, páginas o mensajes.'] },
             { name: 'Cambios', components: ['Quote', 'Draft', 'Proposal'], notes: ['Un Proposal por cambio propuesto, al final de la vista, con lo que cambiará encima (Draft para el texto, Quote para lo que responde).'] },
         ],
         actions: [OpenItem, Do],
