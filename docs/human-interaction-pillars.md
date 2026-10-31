@@ -144,6 +144,8 @@ Sin estas métricas no sabremos si los pilares funcionan. Objetivos por definir 
 
 La última es la más difícil y la más importante: las demás solo miden precisión.
 
+Hoy se calculan por semana y por tipo de acción en Configuración › Impacto («Cómo van los avisos»), a partir del resultado de cada propuesta. «Se escaparon» usa por ahora la detección de Slack (mensajes que el triaje no dio por suyos y luego sí lo eran); faltan reuniones y entregas. Los objetivos se fijarán tras dos semanas de datos.
+
 ## Estado actual frente a los pilares
 
 **Lo urgente ya está corregido:** ninguna tarea, propia o con otros, llega al calendario sin el «sí».
@@ -175,6 +177,7 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-10-31 | Etapa 10: las seis métricas por semana y por tipo de acción en Configuración › Impacto; «se escaparon» desde la detección de Slack. Objetivos pendientes de dos semanas de datos. |
 | 2026-10-31 | Etapa 9: aprender de cada interacción. Pesos de las señales, lecciones por capa y persona escritas por un modelo ligero, que se sustituyen o caducan; casos de evaluación desde las correcciones; revisión de la inercia; página de Lecciones en Configuración. |
 | 2026-10-31 | Etapa 8: ciclo de vida. Caducidad cuando otro lo resuelve o la llamada ya pasó; orden por plazo y bloqueo; los avisos de baja urgencia no suenan y van a un resumen dos veces al día. |
 | 2026-10-31 | Etapa 7: cada propuesta cita sus fuentes con fecha; el destinatario se clasifica (organización, otro equipo, fuera) y los datos internos que van fuera piden un «sí» más. |

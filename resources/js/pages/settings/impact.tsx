@@ -8,7 +8,73 @@ type ImpactProps = {
     summary: { minutes: number; proposals: number; slots: number; events: number; by_service: { service: string; count: number }[] };
     weekly: { week: string; minutes: number }[];
     rates: { proposal: number; slot: number };
+    alerts: {
+        weeks: (AlertMeasure & { week: string; missed: number })[];
+        classes: (AlertMeasure & { class: string })[];
+    };
 };
+
+type AlertMeasure = {
+    total: number;
+    acceptance: number | null;
+    edit_rate: number | null;
+    edit_size: number | null;
+    discards: Record<'not_important' | 'not_for_me' | 'bad_proposal' | 'none', number | null>;
+    median_minutes: number | null;
+    expired: number | null;
+};
+
+const classLabel: Record<string, string> = { reply: 'Respuesta', call: 'Llamada', task: 'Tarea', question: 'Pregunta' };
+
+const percent = (value: number | null): string => (value === null ? '—' : `${Math.round(value * 100)} %`);
+
+/** The pillars' metrics, one row each; one column per week or per class. */
+const alertRows: { label: string; hint: string; value: (measure: AlertMeasure & { missed?: number }) => string }[] = [
+    { label: 'Avisos', hint: 'Con un final: enviado, descartado, resuelto o caducado', value: (measure) => String(measure.total) },
+    { label: 'Aceptación', hint: 'Enviados tal cual o modificados', value: (measure) => percent(measure.acceptance) },
+    { label: 'Modificados', hint: 'De los enviados; entre paréntesis, caracteres cambiados de media', value: (measure) => `${percent(measure.edit_rate)}${measure.edit_size ? ` (${measure.edit_size})` : ''}` },
+    { label: 'Descarte: no importa', hint: 'Falló el filtro de importancia', value: (measure) => percent(measure.discards.not_important) },
+    { label: 'Descarte: no es para mí', hint: 'Falló a quién le toca', value: (measure) => percent(measure.discards.not_for_me) },
+    { label: 'Descarte: propuesta mal', hint: 'Falló la clase o el borrador', value: (measure) => percent(measure.discards.bad_proposal) },
+    { label: 'Hasta la acción', hint: 'Mediana desde el aviso', value: (measure) => (measure.median_minutes === null ? '—' : duration(measure.median_minutes)) },
+    { label: 'Caducados', hint: 'Llegaron tarde o no hacían falta', value: (measure) => percent(measure.expired) },
+    { label: 'Se escaparon', hint: 'En Slack, lo que hacía falta responder y no se avisó', value: (measure) => (measure.missed === undefined ? '' : String(measure.missed)) },
+];
+
+function AlertTable({ columns, heads }: { columns: (AlertMeasure & { missed?: number })[]; heads: string[] }) {
+    return (
+        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+            <table className="w-full min-w-[520px] text-[13px]">
+                <thead>
+                    <tr className="border-b border-line text-left text-[12px] text-muted">
+                        <th className="px-4 py-2.5 font-normal">Métrica</th>
+                        {heads.map((head) => (
+                            <th key={head} className="px-3 py-2.5 text-right font-normal">
+                                {head}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {alertRows
+                        .filter((row) => row.label !== 'Se escaparon' || columns.some((column) => column.missed !== undefined))
+                        .map((row) => (
+                            <tr key={row.label} className="border-b border-line last:border-b-0">
+                                <th scope="row" className="px-4 py-2 text-left font-normal" title={row.hint}>
+                                    {row.label}
+                                </th>
+                                {columns.map((column, position) => (
+                                    <td key={position} className="px-3 py-2 text-right font-mono tabular-nums">
+                                        {row.value(column)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
 
 const periods: { key: ImpactProps['period']; label: string }[] = [
     { key: '7', label: '7 días' },
@@ -39,7 +105,7 @@ function Stat({ value, label, hint }: { value: number; label: string; hint: stri
     );
 }
 
-export default function Impact({ period, summary, weekly, rates }: ImpactProps) {
+export default function Impact({ period, summary, weekly, rates, alerts }: ImpactProps) {
     const choose = (key: ImpactProps['period']) => router.get('/settings/impact', key === '30' ? {} : { period: key }, { preserveScroll: true, preserveState: true, replace: true });
     const busiest = Math.max(1, ...weekly.map((week) => week.minutes));
     const topService = Math.max(1, ...summary.by_service.map((service) => service.count));
@@ -108,6 +174,17 @@ export default function Impact({ period, summary, weekly, rates }: ImpactProps) 
                             </li>
                         ))}
                     </ul>
+                </section>
+            )}
+
+            {alerts.weeks.some((week) => week.total > 0 || week.missed > 0) && (
+                <section className="mt-8 grid gap-3">
+                    <div>
+                        <h2 className="text-[15px] font-medium">Cómo van los avisos</h2>
+                        <p className="text-[12.5px] text-muted">Lo que pasa con cada propuesta, por semana y por tipo de acción.</p>
+                    </div>
+                    <AlertTable columns={alerts.weeks} heads={alerts.weeks.map((week) => weekLabel.format(new Date(week.week)))} />
+                    {alerts.classes.length > 0 && <AlertTable columns={alerts.classes} heads={alerts.classes.map((measure) => classLabel[measure.class] ?? measure.class)} />}
                 </section>
             )}
         </SettingsLayout>

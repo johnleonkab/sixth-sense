@@ -230,4 +230,4 @@ Pasos:
 | 7 · Fuente, fecha y destinatario | Hecho |
 | 8 · Ciclo de vida del aviso | Hecho |
 | 9 · Aprender de cada interacción | Hecho |
-| 10 · Métricas | Pendiente |
+| 10 · Métricas | Hecho (objetivos tras dos semanas de datos) |

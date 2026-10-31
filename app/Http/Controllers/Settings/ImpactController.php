@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Alerts\Outcomes\AlertMetrics;
 use App\Analytics\Impact;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -20,7 +21,7 @@ class ImpactController extends Controller
     /**
      * What sixth-sense saved the person.
      */
-    public function index(Request $request, Impact $impact): Response
+    public function index(Request $request, Impact $impact, AlertMetrics $metrics): Response
     {
         $period = $request->validate(['period' => ['nullable', Rule::in(array_keys(self::PERIODS))]])['period'] ?? '30';
         $days = self::PERIODS[$period];
@@ -31,6 +32,7 @@ class ImpactController extends Controller
             'summary' => $impact->summary($request->user(), $days === null ? null : CarbonImmutable::now($timezone)->subDays($days)),
             'weekly' => $impact->weekly($request->user(), self::WEEKS, $timezone),
             'rates' => ['proposal' => Impact::MINUTES_PER_PROPOSAL, 'slot' => Impact::MINUTES_PER_SLOT],
+            'alerts' => $metrics->for($request->user(), 6, $timezone),
         ]);
     }
 }
