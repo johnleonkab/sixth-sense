@@ -81,6 +81,25 @@ class AlertFeed
             ->limit(self::LIMIT)
             ->get()
             ->map(fn (InboxItem $item): array => $item->toAlert())
+            ->sortBy(fn (array $alert): array => self::priority($alert))
+            ->values()
             ->all();
+    }
+
+    /**
+     * What comes first: waiting alerts, by nearest deadline, then those someone
+     * is blocked on, then the rest; newest first within each.
+     *
+     * @param  array<string, mixed>  $alert
+     * @return array{int, string, int, int}
+     */
+    public static function priority(array $alert): array
+    {
+        return [
+            $alert['status'] === AlertStatus::Pending->value ? 0 : 1,
+            $alert['deadline'] ?? '9999-12-31',
+            ($alert['blocking'] ?? false) ? 0 : 1,
+            -strtotime($alert['received_at']),
+        ];
     }
 }

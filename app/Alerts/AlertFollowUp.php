@@ -11,6 +11,7 @@ use App\Alerts\Intents\SlackAutonomy;
 use App\Alerts\Intents\SlackDraft;
 use App\Alerts\Intents\SlackDraftBrief;
 use App\Alerts\Outcomes\ProposalOutcomes;
+use App\Alerts\Outcomes\ResolutionInference;
 use App\Alerts\Questions\QuestionAnswer;
 use App\Alerts\Questions\QuestionResearch;
 use App\Alerts\Recipients\RecipientScope;
@@ -483,6 +484,18 @@ class AlertFollowUp
                 $item->close(AlertStatus::Resolved, 'replied');
                 InboxItemUpdated::dispatch($item);
                 app(ProposalOutcomes::class)->resolved($item, 'replied_outside');
+                $resolved[] = $item;
+
+                continue;
+            }
+
+            // No longer needed: someone else settled it, or the call already happened.
+            $expired = app(ResolutionInference::class)->expiry($item);
+
+            if ($expired !== null) {
+                $item->close(AlertStatus::Resolved, $expired);
+                InboxItemUpdated::dispatch($item);
+                app(ProposalOutcomes::class)->expired($item, $expired);
                 $resolved[] = $item;
             }
         }

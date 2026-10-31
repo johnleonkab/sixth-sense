@@ -163,7 +163,44 @@ class InboxItem extends Model
      */
     public function awaitsPush(): bool
     {
-        return in_array($this->state(), ['important', 'planning', 'ready'], true);
+        return in_array($this->state(), ['important', 'planning', 'ready'], true) && ! $this->quiet();
+    }
+
+    /**
+     * The nearest date by which something is due: a task's deadline, or today
+     * for a call wanted now. Null when nothing has a date.
+     */
+    public function deadline(): ?string
+    {
+        $dates = collect($this->proposal['actions'] ?? [])
+            ->map(fn (array $action): ?string => $action['data']['deadline'] ?? (in_array($action['data']['urgency'] ?? null, ['now', 'today'], true) ? now(config('agenda.timezone'))->toDateString() : null))
+            ->push($this->agendaTask?->deadline?->toDateString())
+            ->filter();
+
+        return $dates->isEmpty() ? null : $dates->min();
+    }
+
+    /**
+     * Someone is waiting on the person: they asked for a call or a question.
+     */
+    public function blocking(): bool
+    {
+        return collect($this->proposal['actions'] ?? [])->contains(fn (array $action): bool => in_array($action['class'] ?? null, ['call', 'question'], true));
+    }
+
+    /**
+     * Low urgency: it waits for the person but need not interrupt them. It
+     * does not ring, and goes in the twice-daily digest instead.
+     */
+    public function quiet(): bool
+    {
+        $deadline = $this->deadline();
+
+        return $this->status === AlertStatus::Pending
+            && ! in_array($this->source, [AlertSource::Calendar, AlertSource::Agenda, AlertSource::Questions], true)
+            && $this->relevance < (int) config('alerts.quiet_below')
+            && ! $this->blocking()
+            && ($deadline === null || $deadline > now(config('agenda.timezone'))->addDays(2)->toDateString());
     }
 
     /**
@@ -238,6 +275,9 @@ class InboxItem extends Model
             'state' => $this->state(),
             'resolved_at' => $this->resolved_at?->toIso8601String(),
             'resolution' => $this->resolution,
+            'deadline' => $this->deadline(),
+            'blocking' => $this->blocking(),
+            'quiet' => $this->quiet(),
             'conversation' => $this->payload['conversation'] ?? null,
             'messages' => $this->source === AlertSource::Calendar ? [] : $this->messages(),
             'proposal' => $this->proposal ? ['summary' => $this->proposal['summary'] ?? null] : null,

@@ -160,6 +160,8 @@ const resolutionText: Record<string, string> = {
     marked_done: 'La marcaste como resuelta.',
     dismissed: 'La descartaste: no hacía falta hacer nada.',
     superseded: 'La sustituyó un mensaje más reciente de la misma conversación.',
+    someone_else: 'Otra persona lo resolvió en el hilo: ya no hacía falta.',
+    call_happened: 'La llamada que pedía ya ha pasado.',
 };
 
 /** Where the alert stands, said in a line under its label. */

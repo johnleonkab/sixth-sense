@@ -18,6 +18,12 @@ export type Alert = {
     /** Where it stands, as the widget shows it. Mirrors InboxItem::state(). */
     state: AlertState;
     resolution: string | null;
+    /** The nearest date something is due. */
+    deadline?: string | null;
+    /** Someone is waiting on the person (a call or a question). */
+    blocking?: boolean;
+    /** Low urgency: it does not ring and goes in the twice-daily digest. */
+    quiet?: boolean;
     resolved_at?: string | null;
     /** A conversation is one alert: what was said in it since the person last dealt with it, oldest first. */
     messages?: { id: string; from: string | null; text: string; at: string }[];

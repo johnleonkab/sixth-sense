@@ -36,7 +36,12 @@ function remember(rung: Set<string>): void {
     }
 }
 
-const newestFirst = (a: Alert, b: Alert) => b.received_at.localeCompare(a.received_at);
+/** Waiting alerts first, by nearest deadline, then those someone is blocked on; newest first within each (as the server orders them). */
+const newestFirst = (a: Alert, b: Alert) =>
+    Number(a.status !== 'pending') - Number(b.status !== 'pending') ||
+    (a.deadline ?? '9999-12-31').localeCompare(b.deadline ?? '9999-12-31') ||
+    Number(!a.blocking) - Number(!b.blocking) ||
+    b.received_at.localeCompare(a.received_at);
 
 /** Window event with an alert's latest state, for whatever shows it (an alert on review, for one). */
 export const ALERT_CHANGED = 'sixth-sense:alert-changed';
@@ -106,7 +111,8 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
                 rung.current.add(ringKey(incoming));
                 remember(rung.current);
 
-                if (recent) {
+                // Low urgency waits for the digest: it is listed, but does not interrupt.
+                if (recent && !incoming.quiet) {
                     ring(incoming.source);
                     callbacks.current.onImportant?.(incoming);
                 }
@@ -124,7 +130,7 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
             const closedByThem = (incoming.state === 'resolved' || incoming.state === 'dismissed') && incoming.resolution !== 'replied';
 
             // New, or newly important, or its state changed: shown briefly.
-            if (announce && !closedByThem && (!previous || (becameImportant && recent) || previous.state !== incoming.state)) {
+            if (announce && !closedByThem && !incoming.quiet && (!previous || (becameImportant && recent) || previous.state !== incoming.state)) {
                 setFresh((list) => [incoming, ...list.filter((item) => item.id !== incoming.id)].slice(0, 3));
             }
         } catch (error) {

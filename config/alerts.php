@@ -42,6 +42,20 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Quiet alerts
+    |--------------------------------------------------------------------------
+    |
+    | Alerts judged below this relevance, with nobody waiting and nothing due
+    | in the next two days, do not ring: they go in a digest at these times.
+    |
+    */
+
+    'quiet_below' => (int) env('ALERTS_QUIET_BELOW', 60),
+
+    'digest_at' => ['09:30', '15:30'],
+
     'max_new_messages_per_check' => (int) env('ALERTS_MAX_NEW_MESSAGES', 20),
 
 ];

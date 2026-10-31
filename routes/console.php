@@ -15,6 +15,11 @@ Artisan::command('inspire', function () {
 Schedule::command('alerts:watch')->everyMinute()->withoutOverlapping(5);
 Schedule::command('alerts:check-replies')->everyTwoMinutes()->withoutOverlapping(10);
 Schedule::command('alerts:check-commitments')->everyTenMinutes()->withoutOverlapping(20);
+
+foreach (config('alerts.digest_at') as $time) {
+    Schedule::command('alerts:digest')->weekdays()->dailyAt($time)->timezone(config('agenda.timezone'));
+}
+
 Schedule::command('alerts:plan-meetings')->everyTenMinutes()->withoutOverlapping(30);
 Schedule::command('alerts:remind-meetings')->everyMinute()->withoutOverlapping(5);
 Schedule::command('chats:warm')->hourly()->withoutOverlapping(60);

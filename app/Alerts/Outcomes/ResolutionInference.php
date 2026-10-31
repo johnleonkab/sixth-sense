@@ -13,6 +13,7 @@ use App\Knowledge\Gaps\GapKind;
 use App\Knowledge\Gaps\GapStatus;
 use App\Models\InboxItem;
 use App\Models\ProposalOutcome;
+use App\Scheduling\AgendaTaskStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Throwable;
@@ -72,6 +73,48 @@ class ResolutionInference
 
             return null;
         }
+    }
+
+    /**
+     * Whether a pending alert stopped making sense on its own: someone else
+     * answered it in its thread (without asking anything back of the person),
+     * or the call it asked for already happened.
+     *
+     * @return ?string 'someone_else' or 'call_happened', or null while it still stands.
+     */
+    public function expiry(InboxItem $alert): ?string
+    {
+        try {
+            if ($alert->source === AlertSource::Slack && $this->someoneElseSettled($alert)) {
+                return 'someone_else';
+            }
+
+            $asksCall = collect($alert->proposal['actions'] ?? [])->contains(fn (array $action): bool => ($action['class'] ?? null) === 'call' && ($action['confidence'] ?? null) === 'sure');
+            $task = $alert->agendaTask;
+
+            if ($asksCall && (($task?->status === AgendaTaskStatus::Scheduled && $task->ends_at?->isPast()) || $this->met($alert) !== null)) {
+                return 'call_happened';
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        return null;
+    }
+
+    /**
+     * Someone else answered in the thread after the alert, and did not hand
+     * it back to the person (no question, no mention of them).
+     */
+    private function someoneElseSettled(InboxItem $alert): bool
+    {
+        $view = $this->chats->view($alert->user, Str::beforeLast($alert->messageRef(), ':'), $alert->messageRef(), $alert->thread_key);
+
+        return collect($view?->messages ?? [])->contains(fn (ChatMessage $message): bool => ! $message->isMine
+            && $message->authorName !== $alert->actor_name
+            && $message->sentAt->greaterThan($alert->received_at)
+            && ! $message->mentionsMe
+            && ! str_ends_with(rtrim($message->text), '?'));
     }
 
     /**
