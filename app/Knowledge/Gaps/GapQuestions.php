@@ -4,6 +4,7 @@ namespace App\Knowledge\Gaps;
 
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Triage;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
@@ -50,10 +51,11 @@ class GapQuestions
 
         $meetings = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Meeting)->orderBy('next_occurrence_at')->limit($budget)->get();
         $terms = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Term)->orderByDesc('priority')->limit($budget)->get();
+        $resolutions = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Resolution)->latest('id')->limit(1)->get();
 
         $asked = 0;
 
-        foreach ($meetings->concat($terms)->take($budget) as $gap) {
+        foreach ($meetings->concat($terms)->concat($resolutions)->take($budget) as $gap) {
             $this->raise($gap, $now);
             $asked++;
         }
@@ -69,6 +71,10 @@ class GapQuestions
         $gap->update(['status' => GapStatus::Answered, 'answer' => trim($answer), 'answered_at' => now()]);
         $this->close($gap, AlertStatus::Resolved, 'answered');
         $this->sync->syncMemory($gap->user);
+
+        if ($gap->kind === GapKind::Resolution && isset($gap->context['alert_id'])) {
+            app(ProposalOutcomes::class)->explained((int) $gap->context['alert_id'], $answer);
+        }
     }
 
     /**
@@ -85,11 +91,17 @@ class GapQuestions
         $item = $gap->user->inboxItems()->create([
             'source' => AlertSource::Questions,
             'external_id' => "gap:{$gap->id}",
-            'title' => $gap->kind === GapKind::Meeting ? "¿Para qué es «{$gap->subject}»?" : "¿Qué es «{$gap->subject}»?",
+            'title' => match ($gap->kind) {
+                GapKind::Meeting => "¿Para qué es «{$gap->subject}»?",
+                GapKind::Resolution => "¿Cómo se resolvió «{$gap->subject}»?",
+                default => "¿Qué es «{$gap->subject}»?",
+            },
             'body' => $gap->question,
-            'why' => $gap->kind === GapKind::Meeting
-                ? 'No sé de qué va esta reunión: ni descripción, ni documentos, ni notas.'
-                : 'Sale en '.($gap->context['documents'] ?? 'varios').' documentos recientes y no está en tu archivo.',
+            'why' => match ($gap->kind) {
+                GapKind::Meeting => 'No sé de qué va esta reunión: ni descripción, ni documentos, ni notas.',
+                GapKind::Resolution => 'Lo diste por resuelto y no veo cómo: saberlo me ayuda a proponer mejor la próxima vez.',
+                default => 'Sale en '.($gap->context['documents'] ?? 'varios').' documentos recientes y no está en tu archivo.',
+            },
             'relevance' => 40,
             'status' => AlertStatus::Pending,
             'triage' => Triage::Routine,

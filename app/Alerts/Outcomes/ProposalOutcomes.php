@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Outcomes;
 
+use App\Jobs\InferResolution;
 use App\Models\InboxItem;
 use App\Models\PendingAction;
 use App\Models\ProposalOutcome;
@@ -52,10 +53,27 @@ class ProposalOutcomes
      */
     public function discarded(InboxItem $alert, ?string $reason = null): ProposalOutcome
     {
-        return $this->write($alert, ProposalOutcome::DISCARDED, [
-            'class' => $this->classOf($alert),
-            'reason' => in_array($reason, ProposalOutcome::REASONS, true) ? $reason : null,
-        ]);
+        $reason = in_array($reason, ProposalOutcome::REASONS, true) ? $reason : null;
+        $lesson = $this->lesson($alert, $reason);
+
+        // Each reason teaches its layer: the judge, the triage, or the reply engine read these.
+        if ($lesson !== null) {
+            $alert->user->intentLessons()->create(['inbox_item_id' => $alert->id, 'body' => $lesson]);
+        }
+
+        return $this->write($alert, ProposalOutcome::DISCARDED, ['class' => $this->classOf($alert), 'reason' => $reason]);
+    }
+
+    private function lesson(InboxItem $alert, ?string $reason): ?string
+    {
+        $what = trim("{$alert->source->label()} de {$alert->actor_name} sobre «{$alert->title}»");
+
+        return match ($reason) {
+            'not_important' => "No le importó: {$what}. No avisar de mensajes así.",
+            'not_for_me' => "No era para él: {$what}. Le tocaba a otra persona.",
+            'bad_proposal' => "Importaba, pero la propuesta no servía: {$what}. Se propuso: «".($alert->proposal['summary'] ?? 'sin propuesta').'».',
+            default => null,
+        };
     }
 
     /**
@@ -70,7 +88,23 @@ class ProposalOutcomes
             return null;
         }
 
-        return $this->write($alert, ProposalOutcome::RESOLVED, ['class' => $this->classOf($alert), 'reason' => $how]);
+        $outcome = $this->write($alert, ProposalOutcome::RESOLVED, ['class' => $this->classOf($alert), 'reason' => $how]);
+
+        // Marked by the person: how it was resolved is worked out without hurry.
+        if ($how === 'marked_done') {
+            InferResolution::dispatch($outcome->id);
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * The person said how an alert was resolved, when it could not be seen.
+     */
+    public function explained(int $alertId, string $how): void
+    {
+        $outcome = ProposalOutcome::query()->where('inbox_item_id', $alertId)->where('outcome', ProposalOutcome::RESOLVED)->latest('id')->first();
+        $outcome?->update(['detail' => [...($outcome->detail ?? []), 'how' => 'told', 'told' => mb_substr($how, 0, 500)]]);
     }
 
     /**

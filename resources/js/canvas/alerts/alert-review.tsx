@@ -79,6 +79,14 @@ function stateLine(alert: Alert): string {
     }
 }
 
+type DiscardReason = 'not_important' | 'not_for_me' | 'bad_proposal';
+
+const discardReasons: { reason: DiscardReason; label: string }[] = [
+    { reason: 'not_important', label: 'No es importante' },
+    { reason: 'not_for_me', label: 'No es para mí' },
+    { reason: 'bad_proposal', label: 'La propuesta está mal' },
+];
+
 const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => {
     const { runTool } = useCanvas();
     const [alert, setAlert] = useState<Alert>(props.alert);
@@ -156,8 +164,12 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     }, [props.alert.id, props.proposal, props.task, runTool]);
 
     /** Shown at once; the canvas then comes back as the server left it. */
-    const change = (outcome: 'done' | 'dismissed' | 'reopen') => {
+    // Discarding asks why, with one tap: each reason teaches a different part of the system.
+    const [discarding, setDiscarding] = useState(false);
+
+    const change = (outcome: 'done' | 'dismissed' | 'reopen', reason?: DiscardReason) => {
         setBusy(true);
+        setDiscarding(false);
         setAlert((current) => ({
             ...current,
             ...(outcome === 'reopen'
@@ -172,7 +184,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                       resolution: outcome === 'done' ? 'marked_done' : 'dismissed',
                   }),
         }));
-        runTool('resolve_alert', { alert_id: alert.id, outcome });
+        runTool('resolve_alert', { alert_id: alert.id, outcome, ...(reason ? { reason } : {}) });
     };
 
     return (
@@ -353,9 +365,22 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                     <Buttons className="ml-auto">
                         {pending ? (
                             <>
-                                <Button disabled={busy} onClick={() => change('dismissed')}>
-                                    Descartar
-                                </Button>
+                                {discarding ? (
+                                    <>
+                                        {discardReasons.map((option) => (
+                                            <Button key={option.reason} size="small" disabled={busy} onClick={() => change('dismissed', option.reason)}>
+                                                {option.label}
+                                            </Button>
+                                        ))}
+                                        <Button size="small" variant="tertiary" disabled={busy} onClick={() => change('dismissed')}>
+                                            Sin motivo
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button disabled={busy} onClick={() => setDiscarding(true)}>
+                                        Descartar
+                                    </Button>
+                                )}
                                 {/* With a reply ready to send, sending is the main thing to do. */}
                                 <Button variant={canSend ? 'secondary' : 'primary'} disabled={busy} onClick={() => change('done')}>
                                     Ya está resuelta
