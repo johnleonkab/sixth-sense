@@ -132,20 +132,6 @@ return [
             'routes' => ['busca', 'qué sabemos', 'que sabemos', 'contexto', 'investiga', 'averigua', 'quién', 'dónde está', 'de qué va'],
         ]),
 
-        'redaccion' => $agent('redaccion', [
-            'label' => 'Redacción',
-            'description' => 'Documentos largos, páginas de Notion, issues de Jira y archivos del Archivo: los redacta o los edita como propuesta.',
-            'instructions' => 'Redacta con estructura clara y sin relleno. Lee antes lo que vas a editar y cambia solo lo pedido.',
-            'tier' => 'capable',
-            'reasoning' => true,
-            'effort' => 'high',
-            'temperature' => 0.5,
-            'queue' => 'agents-heavy',
-            'timeout' => 150,
-            'tools' => $tools['redaccion'],
-            'routes' => ['documento', 'redacta', 'escribe un', 'página de notion', 'pagina de notion', 'historia', 'épica', 'epica', 'issue', 'prd'],
-        ]),
-
         'integraciones' => $agent('integraciones', [
             'label' => 'Integraciones',
             'description' => 'Servidores MCP conectados y Google Analytics. Lo que pueda cambiar algo se propone.',
@@ -155,7 +141,21 @@ return [
             'effort' => 'low',
             'queue' => 'agents-heavy',
             'tools' => $tools['integraciones'],
-            'routes' => ['mcp', 'analytics', 'linear', 'servidor', 'tráfico', 'trafico', 'sesiones', 'usuarios activos'],
+            'routes' => ['mcp', 'analytics', 'analítica', 'analitica', 'analíticas', 'analiticas', 'métricas', 'metricas', 'linear', 'servidor', 'tráfico', 'trafico', 'sesiones', 'usuarios activos', 'conversión', 'conversion'],
+        ]),
+
+        'redaccion' => $agent('redaccion', [
+            'label' => 'Redacción',
+            'description' => 'Documentos largos, páginas de Notion, issues de Jira y archivos del Archivo: los redacta o los edita como propuesta.',
+            'instructions' => 'Investiga lo justo: como mucho tres búsquedas. Si te falta un dato, no lo sigas buscando: escribe con lo que tienes y di en say qué falta. Si ya hay datos de otro agente en el encargo, úsalos. Redacta con estructura clara y sin relleno. Lee antes lo que vas a editar y cambia solo lo pedido.',
+            'tier' => 'capable',
+            'reasoning' => true,
+            'effort' => 'high',
+            'temperature' => 0.5,
+            'queue' => 'agents-heavy',
+            'timeout' => 150,
+            'tools' => $tools['redaccion'],
+            'routes' => ['documento', 'redacta', 'escribe un', 'página de notion', 'pagina de notion', 'historia', 'épica', 'epica', 'issue', 'prd'],
         ]),
 
         'vistas' => $agent('vistas', [

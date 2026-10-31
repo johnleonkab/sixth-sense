@@ -33,6 +33,12 @@ class AgentRunner
     /** What a tool's answer may take in the conversation, in characters. */
     private const RESULT_CHARS = 8000;
 
+    /** Rounds left when the agent is told to wrap up with what it has. */
+    private const WRAP_UP = 2;
+
+    /** Tools that leave something for the person; the only ones left on the last round. */
+    private const DELIVERS = ['propose_', 'compose_view', 'mcp_call', 'schedule_task'];
+
     public function __construct(private Toolbox $toolbox, private ToolModels $models, private Chats $chats, private IssueTracker $issues) {}
 
     /**
@@ -59,12 +65,23 @@ class AgentRunner
         $refs = null;
 
         try {
-            for ($round = 0; $round < $agent->maxSteps && $say === null; $round++) {
+            // One closing round beyond the limit, with only `finish`: an agent
+            // that ran out of steps says what it has and what is missing.
+            for ($round = 0; $round <= $agent->maxSteps && $say === null; $round++) {
                 if (microtime(true) - $startedAt > $agent->timeout) {
                     return $this->fail($agent, $run, $startedAt, "{$agent->label} ha tardado demasiado.", $steps, $usage);
                 }
 
-                $turn = $this->models->for($agent)->turn($agent, $messages, $tools);
+                $left = $agent->maxSteps - $round;
+
+                if ($left === self::WRAP_UP) {
+                    $messages[] = ['role' => 'user', 'content' => 'Te quedan dos pasos. No busques más: deja ya la propuesta con lo que tienes y termina con finish; si falta algo, dilo en say.'];
+                } elseif ($left === 0) {
+                    $messages[] = ['role' => 'user', 'content' => 'Se acabaron los pasos. Llama a finish ya: en say, lo que has dejado preparado y lo que falta para terminarlo.'];
+                }
+
+                $offered = $this->offered($tools, $left);
+                $turn = $this->models->for($agent)->turn($agent, $messages, $offered);
                 $usage = ['input' => $usage['input'] + $turn->inputTokens, 'output' => $usage['output'] + $turn->outputTokens, 'reasoning' => $usage['reasoning'] + $turn->reasoningTokens];
                 $messages[] = ['role' => 'assistant', 'content' => $turn->text, 'tool_calls' => $turn->toolCalls, 'reasoning' => $turn->reasoning];
 
@@ -83,7 +100,7 @@ class AgentRunner
                         continue;
                     }
 
-                    [$content, $step] = $this->call($agent, $user, $run, $call, $now);
+                    [$content, $step] = $this->call($agent, $user, $run, $call, $now, array_column($offered, 'name'));
                     $steps[] = $step;
                     $messages[] = ['role' => 'tool', 'tool_call_id' => $call->id, 'name' => $call->name, 'content' => $content];
                 }
@@ -117,13 +134,19 @@ class AgentRunner
     }
 
     /**
-     * Run one tool the model asked for, if it is the agent's, and keep what it
-     * shows as a production. Returns what the model reads back, and the step.
+     * Run one tool the model asked for, if it is the agent's and offered this
+     * round, and keep what it shows as a production. Returns what the model
+     * reads back, and the step.
      *
+     * @param  list<string>  $offered
      * @return array{0: string, 1: array<string, mixed>}
      */
-    private function call(AgentDefinition $agent, User $user, AgentRun $run, ToolCall $call, CarbonImmutable $now): array
+    private function call(AgentDefinition $agent, User $user, AgentRun $run, ToolCall $call, CarbonImmutable $now, array $offered): array
     {
+        if (in_array($call->name, $agent->tools, true) && ! in_array($call->name, $offered, true)) {
+            return [json_encode(['error' => 'Ya no quedan pasos para eso: termina con finish.'], JSON_UNESCAPED_UNICODE), ['tool' => $call->name, 'arguments' => $call->arguments, 'error' => 'out of steps']];
+        }
+
         $tool = in_array($call->name, $agent->tools, true) ? $this->toolbox->find($call->name) : null;
 
         if ($tool === null) {
@@ -159,6 +182,23 @@ class AgentRunner
                 'result' => Str::limit(json_encode($result->output, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '', 600),
             ], fn (mixed $value): bool => $value !== null),
         ];
+    }
+
+    /**
+     * What the model may call this round: everything, then on the last round
+     * only what leaves something for the person and `finish`, and on the
+     * closing round only `finish`.
+     *
+     * @param  list<array{name: string, description: string, parameters: array<string, mixed>}>  $tools
+     * @return list<array{name: string, description: string, parameters: array<string, mixed>}>
+     */
+    private function offered(array $tools, int $left): array
+    {
+        return match (true) {
+            $left > 1 => $tools,
+            $left === 1 => array_values(array_filter($tools, fn (array $tool): bool => $tool['name'] === 'finish' || Str::startsWith($tool['name'], self::DELIVERS))),
+            default => array_values(array_filter($tools, fn (array $tool): bool => $tool['name'] === 'finish')),
+        };
     }
 
     /**

@@ -43,6 +43,15 @@ test('an agent named by the voice, or the only one whose words appear, gets the 
         ->and($this->model->calls)->toBe([]);
 });
 
+test('writing about analytics goes first to the agent that brings the data, then to the one that writes', function () {
+    $this->model->script('orquestador', new ModelTurn(text: 'No sé.', model: 'fake'));
+
+    expect(app(Orchestrator::class)->plan($this->user, 'Crea un documento de Notion con las analíticas de Sense Tickets'))->toBe([
+        ['agent' => 'integraciones', 'task' => 'Crea un documento de Notion con las analíticas de Sense Tickets'],
+        ['agent' => 'redaccion', 'task' => 'Crea un documento de Notion con las analíticas de Sense Tickets'],
+    ]);
+});
+
 test('otherwise a light model plans it, readers first, and a plan it can not give falls back to reading', function () {
     $this->model->script('orquestador', plans([
         ['agent' => 'comunicacion', 'task' => 'Contesta a Marta con lo decidido'],
@@ -98,12 +107,11 @@ test('delegating opens the screen at once; readers run first, writers after with
 });
 
 test('an ask whose agents all fail is a failed ask, and says why', function () {
-    $this->model->script('agenda', new ModelTurn(toolCalls: [], text: '', model: 'fake'));
-    config(['agents.agents.agenda.max_steps' => 0]);
+    config(['agents.agents.agenda.budget_day' => 0]);
 
     $run = AgentRun::query()->findOrFail(voiceCall('delegate', ['task' => 'Mueve la sync al viernes', 'agent' => 'agenda'])->json('output.run_id'));
 
-    expect($run->status)->toBe(AgentRun::FAILED)->and($run->error)->toBe('Agenda ha dado demasiados pasos sin terminar.');
+    expect($run->status)->toBe(AgentRun::FAILED)->and($run->error)->toBe('El agente Agenda ya ha gastado su presupuesto de hoy.');
 });
 
 test('the voice shows what agents made by its reference, and only the person\'s own', function () {

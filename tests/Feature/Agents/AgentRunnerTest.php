@@ -114,8 +114,28 @@ test('the reasoning of each round goes back to the model with the next one', fun
         ->and(collect($second)->firstWhere('role', 'tool')['name'])->toBe('list_alerts');
 });
 
-test('an agent that never finishes stops at its step limit, and one over budget stops too', function () {
-    config(['agents.agents.agenda.max_steps' => 2]);
+test('an agent that keeps searching is told to wrap up, then may only deliver, and finally says what it has and what is missing', function () {
+    config(['agents.agents.redaccion.max_steps' => 3]);
+    $search = fn (string $query): ModelTurn => FakeToolModel::call('search_knowledge', ['query' => $query]);
+    $this->model->script('redaccion', $search('uno'), $search('dos'), $search('tres'), FakeToolModel::finish('No tengo los datos de Analytics: te dejo el documento sin cifras.'));
+
+    $run = runAgent('redaccion', 'Crea el documento de las analíticas');
+    $offered = array_column($this->model->calls, 'tools');
+    $last = $this->model->calls[3]['messages'];
+
+    expect($run->status)->toBe(AgentRun::DONE)
+        ->and($run->say)->toBe('No tengo los datos de Analytics: te dejo el documento sin cifras.')
+        ->and($offered[0])->toContain('search_knowledge', 'propose_notion_page')
+        ->and($offered[1])->toContain('search_knowledge')
+        ->and($offered[2])->toContain('propose_notion_page', 'finish')->not->toContain('search_knowledge')
+        ->and($offered[3])->toBe(['finish'])
+        ->and(collect($this->model->calls[1]['messages'])->last()['content'])->toContain('Te quedan dos pasos')
+        ->and($run->steps[2]['error'])->toBe('out of steps')
+        ->and(collect($last)->where('role', 'user')->last()['content'])->toContain('Se acabaron los pasos');
+});
+
+test('an agent that does not finish even then fails, and one over budget stops too', function () {
+    config(['agents.agents.agenda.max_steps' => 1]);
     $this->model->script('agenda', FakeToolModel::call('find_calendar_events', ['start_date' => '2026-10-08']), FakeToolModel::call('find_calendar_events', ['start_date' => '2026-10-09']));
 
     expect(runAgent('agenda')->only(['status', 'error']))->toBe(['status' => AgentRun::FAILED, 'error' => 'Agenda ha dado demasiados pasos sin terminar.']);

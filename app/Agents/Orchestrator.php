@@ -32,25 +32,30 @@ class Orchestrator
         $workers = $this->registry->workers($user);
         $routed = $this->routed($workers, $task);
 
-        if ($routed !== null) {
-            return [['agent' => $routed, 'task' => $task]];
+        if (count($routed) === 1) {
+            return [['agent' => $routed[0], 'task' => $task]];
         }
 
-        return $this->ordered($workers, $this->planned($user, $workers, $task) ?? [['agent' => 'investigacion', 'task' => $task]]);
+        // Several agents' words, or none: a light model plans it. If it can not,
+        // the agents whose words appear, in the configured order (the one that
+        // brings the data before the one that writes); with none, reading.
+        $fallback = array_map(fn (string $agent): array => ['agent' => $agent, 'task' => $task], $routed ?: ['investigacion']);
+
+        return $this->ordered($workers, $this->planned($user, $workers, $task) ?? $fallback);
     }
 
     /**
-     * The only agent whose route words appear in the ask, if exactly one does.
+     * The agents whose route words appear in the ask, in the configured order.
      *
      * @param  list<AgentDefinition>  $workers
+     * @return list<string>
      */
-    private function routed(array $workers, string $task): ?string
+    private function routed(array $workers, string $task): array
     {
         $ask = ' '.Str::lower($task).' ';
-        $matching = array_filter($workers, fn (AgentDefinition $agent): bool => collect($agent->routes)
-            ->contains(fn (string $word): bool => preg_match('/(?<!\pL)'.preg_quote(Str::lower($word), '/').'(?!\pL)/u', $ask) === 1));
 
-        return count($matching) === 1 ? array_values($matching)[0]->name : null;
+        return array_values(array_map(fn (AgentDefinition $agent): string => $agent->name, array_filter($workers, fn (AgentDefinition $agent): bool => collect($agent->routes)
+            ->contains(fn (string $word): bool => preg_match('/(?<!\pL)'.preg_quote(Str::lower($word), '/').'(?!\pL)/u', $ask) === 1))));
     }
 
     /**
@@ -69,7 +74,8 @@ class Orchestrator
             $turn = $this->models->for($orchestrator)->turn($orchestrator, [
                 ['role' => 'system', 'content' => "Repartes los encargos de {$user->name} entre estos agentes:\n{$catalog}\n\n"
                     .'Llama a plan con los pasos: cada uno, un agente y lo que tiene que hacer, en una frase. Los menos posibles: uno si basta. '
-                    .'Investigación primero si hace falta contexto; luego los que proponen cambios, en el orden en que dependen unos de otros.'],
+                    .'Investigación primero si hace falta contexto. Si hay que escribir sobre datos (analítica, métricas, un servidor MCP), antes el agente que los trae (integraciones) y después el que escribe. '
+                    .'Luego los que proponen cambios, en el orden en que dependen unos de otros.'],
                 ['role' => 'user', 'content' => $task],
             ], [[
                 'name' => 'plan',
