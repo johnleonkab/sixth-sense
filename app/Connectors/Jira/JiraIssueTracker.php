@@ -37,22 +37,31 @@ class JiraIssueTracker implements IssueTracker
 
         foreach ($user->accountsWith(Capability::JiraRead) as $account) {
             $rules = $this->rulesOf($account);
+            $token = null;
+            $fromAccount = 0;
 
-            try {
-                $issues = $this->jira->post($account, 'search/jql', [
-                    'jql' => $this->query($rules, $jql, $text),
-                    'maxResults' => $limit,
-                    'fields' => self::LIST_FIELDS,
-                ])['issues'] ?? [];
-            } catch (JiraError $exception) {
-                report($exception);
+            // Jira gives at most 100 per page: more are read page by page.
+            do {
+                try {
+                    $page = $this->jira->post($account, 'search/jql', array_filter([
+                        'jql' => $this->query($rules, $jql, $text),
+                        'maxResults' => min(100, $limit - $fromAccount),
+                        'fields' => self::LIST_FIELDS,
+                        'nextPageToken' => $token,
+                    ]));
+                } catch (JiraError $exception) {
+                    report($exception);
 
-                continue;
-            }
+                    break;
+                }
 
-            foreach ($issues as $issue) {
-                $found[] = $this->summary($account, $issue);
-            }
+                foreach ($page['issues'] ?? [] as $issue) {
+                    $found[] = $this->summary($account, $issue);
+                    $fromAccount++;
+                }
+
+                $token = $page['nextPageToken'] ?? null;
+            } while (is_string($token) && $fromAccount < $limit);
         }
 
         usort($found, fn (IssueSummary $a, IssueSummary $b): int => $b->updatedAt <=> $a->updatedAt);

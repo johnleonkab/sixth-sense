@@ -125,6 +125,17 @@ test('a mention counts as answered once the user commented after it', function (
     'not yet' => [[jiraComment('9', 'u-me', 'y', '2026-10-13T07:00:00.000+0000'), jiraComment('10', 'u-marta', 'x', '2026-10-13T08:00:00.000+0000')], false],
 ]);
 
+test('search reads page by page beyond the 100 Jira gives at once, up to the limit', function () {
+    Http::fake([JIRA.'search/jql' => Http::sequence()
+        ->push(['issues' => array_map(fn (int $n): array => jiraIssue("CPD-{$n}"), range(1, 100)), 'nextPageToken' => 'p2'])
+        ->push(['issues' => array_map(fn (int $n): array => jiraIssue("CPD-{$n}"), range(101, 150)), 'nextPageToken' => 'p3'])]);
+
+    expect($this->jira->search($this->user, null, null, 150))->toHaveCount(150);
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request) => ($request->data()['nextPageToken'] ?? null) === 'p2' && $request['maxResults'] === 50);
+});
+
 test('new comments mentioning the user, by others, in the projects of the rules', function () {
     Http::fake([
         JIRA.'search/jql' => Http::response(['issues' => [jiraIssue('CPD-1')]]),

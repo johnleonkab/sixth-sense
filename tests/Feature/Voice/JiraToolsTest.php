@@ -33,6 +33,15 @@ test('issues are found and shown numbered', function () {
     expect($response->json('canvas.props.ui'))->toContain('eyebrow: "CPD-405 · Story", status: "In Progress"')->toBeValidOpenUi();
 });
 
+test('a search brings up to the limit asked for, and says when there are more', function () {
+    runJiraTool('search_jira', ['limit' => 2])
+        ->assertJsonCount(2, 'output.issues')
+        ->assertJsonPath('output.more', true)
+        ->assertJsonPath('output.note', 'Hay más de 2: si los quiere todos, vuelve a buscar con un limit mayor o afina la consulta.');
+
+    runJiraTool('search_jira')->assertJsonPath('output.more', null)->assertJsonPath('output.note', null);
+});
+
 test('an issue opens with its dependencies and its comments, numbered', function () {
     runJiraTool('open_jira_issue', ['issue' => 'CPD-412'])
         ->assertJsonPath('canvas.view', 'jira.issue')
