@@ -13,6 +13,7 @@ use App\Voice\Tools\Agents\Present;
 use App\Voice\Tools\Alerts\ListAlerts;
 use App\Voice\Tools\Alerts\ResolveAlert;
 use App\Voice\Tools\Alerts\ReviewAlert;
+use App\Voice\Tools\Alerts\SettleAlertAction;
 use App\Voice\Tools\Alerts\ShowAlertHistory;
 use App\Voice\Tools\Analytics\ShowAnalyticsReport;
 use App\Voice\Tools\Calendar\FindCalendarEvents;
@@ -151,6 +152,7 @@ class Toolbox
         ShowAlertHistory::class,
         ReviewAlert::class,
         ResolveAlert::class,
+        SettleAlertAction::class,
         ReviewMeeting::class,
         ProposeMeetingAction::class,
         DismissMeetingActions::class,

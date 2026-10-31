@@ -60,44 +60,12 @@ test('an answer without a summary is an error, so the alert stays without a prop
     $this->planner->plan($this->user, $this->brief);
 })->throws(RuntimeException::class);
 
-test('work the person has to do themselves comes with the proposal, for the scheduler', function () {
-    planAnswers([
-        'summary' => 'Responder que lo revisas hoy.', 'reply_to' => 'sender', 'reply_text' => 'Lo reviso hoy.', 'other_actions' => [], 'question' => '',
-        'manual_task' => ['needed' => true, 'title' => 'Revisar el contrato de Grupo Vela', 'effort_minutes' => 45, 'deadline' => '2026-10-16', 'people' => []],
-    ]);
-
-    expect($this->planner->plan($this->user, $this->brief)->task)->toBe(['title' => 'Revisar el contrato de Grupo Vela', 'effort_minutes' => 45, 'deadline' => '2026-10-16', 'people' => []]);
-});
-
-test('when answering is enough, there is no task to schedule', function () {
-    planAnswers(['summary' => 'Responder.', 'reply_to' => 'sender', 'reply_text' => 'Ok', 'other_actions' => [], 'question' => '', 'manual_task' => ['needed' => false, 'title' => '', 'effort_minutes' => 0, 'deadline' => '', 'people' => []]]);
-
-    expect($this->planner->plan($this->user, $this->brief)->task)->toBeNull();
-});
-
-test('asked to pass something on, it acknowledges and drafts the message for that person', function () {
-    planAnswers([
-        'summary' => 'Decirle a Marta que vale y pasarle a Alba lo de la configuración.',
-        'reply_to' => 'conversation',
-        'reply_text' => 'Ok, se lo digo.',
-        'other_actions' => [],
-        'question' => '',
-        'relay_to' => 'Alba',
-        'relay_text' => 'Alba, ¿por qué se está tardando tanto con la config de obeach?',
-    ]);
+test('calls and work of the person own are left to the action classifier', function () {
+    planAnswers(['summary' => 'Responder que lo revisas hoy.', 'reply_to' => 'sender', 'reply_text' => 'Lo reviso hoy.', 'other_actions' => [], 'question' => '']);
 
     $plan = $this->planner->plan($this->user, $this->brief);
 
-    expect($plan->reply['text'])->toBe('Ok, se lo digo.')
-        ->and($plan->toArray()['redirect'])->toBe(['to' => 'Alba', 'text' => 'Alba, ¿por qué se está tardando tanto con la config de obeach?'])
-        ->and($this->model->calls[0]['system'])->toContain('«dile a Alba»');
-});
-
-test('in Slack a reaction can answer instead of writing back, never in an email', function () {
-    planAnswers(['summary' => 'Reaccionar.', 'reply_to' => 'none', 'reply_text' => '', 'other_actions' => [], 'question' => '', 'reaction' => '+1']);
-
-    $slack = new AlertBrief(source: AlertSource::Slack, where: '#producto', from: 'Marta Ruiz', subject: null, text: 'Ya tienes acceso', receivedAt: CarbonImmutable::parse('2026-10-08 09:00'));
-
-    expect($this->planner->plan($this->user, $slack)->toArray()['reaction'])->toBe(['name' => '+1', 'emoji' => '👍'])
-        ->and($this->planner->plan($this->user, $this->brief)->reaction)->toBeNull();
+    expect($plan->toArray())->not->toHaveKey('task')
+        ->and($this->model->calls[0]['schema']['properties'])->not->toHaveKey('manual_task')
+        ->and($this->model->calls[0]['system'])->toContain('las decide otra pieza');
 });

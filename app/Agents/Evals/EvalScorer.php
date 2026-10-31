@@ -2,6 +2,7 @@
 
 namespace App\Agents\Evals;
 
+use App\Alerts\Actions\ClassifiedAction;
 use App\Models\AgentProduction;
 use App\Models\AgentRun;
 
@@ -62,5 +63,29 @@ class EvalScorer
             $missing === [] ? null : 'no lo pasó a: '.implode(', ', $missing),
             $extra === [] ? null : 'lo pasó de más a: '.implode(', ', $extra),
         ]);
+    }
+
+    /**
+     * The classifier's answer: the kinds it should find (a reply is never
+     * required nor counted as extra, it goes with almost everything), and,
+     * for calls and tasks, whether it was as sure as it should be.
+     *
+     * @param  list<ClassifiedAction>  $actions
+     * @return list<string>
+     */
+    public function classification(EvalCase $case, array $actions): array
+    {
+        $expected = array_values(array_diff($case->classes ?? [], [ClassifiedAction::REPLY]));
+        $found = array_values(array_unique(array_diff(array_map(fn (ClassifiedAction $action): string => $action->class, $actions), [ClassifiedAction::REPLY])));
+        $missing = array_values(array_diff($expected, $found));
+        $extra = array_values(array_diff($found, $expected));
+        $scheduled = array_filter($actions, fn (ClassifiedAction $action): bool => in_array($action->class, [ClassifiedAction::CALL, ClassifiedAction::TASK], true));
+        $wrongConfidence = $case->confidence !== null && $scheduled !== [] && collect($scheduled)->contains(fn (ClassifiedAction $action): bool => $action->confidence !== $case->confidence);
+
+        return array_values(array_filter([
+            $missing === [] ? null : 'no vio: '.implode(', ', $missing),
+            $extra === [] ? null : 'vio de más: '.implode(', ', $extra),
+            $wrongConfidence ? 'debía estar '.($case->confidence === ClassifiedAction::SURE ? 'seguro' : 'en duda') : null,
+        ]));
     }
 }

@@ -27,7 +27,27 @@ type Proposal = {
     reaction?: { name: string; emoji: string } | null;
     /** What the search found, for the person: never part of what is sent. */
     context?: string | null;
+    /** What the message asks of the person, as the classifier saw it. */
+    actions?: ProposedAction[];
 };
+
+type ProposedAction = {
+    key: string;
+    class: 'call' | 'task' | 'question' | 'reply';
+    confidence: 'sure' | 'doubt';
+    summary: string;
+    doubt?: string;
+};
+
+const actionClass: Record<ProposedAction['class'], string> = {
+    call: 'Llamada',
+    task: 'Tarea',
+    question: 'Pregunta',
+    reply: 'Respuesta',
+};
+
+/** A part of the one-tap "sí" the person can leave out. */
+type Part = 'reply' | 'relay' | 'task';
 
 type AlertReviewProps = {
     task: AgendaTaskCard | null;
@@ -99,6 +119,16 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const relay = slack && props.proposal?.redirect?.text && props.proposal.redirect.to ? props.proposal.redirect : null;
     const reaction = slack && !props.proposal?.reply?.text ? (props.proposal?.reaction ?? null) : null;
     const canSend = pending && (slack || props.is_email) && Boolean(props.proposal?.reply?.text || relay || reaction);
+    // The call or task for the calendar goes with the same "sí" as the reply.
+    const bundlesTask = canSend && props.task?.status === 'proposed' && Boolean(props.task.pending_action_id);
+    const parts: Part[] = [
+        ...(props.proposal?.reply?.text || reaction ? (['reply'] as Part[]) : []),
+        ...(relay ? (['relay'] as Part[]) : []),
+        ...(bundlesTask ? (['task'] as Part[]) : []),
+    ];
+    const [excluded, setExcluded] = useState<Part[]>([]);
+    const included = parts.filter((part) => !excluded.includes(part));
+    const toggle = (part: Part) => setExcluded((current) => (current.includes(part) ? current.filter((other) => other !== part) : [...current, part]));
     const sendLabel = props.is_email
         ? props.proposal?.reply?.to === 'all'
             ? 'Responder a todos'
@@ -130,6 +160,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                         timezone: browserTimezone(),
                         text: replyText !== (props.proposal?.reply?.text ?? '') ? replyText : null,
                         relay_text: relayText !== (props.proposal?.redirect?.text ?? '') ? relayText : null,
+                        exclude: excluded,
                     })
                 ).actions,
             );
@@ -186,6 +217,23 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
         }));
         runTool('resolve_alert', { alert_id: alert.id, outcome, ...(reason ? { reason } : {}) });
     };
+
+    /** A doubt of the classifier, settled with one tap: "sí" prepares it, "no" takes it off. */
+    const settle = (action: ProposedAction, answer: 'yes' | 'no') => {
+        setBusy(true);
+        runTool('settle_alert_action', { alert_id: alert.id, action: action.key, answer });
+    };
+
+    /** Ticked, it goes out with the "sí"; shown only when the "sí" covers more than one thing. */
+    const includeBox = (part: Part, label: string) =>
+        parts.length > 1 && !sent ? (
+            <label className="flex items-center gap-1.5 text-[12px] text-muted">
+                <input type="checkbox" checked={!excluded.includes(part)} onChange={() => toggle(part)} className="accent-[var(--color-accent)]" />
+                {label}
+            </label>
+        ) : (
+            <p className="text-[12px] text-muted">{label}</p>
+        );
 
     return (
         <CanvasFrame
@@ -249,7 +297,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
 
                             {props.proposal.reply && (
                                 <div className="rounded-lg bg-soft px-3 py-2.5">
-                                    <p className="text-[12px] text-muted">{audience[props.proposal.reply.to]}</p>
+                                    {includeBox('reply', audience[props.proposal.reply.to])}
                                     {editing ? (
                                         <textarea
                                             aria-label="Respuesta"
@@ -269,13 +317,13 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                     <span aria-hidden className="text-[20px] leading-none">
                                         {reaction.emoji}
                                     </span>
-                                    <p className="text-[13px] text-muted">Reaccionar a su mensaje, sin escribir nada</p>
+                                    {includeBox('reply', 'Reaccionar a su mensaje, sin escribir nada')}
                                 </div>
                             )}
 
                             {props.proposal.redirect?.text && (
                                 <div className="rounded-lg bg-soft px-3 py-2.5">
-                                    <p className="text-[12px] text-muted">Pasárselo a {props.proposal.redirect.to ?? 'otra persona'}</p>
+                                    {includeBox('relay', `Pasárselo a ${props.proposal.redirect.to ?? 'otra persona'}`)}
                                     {editing && slack ? (
                                         <textarea
                                             aria-label="Mensaje para pasarlo"
@@ -302,8 +350,16 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             ) : (
                                 canSend && (
                                     <Buttons className="gap-x-3 gap-y-1.5">
-                                        <Button variant="primary" disabled={busy} onClick={() => void send()}>
-                                            {busy ? 'Enviando…' : sendLabel}
+                                        <Button variant="primary" disabled={busy || included.length === 0} onClick={() => void send()}>
+                                            {busy
+                                                ? 'Enviando…'
+                                                : included.length === 1 && included[0] === 'task'
+                                                  ? props.task?.kind === 'meeting'
+                                                      ? 'Convocar'
+                                                      : 'Reservar'
+                                                  : included.includes('task')
+                                                    ? `${sendLabel} y ${props.task?.kind === 'meeting' ? 'convocar' : 'reservar'}`
+                                                    : sendLabel}
                                         </Button>
                                         {(props.proposal.reply || relay) && !editing && (
                                             <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
@@ -321,6 +377,30 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                     {props.proposal.other_actions.map((action) => (
                                         <li key={action}>+ {action}</li>
                                     ))}
+                                </ul>
+                            )}
+
+                            {(props.proposal.actions ?? []).filter((action) => action.class !== 'reply').length > 0 && (
+                                <ul aria-label="Acciones" className="grid gap-1.5 text-[13px]">
+                                    {(props.proposal.actions ?? [])
+                                        .filter((action) => action.class !== 'reply')
+                                        .map((action) => (
+                                            <li key={action.key} className={action.confidence === 'doubt' ? 'rounded-lg border border-dashed border-line px-3 py-2' : ''}>
+                                                <span className="mr-1.5 text-[11.5px] font-medium tracking-wide text-muted uppercase">{actionClass[action.class]}</span>
+                                                {action.summary}
+                                                {action.confidence === 'doubt' && pending && (
+                                                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                        <span className="text-accent">{action.doubt}</span>
+                                                        <Button variant="secondary" disabled={busy} onClick={() => settle(action, 'yes')}>
+                                                            Sí
+                                                        </Button>
+                                                        <Button variant="tertiary" disabled={busy} onClick={() => settle(action, 'no')}>
+                                                            No
+                                                        </Button>
+                                                    </span>
+                                                )}
+                                            </li>
+                                        ))}
                                 </ul>
                             )}
 
@@ -345,12 +425,17 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                     <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
                     <AgendaTaskSummary task={props.task} compact />
                     {/* Nothing reaches the calendar before the "sí". */}
-                    {props.task.status === 'proposed' && props.task.pending_action_id && (
+                    {bundlesTask && !sent ? (
+                        <div className="mt-2">{includeBox('task', 'Va con el «sí» de la propuesta')}</div>
+                    ) : (
+                        props.task.status === 'proposed' &&
+                        props.task.pending_action_id && (
                         <ProposalBar
                             action={props.task.pending_action_id}
                             verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
                             done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
                         />
+                        )
                     )}
                 </section>
             )}

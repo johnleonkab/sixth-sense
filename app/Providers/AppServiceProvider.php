@@ -9,6 +9,9 @@ use App\Ai\GeminiTextModel;
 use App\Ai\JobOwner;
 use App\Ai\ProviderKeys;
 use App\Ai\TextModel;
+use App\Alerts\Actions\ActionClassifier;
+use App\Alerts\Actions\FakeActionClassifier;
+use App\Alerts\Actions\LlmActionClassifier;
 use App\Alerts\Intents\FakeIntentClassifier;
 use App\Alerts\Intents\IntentClassifier;
 use App\Alerts\Intents\LlmIntentClassifier;
@@ -156,6 +159,13 @@ class AppServiceProvider extends ServiceProvider
             $this->usesTextModel(config('alerts.planner')) => new LlmReplyPlanner($this->pipeline('reply_planner')),
             config('alerts.planner') === 'fake' => new FakeReplyPlanner,
             default => throw new InvalidArgumentException('Unsupported reply planner ['.config('alerts.planner').'].'),
+        });
+
+        // What a message asks of the person (call, task, question, reply) is decided apart from how to answer it.
+        $this->app->bind(ActionClassifier::class, fn (): ActionClassifier => match (true) {
+            $this->usesTextModel(config('alerts.planner')) => new LlmActionClassifier($this->pipeline('action_classifier')),
+            config('alerts.planner') === 'fake' => new FakeActionClassifier,
+            default => throw new InvalidArgumentException('Unsupported action classifier ['.config('alerts.planner').'].'),
         });
 
         // The scheduler's judgement is its own piece too: urgency and length of each task.

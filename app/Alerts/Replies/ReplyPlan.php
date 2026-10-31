@@ -16,7 +16,6 @@ final readonly class ReplyPlan
      * @param  ?array{to: string, text: string}  $reply  To: sender, all (everyone in the email), thread or conversation (Slack).
      * @param  list<string>  $otherActions  Anything else to do, e.g. "Crear un evento el jueves a las 10 con Julián".
      * @param  ?string  $question  What the engine could not decide and the person should say.
-     * @param  ?array{title: string, effort_minutes: ?int, deadline: ?string, people: list<string>}  $task  Work the person has to do themselves, beyond answering (for the scheduler).
      * @param  ?array{to: string, text: string}  $relay  A message to pass on to someone else, when the person is asked to ("dile a Alba…").
      * @param  ?string  $reaction  In Slack, a reaction (ChatReactions::NAMES) that answers instead of writing back.
      */
@@ -25,14 +24,13 @@ final readonly class ReplyPlan
         public ?array $reply = null,
         public array $otherActions = [],
         public ?string $question = null,
-        public ?array $task = null,
         public ?string $learned = null,
         public ?array $relay = null,
         public ?string $reaction = null,
     ) {}
 
     /**
-     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, task: ?array<string, mixed>, redirect: ?array{to: string, text: string}, reaction: ?array{name: string, emoji: string}}
+     * @return array{summary: string, reply: ?array{to: string, text: string}, other_actions: list<string>, question: ?string, redirect: ?array{to: string, text: string}, reaction: ?array{name: string, emoji: string}}
      */
     public function toArray(): array
     {
@@ -41,7 +39,6 @@ final readonly class ReplyPlan
             'reply' => $this->reply,
             'other_actions' => $this->otherActions,
             'question' => $this->question,
-            'task' => $this->task,
             'redirect' => $this->relay,
             'reaction' => $this->reaction ? ['name' => $this->reaction, 'emoji' => ChatReactions::emoji($this->reaction)] : null,
         ];

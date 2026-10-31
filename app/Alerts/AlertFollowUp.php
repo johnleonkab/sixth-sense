@@ -2,6 +2,8 @@
 
 namespace App\Alerts;
 
+use App\Alerts\Actions\ActionClassifier;
+use App\Alerts\Actions\ClassifiedAction;
 use App\Alerts\Intents\AutonomyLevel;
 use App\Alerts\Intents\IntentResearch;
 use App\Alerts\Intents\SlackAction;
@@ -50,6 +52,7 @@ class AlertFollowUp
         private SlackDraft $drafts,
         private ProductAnalytics $analytics,
         private SlackAutonomy $autonomy,
+        private ActionClassifier $classifier,
     ) {}
 
     /**
@@ -111,6 +114,9 @@ class AlertFollowUp
             $proposal = $this->proposal($plan, $decision, $draft);
         }
 
+        $actions = $decision?->action === SlackAction::Redirect->value ? [] : $this->classify($item, $brief);
+        $proposal['actions'] = array_map(fn (ClassifiedAction $action, int $index): array => $action->toArray("a{$index}"), $actions, array_keys($actions));
+
         $item->update(['proposal' => $proposal, 'planning' => false]);
         InboxItemUpdated::dispatch($item);
 
@@ -137,17 +143,51 @@ class AlertFollowUp
             }
         }
 
-        // Work the person has to do themselves: the scheduler finds time for it.
-        if ($decision?->action !== SlackAction::Redirect->value && $plan->task !== null && $item->user->wantsAlertsFrom(AlertSource::Agenda) && ! AgendaTask::where('inbox_item_id', $item->id)->exists()) {
-            $task = $item->user->agendaTasks()->create([
-                'inbox_item_id' => $item->id,
-                'origin' => 'alert',
-                'title' => $plan->task['title'],
-                'context' => trim("{$item->actor_name}: {$item->why}\n\n".mb_substr($brief->text, 0, 1500)),
-            ]);
-
-            ScheduleTask::dispatch($task, $plan->task['effort_minutes'], $plan->task['deadline'], $plan->task['people']);
+        // A call or work of the person's own, when the classifier is sure: the scheduler finds time for it.
+        // A doubt waits for the person to settle it (AlertActions::settle).
+        foreach ($actions as $action) {
+            if ($action->sure()) {
+                $this->schedule($item, $action, $brief);
+            }
         }
+    }
+
+    /**
+     * What the message asks of the person. A classifier that fails leaves the
+     * proposal as it was: just the reply.
+     *
+     * @return list<ClassifiedAction>
+     */
+    private function classify(InboxItem $item, AlertBrief $brief): array
+    {
+        try {
+            return $this->classifier->classify($item->user, $brief);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+    /**
+     * Sends a call or a task to the scheduler, once per alert.
+     */
+    public function schedule(InboxItem $item, ClassifiedAction $action, ?AlertBrief $brief = null): void
+    {
+        if (! in_array($action->class, [ClassifiedAction::CALL, ClassifiedAction::TASK], true) || ! $item->user->wantsAlertsFrom(AlertSource::Agenda) || AgendaTask::where('inbox_item_id', $item->id)->exists()) {
+            return;
+        }
+
+        $call = $action->class === ClassifiedAction::CALL;
+        $people = $call ? ($action->data['people'] ?? []) : [];
+        $task = $item->user->agendaTasks()->create([
+            'inbox_item_id' => $item->id,
+            'origin' => 'alert',
+            'title' => Str::limit($call ? 'Llamada con '.($people === [] ? $item->actor_name : implode(', ', $people)) : $action->summary, 120),
+            'context' => trim("{$item->actor_name}: {$item->why}\n".(filled($action->data['deliverable'] ?? null) ? "Entregable: {$action->data['deliverable']}\n" : '')."\n".mb_substr($brief?->text ?? (string) $item->body, 0, 1500)),
+        ]);
+
+        ScheduleTask::dispatch($task, $action->data['duration_minutes'] ?? null, $action->data['deadline'] ?? null, $people);
     }
 
     /**
@@ -167,7 +207,6 @@ class AlertFollowUp
                 'reply' => null,
                 'other_actions' => [],
                 'question' => $draft->sufficient ? null : $draft->note,
-                'task' => null,
                 'redirect' => ['to' => $decision->target, 'text' => Str::limit($text, 2000)],
                 'context' => $draft->note,
             ];
