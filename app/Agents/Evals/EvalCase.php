@@ -2,6 +2,8 @@
 
 namespace App\Agents\Evals;
 
+use App\Models\LearnedEvalCase;
+
 /**
  * One real ask for an agent and what a good outcome looks like: the tools it
  * must have used (any of them), the ones it must never use, whether it ends
@@ -57,5 +59,15 @@ final readonly class EvalCase
         $path = config('agents.evals_path')."/{$agent}.php";
 
         return is_file($path) ? array_map(self::fromArray(...), require $path) : [];
+    }
+
+    /**
+     * The written cases, and those learned from the person's corrections.
+     *
+     * @return list<self>
+     */
+    public static function withLearned(string $agent): array
+    {
+        return [...self::for($agent), ...LearnedEvalCase::query()->where('agent', $agent)->oldest('id')->pluck('case')->map(self::fromArray(...))->all()];
     }
 }

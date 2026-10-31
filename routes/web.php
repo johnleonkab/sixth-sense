@@ -22,6 +22,7 @@ use App\Http\Controllers\Settings\ConnectionController;
 use App\Http\Controllers\Settings\GithubRepositoryController;
 use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
+use App\Http\Controllers\Settings\LessonController;
 use App\Http\Controllers\Settings\McpServerController;
 use App\Http\Controllers\Settings\SenseWorkspaceController;
 use App\Http\Controllers\Settings\SystemController;
@@ -102,6 +103,9 @@ Route::middleware('auth')->group(function () {
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
         Route::get('impact', [ImpactController::class, 'index'])->name('impact.index');
+        Route::get('lessons', [LessonController::class, 'index'])->name('lessons.index');
+        Route::put('lessons/{lesson}', [LessonController::class, 'update'])->whereNumber('lesson')->name('lessons.update');
+        Route::delete('lessons/{lesson}', [LessonController::class, 'destroy'])->whereNumber('lesson')->name('lessons.destroy');
         Route::get('mcp', [McpServerController::class, 'index'])->name('mcp.index');
         Route::post('mcp', [McpServerController::class, 'store'])->middleware('throttle:10,1')->name('mcp.store');
         Route::get('mcp/oauth/callback', [McpServerController::class, 'callback'])->name('mcp.callback');

@@ -3,9 +3,13 @@
 namespace App\Alerts\Actions;
 
 use App\Alerts\AlertFollowUp;
+use App\Alerts\Lessons\Lessons;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Events\InboxItemUpdated;
 use App\Models\AgendaTask;
 use App\Models\InboxItem;
+use App\Models\LearnedEvalCase;
+use App\Models\ProposalOutcome;
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Scheduler;
 use Illuminate\Support\Str;
@@ -26,7 +30,12 @@ class AlertActions
         ClassifiedAction::REPLY => 'una respuesta',
     ];
 
-    public function __construct(private AlertFollowUp $followUp, private Scheduler $scheduler) {}
+    public function __construct(
+        private AlertFollowUp $followUp,
+        private Scheduler $scheduler,
+        private Lessons $lessons,
+        private ProposalOutcomes $outcomes,
+    ) {}
 
     /**
      * @param  ?bool  $yes  The answer to a doubt; null when only completing the action.
@@ -58,14 +67,25 @@ class AlertActions
 
         if ($yes === false) {
             array_splice($actions, $index, 1);
-            $item->user->intentLessons()->create([
-                'inbox_item_id' => $item->id,
-                'body' => Str::limit("Un mensaje de {$item->actor_name} como «{$item->title}» no pedía ".self::CLASS_NAMES[$action->class]." ({$action->summary}).", 240),
-            ]);
+            $this->lessons->learn($item->user, "Un mensaje de {$item->actor_name} como «{$item->title}» no pedía ".self::CLASS_NAMES[$action->class]." ({$action->summary}).", 'classifier', $item->actor_name, "not-{$action->class}", $item->id);
+            $this->evalCase($item, array_column($actions, 'class'));
             $item->update(['proposal' => [...$proposal, 'actions' => array_values($actions)]]);
             InboxItemUpdated::dispatch($item);
 
             return null;
+        }
+
+        // A doubt that was right: the classifier should have been sure.
+        if ($yes === true && ! $action->sure()) {
+            $this->evalCase($item, array_column($actions, 'class'), $action->class);
+        }
+
+        if (isset($changes['people'])) {
+            $this->outcomes->adjusted($item, ProposalOutcome::PEOPLE_CHOSEN, $action->class, ['people' => array_values($changes['people'])]);
+        }
+
+        if (isset($changes['duration_minutes']) && $changes['duration_minutes'] !== ($action->data['duration_minutes'] ?? null)) {
+            $this->outcomes->adjusted($item, ProposalOutcome::DURATION_CHANGED, $action->class, ['minutes' => $changes['duration_minutes'], 'was' => $action->data['duration_minutes'] ?? null]);
         }
 
         $brief = $this->followUp->brief($item);
@@ -89,6 +109,25 @@ class AlertActions
         $this->followUp->schedule($item->refresh(), $action, $brief);
 
         return $action;
+    }
+
+    /**
+     * The message joins the classifier's evaluation set with what it really asked.
+     *
+     * @param  list<string>  $classes  The classes left on the alert.
+     */
+    private function evalCase(InboxItem $item, array $classes, ?string $sure = null): void
+    {
+        LearnedEvalCase::query()->create([
+            'user_id' => $item->user_id,
+            'agent' => 'clasificador',
+            'case' => array_filter([
+                'ask' => Str::limit(trim((string) ($item->body ?: $item->title)), 1000),
+                'from' => $item->actor_name,
+                'classes' => array_values(array_unique(array_diff($classes, [ClassifiedAction::REPLY]))),
+                'confidence' => $sure !== null && in_array($sure, [ClassifiedAction::CALL, ClassifiedAction::TASK], true) ? ClassifiedAction::SURE : null,
+            ], fn (mixed $value): bool => $value !== null),
+        ]);
     }
 
     /**

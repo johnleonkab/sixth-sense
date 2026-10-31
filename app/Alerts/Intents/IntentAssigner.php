@@ -5,6 +5,7 @@ namespace App\Alerts\Intents;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
+use App\Alerts\Lessons\Lessons;
 use App\Alerts\Triage;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
@@ -138,7 +139,7 @@ class IntentAssigner
             $parts[] = "Política de atención en Slack, aprendida de cómo ha respondido:\n".$attention->body;
         }
 
-        $lessons = $user->intentLessons()->latest('id')->limit(8)->pluck('body');
+        $lessons = app(Lessons::class)->for($user, 'triage')->pluck('body');
 
         if ($lessons->isNotEmpty()) {
             $parts[] = "Aprendido al resolver avisos anteriores:\n".$lessons->implode("\n");

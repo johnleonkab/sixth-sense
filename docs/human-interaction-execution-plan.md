@@ -229,5 +229,5 @@ Pasos:
 | 6 · Preguntas | Hecho |
 | 7 · Fuente, fecha y destinatario | Hecho |
 | 8 · Ciclo de vida del aviso | Hecho |
-| 9 · Aprender de cada interacción | Pendiente |
+| 9 · Aprender de cada interacción | Hecho |
 | 10 · Métricas | Pendiente |

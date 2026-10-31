@@ -185,6 +185,7 @@ return [
         'intent_classifier' => ['tier' => 'light'],
         'reply_planner' => ['tier' => 'capable'],
         'action_classifier' => ['tier' => 'capable'],
+        'lesson_writer' => ['tier' => 'light'],
         'task_assessor' => ['tier' => 'capable'],
         'document_summarizer' => ['tier' => 'light'],
         'term_judge' => ['tier' => 'light'],

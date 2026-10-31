@@ -19,6 +19,9 @@ use App\Alerts\Judges\FakeMeetingAdvisor;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\Judges\LlmMeetingAdvisor;
 use App\Alerts\Judges\LlmRelevanceJudge;
+use App\Alerts\Lessons\FakeLessonWriter;
+use App\Alerts\Lessons\LessonWriter;
+use App\Alerts\Lessons\LlmLessonWriter;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\Push\PushSender;
 use App\Alerts\Push\WebPushSender;
@@ -166,6 +169,13 @@ class AppServiceProvider extends ServiceProvider
             $this->usesTextModel(config('alerts.planner')) => new LlmActionClassifier($this->pipeline('action_classifier')),
             config('alerts.planner') === 'fake' => new FakeActionClassifier,
             default => throw new InvalidArgumentException('Unsupported action classifier ['.config('alerts.planner').'].'),
+        });
+
+        // What each correction teaches, in a sentence: a light model.
+        $this->app->bind(LessonWriter::class, fn (): LessonWriter => match (true) {
+            $this->usesTextModel(config('alerts.planner')) => new LlmLessonWriter($this->pipeline('lesson_writer')),
+            config('alerts.planner') === 'fake' => new FakeLessonWriter,
+            default => throw new InvalidArgumentException('Unsupported lesson writer ['.config('alerts.planner').'].'),
         });
 
         // The scheduler's judgement is its own piece too: urgency and length of each task.

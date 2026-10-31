@@ -2,7 +2,9 @@
 
 namespace App\Alerts\Outcomes;
 
+use App\Alerts\Lessons\Lessons;
 use App\Jobs\InferResolution;
+use App\Jobs\LearnFromOutcome;
 use App\Models\InboxItem;
 use App\Models\PendingAction;
 use App\Models\ProposalOutcome;
@@ -56,12 +58,30 @@ class ProposalOutcomes
         $reason = in_array($reason, ProposalOutcome::REASONS, true) ? $reason : null;
         $lesson = $this->lesson($alert, $reason);
 
-        // Each reason teaches its layer: the judge, the triage, or the reply engine read these.
+        $outcome = $this->write($alert, ProposalOutcome::DISCARDED, ['class' => $this->classOf($alert), 'reason' => $reason]);
+
+        // Each reason teaches its layer: the judge, the triage, or the reply engine and the classifier read these.
         if ($lesson !== null) {
-            $alert->user->intentLessons()->create(['inbox_item_id' => $alert->id, 'body' => $lesson]);
+            app(Lessons::class)->learn($alert->user, $lesson, match ($reason) {
+                'not_important' => 'judge',
+                'not_for_me' => 'triage',
+                default => 'reply',
+            }, $alert->actor_name, "discard-{$reason}", outcome: $outcome);
+            $outcome->update(['learned_at' => now()]);
         }
 
-        return $this->write($alert, ProposalOutcome::DISCARDED, ['class' => $this->classOf($alert), 'reason' => $reason]);
+        return $outcome;
+    }
+
+    /**
+     * The person picked who goes to a call, or changed how long it lasts: a
+     * strong signal of how they work with that person.
+     *
+     * @param  array<string, mixed>  $detail  people, or minutes.
+     */
+    public function adjusted(InboxItem $alert, string $outcome, string $class, array $detail): ProposalOutcome
+    {
+        return $this->write($alert, $outcome, ['class' => $class, 'detail' => $detail]);
     }
 
     private function lesson(InboxItem $alert, ?string $reason): ?string
@@ -155,13 +175,20 @@ class ProposalOutcomes
      */
     private function write(InboxItem $alert, string $outcome, array $values): ProposalOutcome
     {
-        return $alert->outcomes()->create([
+        $written = $alert->outcomes()->create([
             'user_id' => $alert->user_id,
             'outcome' => $outcome,
             'confidence' => $this->confidenceOf($alert),
             'seconds_to_outcome' => $alert->received_at ? max(0, (int) $alert->received_at->diffInSeconds(now())) : null,
             ...$values,
         ]);
+
+        // A correction is learned from in the background (pillar 5).
+        if (in_array($outcome, [ProposalOutcome::EDITED, ProposalOutcome::PEOPLE_CHOSEN, ProposalOutcome::DURATION_CHANGED], true)) {
+            LearnFromOutcome::dispatch($written)->afterCommit();
+        }
+
+        return $written;
     }
 
     private function sentFromHere(InboxItem $alert): bool

@@ -21,6 +21,7 @@ const sections: SettingsSection[] = [
     { href: '/settings/wingman', label: 'Wingman' },
     { href: '/settings/system', label: 'Sistema' },
     { href: '/settings/impact', label: 'Impacto' },
+    { href: '/settings/lessons', label: 'Lecciones' },
 ];
 
 type SettingsLayoutProps = {

@@ -5,6 +5,7 @@ namespace App\Agents;
 use App\Agents\Models\ToolCall;
 use App\Agents\Models\ToolModels;
 use App\Ai\AiUnavailable;
+use App\Alerts\Lessons\Lessons;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Issues\IssueTracker;
 use App\Models\AgentProduction;
@@ -241,6 +242,8 @@ class AgentRunner
             $agent->instructions,
             'Hoy es '.$now->locale('es')->isoFormat('dddd D [de] MMMM [de] YYYY, HH:mm')." ({$now->getTimezone()->getName()}).",
             $this->person($user),
+            // Whoever writes for the person reads what their corrections taught about how they write.
+            $agent->name === 'comunicacion' ? trim(app(Lessons::class)->render($user, 'reply')) : '',
             // Whoever composes views follows the same OpenUI prompt the voice used to.
             in_array('compose_view', $agent->tools, true) ? OpenUi::prompt() : '',
             'Reglas: usa solo tus herramientas. Usa solo ids que te hayan devuelto ellas; nunca te los inventes. '

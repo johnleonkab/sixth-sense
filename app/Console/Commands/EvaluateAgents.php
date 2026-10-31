@@ -30,7 +30,7 @@ class EvaluateAgents extends Command
     public function handle(AgentRegistry $registry, AgentRunner $runner, Orchestrator $orchestrator, EvalScorer $scorer, ActionClassifier $classifier): int
     {
         $name = (string) $this->argument('agent');
-        $cases = EvalCase::for($name);
+        $cases = EvalCase::withLearned($name);
         $user = $this->option('user') ? User::query()->find($this->option('user')) : User::query()->orderBy('id')->first();
 
         if ($cases === [] || $user === null) {

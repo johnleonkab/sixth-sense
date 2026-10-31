@@ -2,6 +2,7 @@
 
 namespace App\Alerts\Intents;
 
+use App\Alerts\Lessons\Lessons;
 use App\Alerts\Replies\AlertBrief;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\ChatSearch;
@@ -42,7 +43,7 @@ class IntentResearch
             $lines[] = "Contexto de trabajo:\n".$work->summary;
         }
 
-        $lessons = $user->intentLessons()->latest('id')->limit(8)->pluck('body');
+        $lessons = app(Lessons::class)->for($user, 'reply', $brief->from)->pluck('body');
 
         if ($lessons->isNotEmpty()) {
             $lines[] = "Ya aprendido:\n".$lessons->implode("\n");
