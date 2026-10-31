@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { UNDO_SECONDS } from '@/actions/types';
 import type { ActionState } from '@/actions/types';
 import { useCanvas } from '@/canvas/canvas-context';
 import { Button } from '@/components/button';
@@ -85,7 +86,7 @@ export default function ActionBar({
                     <span aria-hidden className="h-1 w-24 overflow-hidden rounded-full bg-soft">
                         <span
                             className="block h-full bg-accent transition-[width] duration-200 ease-linear"
-                            style={{ width: `${(secondsLeft / 8) * 100}%` }}
+                            style={{ width: `${(secondsLeft / UNDO_SECONDS) * 100}%` }}
                         />
                     </span>
                     <Button onClick={() => void actions.undo(action.id)} className={thumb}>

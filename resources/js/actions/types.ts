@@ -1,3 +1,6 @@
+/** Seconds to undo a confirmed action; the same as Actions::UNDO_WINDOW in Laravel. */
+export const UNDO_SECONDS = 6;
+
 export type ActionStatus = 'pending' | 'confirmed' | 'executing' | 'executed' | 'cancelled' | 'undone' | 'failed' | 'expired';
 
 /** A change the assistant proposed; mirrors PendingAction::toState(). */

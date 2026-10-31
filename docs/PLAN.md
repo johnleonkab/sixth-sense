@@ -77,7 +77,7 @@ Cada fase termina con algo que se puede probar hablando.
 **Objetivo:** actuar, no solo mirar.
 
 - `PendingAction` + directiva `confirm` + botones Sí/Cancela + orden por voz.
-- Ejecución diferida con ventana de deshacer de 8 s.
+- Ejecución diferida con ventana de deshacer de 6 s.
 - Herramientas, por orden: responder en Slack → borrador/respuesta en Gmail → mover/crear evento → comentar en Jira → cambiar estado en Jira → comentar en Notion.
 
 **Hecho cuando:** "responde a Marta que lo reviso a las 11" muestra el borrador, se envía al decir "sí" y se puede deshacer.

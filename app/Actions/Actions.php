@@ -30,7 +30,7 @@ use InvalidArgumentException;
 class Actions
 {
     /** Seconds between "sí" and the change actually happening. */
-    public const UNDO_WINDOW = 8;
+    public const UNDO_WINDOW = 6;
 
     /** A proposal left unanswered for this long can no longer be confirmed. */
     public const PROPOSAL_LIFETIME = 600;

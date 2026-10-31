@@ -331,7 +331,7 @@ Solo lectura (se ejecutan directamente):
 Escritura (crean `PendingAction`, nunca ejecutan sin confirmación):
 `slack_send_message`, `gmail_send_reply`, `gmail_create_draft`, `calendar_move_event`, `calendar_create_event`, `jira_add_comment`, `jira_transition_issue`, `notion_add_comment`.
 
-Al confirmar, un job ejecuta la acción con un retraso igual a la ventana de deshacer (8 s). "Deshaz" dentro de esa ventana cancela el job.
+Al confirmar, un job ejecuta la acción con un retraso igual a la ventana de deshacer (6 s). "Deshaz" dentro de esa ventana cancela el job.
 
 ---
 

@@ -96,3 +96,10 @@ test('the assistant has no tool to confirm anything', function () {
 
     expect(array_filter($names, fn (string $name) => preg_match('/confirm|approve|execute|apply/', $name)))->toBe([]);
 });
+
+test('the screen counts down the same undo window the server waits, six seconds', function () {
+    preg_match('/export const UNDO_SECONDS = (\d+);/', (string) file_get_contents(resource_path('js/actions/types.ts')), $screen);
+
+    expect(Actions::UNDO_WINDOW)->toBe(6)
+        ->and((int) ($screen[1] ?? 0))->toBe(Actions::UNDO_WINDOW);
+});

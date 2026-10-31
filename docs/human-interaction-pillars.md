@@ -12,9 +12,9 @@ Documento vivo: se actualiza cada vez que se implementa o cambia un comportamien
 
 Estas reglas valen para todos los pilares y están por encima de cualquier flujo concreto.
 
-1. **Nada se ejecuta sin el «sí».** Ni mensajes, ni eventos, ni tareas en su propio calendario. El «sí» llega por botón o por voz.
+1. **Nada se ejecuta sin el «sí».** Ni mensajes, ni eventos, ni tareas en su propio calendario. El «sí» llega por botón o por voz. **Única excepción:** lo que la persona haya subido explícitamente al nivel «Hacer» de la autonomía de Slack, por tipo de mensaje; se envía solo, con la misma ventana para deshacer, y se puede bajar en cualquier momento.
 2. **Ante la duda, preguntar; nunca suponer.** La duda no es una clase aparte: es un nivel de confianza que puede tener cualquier clase (ver Pilar 0).
-3. **Deshacer siempre es posible.** Tras el «sí», el envío espera una ventana corta (propuesta: 10 segundos) durante la que se puede cancelar. Los eventos y tareas creados se pueden borrar desde el propio aviso.
+3. **Deshacer siempre es posible.** Tras el «sí», el envío espera **6 segundos**, en toda la app, durante los que se puede cancelar. Los eventos y tareas creados se pueden borrar desde el propio aviso.
 4. **Citar la fuente.** Todo dato que el sistema aporta (estado de un issue, un documento, un hueco) dice de dónde sale y cuándo se actualizó por última vez.
 5. **No compartir más de la cuenta.** Antes de redactar con información interna, se comprueba quién recibe el mensaje (interno, otro equipo, externo).
 
@@ -150,12 +150,12 @@ La última es la más difícil y la más importante: las demás solo miden preci
 
 | Pilar | Hoy | Falta |
 | --- | --- | --- |
-| Principios | El agendador espera el «sí» para reuniones | **Tareas sin «sí» (incumple el principio 1)**; ventana para deshacer; citar fuente y fecha; control de destinatario |
+| Principios | El agendador espera el «sí» para reuniones; ventana para deshacer de 6 s en toda la app; la autonomía «Hacer» es la excepción del principio 1 | **Tareas sin «sí» (incumple el principio 1)**; citar fuente y fecha; control de destinatario |
 | 0 · Clasificación | El juez y el triaje deciden si importa y a quién le toca; el motor de respuestas propone respuesta, reacción, encargo a otro y una «tarea manual» con un criterio amplio | Clases llamada / tarea / pregunta con nivel de confianza; avisos en duda por clase; varias clases en un aviso |
 | 1 · Llamadas | Si la tarea manual tiene personas, el agendador busca hueco (también en su ocupación) y propone la reunión, que espera el «sí» | Comprobar que la llamada le incluye; selector de personas; preguntar duración; respuesta en el mismo «sí»; ampliar ventana; mensaje cuando no hay hueco; externos |
 | 2 · Tareas | Una tarea propia se crea directamente en el calendario; el criterio de qué es una tarea es amplio | Criterio de tres condiciones; detectar sus compromisos (Slack y email); 3 huecos antes del plazo; crear solo tras el «sí»; seguimiento antes del plazo |
 | 3 · Preguntas | Antes de redactar se busca en el hilo, enlaces, archivo, documentos y respuestas anteriores | Índice de Jira con candidatos y búsqueda cerrada; Notion y contexto personal; aviso de datos viejos; control de destinatario |
-| 4 · Interacción | Aviso con propuesta; enviar con un toque (Slack y Gmail); descartar; marcar como resuelta | Motivo al descartar; inferir cómo se resolvió; caducidad, orden y resumen agrupado |
+| 4 · Interacción | Aviso con propuesta; enviar con un toque (Slack y Gmail); descartar; marcar como resuelta. Caducidad en parte: el aviso se cierra solo si responde en Slack o Gmail, y un mensaje nuevo de la misma conversación sustituye al anterior | Motivo al descartar; inferir cómo se resolvió; caducidad cuando otro responde o la llamada ya pasó; orden y resumen agrupado |
 | 5 · Aprender | Lecciones del motor de respuestas; correcciones de triaje que proponen reglas; registro de cada ejecución de agente | Registrar el resultado de cada propuesta con su peso; convertirlo en lecciones y casos de evaluación; métricas |
 
 ## Decisiones abiertas
@@ -167,7 +167,7 @@ Cada una lleva una propuesta para validar o cambiar.
 - [ ] **Selector de personas.** Propuesta: las de la conversación marcadas; las de su grafo habitual como sugerencia, sin marcar.
 - [ ] **Compromisos propios.** Propuesta: Slack y emails enviados (los compromisos con externos suelen estar en el email).
 - [ ] **Umbral de confianza.** Qué nivel separa «segura» de «en duda» en cada clase, y si se ajusta por persona.
-- [ ] **Ventana para deshacer.** Propuesta: 10 segundos para mensajes.
+- [x] **Ventana para deshacer.** Decidido: 6 segundos, igual para todas las acciones.
 - [ ] **Datos viejos.** Propuesta: marcar fuentes sin actualizar en más de 2 semanas.
 - [ ] **Resumen agrupado.** Cuántas veces al día y a qué horas.
 
@@ -175,5 +175,6 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-10-31 | Excepción del principio 1 para la autonomía «Hacer» de Slack. Ventana para deshacer: 6 segundos en toda la app (antes 8). Estado del pilar 4: la caducidad ya existe en parte. |
 | 2026-10-31 | Revisión: principios transversales; la duda pasa a ser nivel de confianza por clase; varias clases por aviso; criterio de tarea con tres condiciones y huecos antes del plazo; guardarraíles en preguntas; motivo al descartar; ciclo de vida del aviso; pesos de las señales; métricas; propuestas para las decisiones abiertas. |
 | 2026-10-31 | Documento creado con los pilares 0 a 5 y el estado actual. |
