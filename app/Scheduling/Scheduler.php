@@ -3,6 +3,7 @@
 namespace App\Scheduling;
 
 use App\Actions\Actions;
+use App\Actions\ActionStatus;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
@@ -67,6 +68,17 @@ class Scheduler
             $until = $until->min($assessment->deadline->setTimezone($now->getTimezone())->endOfDay());
         }
 
+        // Work asked for in a message: three slots to choose from, before the
+        // deadline with a working day of margin when there is room for it.
+        if ($task->inbox_item_id !== null && $people === [] && $until->greaterThan($from)) {
+            $margin = $assessment->deadline?->setTimezone($now->getTimezone())->subWeekday()->endOfDay();
+            $options = $this->slots->options($user, $from, $margin !== null && $margin->greaterThan($from) ? $until->min($margin) : $until, $assessment->durationMinutes);
+
+            if ($options !== []) {
+                return $this->propose($task, $assessment, $people, $accounts, $options[0], [...$decided, 'options' => self::stored($options)]);
+            }
+        }
+
         $slot = $until->greaterThan($from)
             ? $this->slots->find($user, $from, $until, $assessment->durationMinutes, array_map(fn (MailAddress $person): string => (string) $person->email, $people))
             : null;
@@ -117,7 +129,7 @@ class Scheduler
 
             return $this->finish($task, $options === []
                 ? [...$decided, 'status' => AgendaTaskStatus::Conflict]
-                : [...$decided, 'status' => AgendaTaskStatus::Offered, 'options' => array_map(fn (array $option): array => [$option[0]->utc()->toIso8601String(), $option[1]->utc()->toIso8601String()], $options)]);
+                : [...$decided, 'status' => AgendaTaskStatus::Offered, 'options' => self::stored($options)]);
         }
 
         $slot = $this->slots->find($user, $from, $window($assessment->urgency), $assessment->durationMinutes, $emails);
@@ -161,6 +173,35 @@ class Scheduler
 
         // Stored in UTC: the database keeps no timezone.
         return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);
+    }
+
+    /**
+     * The person picks another of the slots offered: the proposal waiting for
+     * the "sí" moves there.
+     */
+    public function choose(AgendaTask $task, int $option): ?AgendaTask
+    {
+        $chosen = $task->options[$option] ?? null;
+        $action = $task->pendingAction;
+
+        if ($chosen === null || $task->status !== AgendaTaskStatus::Proposed || $action === null || $action->status !== ActionStatus::Pending) {
+            return null;
+        }
+
+        $timezone = $action->payload['event']['timezone'] ?? config('agenda.timezone');
+        [$start, $end] = [CarbonImmutable::parse($chosen[0])->setTimezone($timezone), CarbonImmutable::parse($chosen[1])->setTimezone($timezone)];
+        $action->update(['payload' => [...$action->payload, 'event' => [...$action->payload['event'], 'start' => $start->toIso8601String(), 'end' => $end->toIso8601String()], 'squeeze' => []]]);
+
+        return $this->finish($task, ['starts_at' => $start->utc(), 'ends_at' => $end->utc()]);
+    }
+
+    /**
+     * @param  list<array{0: CarbonImmutable, 1: CarbonImmutable}>  $options
+     * @return list<array{string, string}>
+     */
+    private static function stored(array $options): array
+    {
+        return array_map(fn (array $option): array => [$option[0]->utc()->toIso8601String(), $option[1]->utc()->toIso8601String()], $options);
     }
 
     /**

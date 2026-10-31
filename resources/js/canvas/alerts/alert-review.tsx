@@ -48,6 +48,12 @@ type ProposedAction = {
 
 const callLengths = [15, 30, 45, 60];
 
+const taskLengths = [15, 30, 45, 60, 90, 120];
+
+const slotDay = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric' });
+
+const slotTime = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+
 /**
  * What a call is missing, settled with taps: who goes (the people in the
  * conversation ticked, usual colleagues suggested) and how long it lasts.
@@ -281,7 +287,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     };
 
     /** A doubt of the classifier, settled with one tap: "sí" prepares it, "no" takes it off. */
-    const settle = (action: ProposedAction, answer: 'yes' | 'no' | null, changes: { people?: string[]; duration_minutes?: number } = {}) => {
+    const taskAction = (props.proposal?.actions ?? []).find((action) => action.class === 'task' && action.confidence === 'sure');
+
+    const settle = (action: ProposedAction, answer: 'yes' | 'no' | null, changes: { people?: string[]; duration_minutes?: number; slot?: number } = {}) => {
         setBusy(true);
         runTool('settle_alert_action', { alert_id: alert.id, action: action.key, ...(answer ? { answer } : {}), ...changes });
     };
@@ -489,6 +497,39 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 <section aria-label="Agendado" className="mt-4 rounded-xl border border-line p-4">
                     <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
                     <AgendaTaskSummary task={props.task} compact />
+                    {/* Work asked for in a message: which of its slots, and how long, with one tap each. */}
+                    {pending && taskAction && props.task.kind === 'task' && props.task.status === 'proposed' && !sent && (
+                        <div className="mt-2 grid gap-1.5">
+                            {(props.task.options ?? []).length > 1 && (
+                                <div role="group" aria-label="Hueco" className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[12px] text-muted">Otro hueco:</span>
+                                    {(props.task.options ?? []).map(([start], position) => (
+                                        <Button
+                                            key={start}
+                                            variant={start === props.task?.starts_at ? 'primary' : 'secondary'}
+                                            disabled={busy || start === props.task?.starts_at}
+                                            onClick={() => settle(taskAction, null, { slot: position })}
+                                        >
+                                            {slotDay.format(new Date(start))} · {slotTime.format(new Date(start))}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+                            <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[12px] text-muted">Duración:</span>
+                                {taskLengths.map((length) => (
+                                    <Button
+                                        key={length}
+                                        variant={length === props.task?.duration_minutes ? 'primary' : 'tertiary'}
+                                        disabled={busy || length === props.task?.duration_minutes}
+                                        onClick={() => settle(taskAction, null, { duration_minutes: length })}
+                                    >
+                                        {length < 60 ? `${length} min` : `${length / 60} h`.replace('.5', ',5')}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {/* Nothing reaches the calendar before the "sí". */}
                     {bundlesTask && !sent ? (
                         <div className="mt-2">{includeBox('task', 'Va con el «sí» de la propuesta')}</div>

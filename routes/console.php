@@ -14,6 +14,7 @@ Artisan::command('inspire', function () {
  */
 Schedule::command('alerts:watch')->everyMinute()->withoutOverlapping(5);
 Schedule::command('alerts:check-replies')->everyTwoMinutes()->withoutOverlapping(10);
+Schedule::command('alerts:check-commitments')->everyTenMinutes()->withoutOverlapping(20);
 Schedule::command('alerts:plan-meetings')->everyTenMinutes()->withoutOverlapping(30);
 Schedule::command('alerts:remind-meetings')->everyMinute()->withoutOverlapping(5);
 Schedule::command('chats:warm')->hourly()->withoutOverlapping(60);

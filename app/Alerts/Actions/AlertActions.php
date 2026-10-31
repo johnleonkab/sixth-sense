@@ -14,7 +14,8 @@ use Illuminate\Support\Str;
  * The person settles what an alert's action is missing, with one tap or a
  * word: "sí" makes a doubt sure and prepares it; "no" takes it off, and the
  * classifier learns from it next time. For a call, who takes part and how
- * long it lasts; changing either looks for a slot again.
+ * long it lasts; for a task, how long and which of its slots. Changing who
+ * or how long looks for a slot again.
  */
 class AlertActions
 {
@@ -29,7 +30,7 @@ class AlertActions
 
     /**
      * @param  ?bool  $yes  The answer to a doubt; null when only completing the action.
-     * @param  array{people?: list<string>, duration_minutes?: int}  $changes
+     * @param  array{people?: list<string>, duration_minutes?: int, slot?: int}  $changes  slot: another of the slots offered for a task.
      * @return ?ClassifiedAction The action as it now stands, or null when it is not on the alert (or was taken off).
      */
     public function settle(InboxItem $item, string $key, ?bool $yes, array $changes = []): ?ClassifiedAction
@@ -43,6 +44,12 @@ class AlertActions
         }
 
         $action = ClassifiedAction::fromArray($actions[$index]);
+
+        if (isset($changes['slot'])) {
+            $task = $this->openTask($item);
+
+            return $task !== null && $this->scheduler->choose($task, $changes['slot']) !== null ? $action : null;
+        }
 
         if ($yes === false) {
             array_splice($actions, $index, 1);

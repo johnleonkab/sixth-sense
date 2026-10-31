@@ -225,7 +225,7 @@ Pasos:
 | 2 · Descartar con motivo y resolver | Hecho |
 | 3 · Clasificador de acciones | Hecho |
 | 4 · Llamadas | Hecho |
-| 5 · Tareas | Pendiente |
+| 5 · Tareas | Hecho |
 | 6 · Preguntas | Pendiente |
 | 7 · Fuente, fecha y destinatario | Pendiente |
 | 8 · Ciclo de vida del aviso | Pendiente |
