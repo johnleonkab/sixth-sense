@@ -58,6 +58,24 @@ class IntentResearch
     }
 
     /**
+     * The documents the drafting can lean on, to cite under the proposal:
+     * title, link and when each was last touched.
+     *
+     * @return list<array{kind: string, title: string, url: ?string, updated_at: ?string}>
+     */
+    public function sources(User $user, AlertBrief $brief, int $limit = 3): array
+    {
+        $found = $this->safely(fn (): array => $this->knowledge->search($user, trim($brief->subject.' '.Str::limit($brief->text, 600, '')), [], $limit)) ?? [];
+
+        return array_map(fn (array $document): array => [
+            'kind' => Str::lower(Str::ascii($document['source'])),
+            'title' => $document['title'],
+            'url' => $document['url'],
+            'updated_at' => $document['updated_at'],
+        ], $found);
+    }
+
+    /**
      * @return list<string>
      */
     private function look(User $user, string $query): array
@@ -102,7 +120,7 @@ class IntentResearch
         return array_values(array_filter($found));
     }
 
-    private function safely(callable $search): ?string
+    private function safely(callable $search): mixed
     {
         try {
             return $search();

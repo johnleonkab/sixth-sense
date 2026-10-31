@@ -12,7 +12,7 @@ import CanvasFrame from '@/canvas/canvas-frame';
 import SlackCorrections from '@/canvas/slack/slack-corrections';
 import type { CanvasComponent } from '@/canvas/types';
 import { Button, Buttons } from '@/components/button';
-import { browserTimezone, postJson } from '@/lib/http';
+import { browserTimezone, HttpError, postJson } from '@/lib/http';
 
 type Proposal = {
     summary: string;
@@ -35,6 +35,10 @@ type Proposal = {
         sources: { kind: string; title: string; url: string | null; updated_at: string | null; status?: string | null }[];
         stale: string | null;
     };
+    /** Where the facts come from. */
+    sources?: { kind: string; title: string; url: string | null; updated_at: string | null }[];
+    /** Whom it goes to, when outside the person's circle, and the internal data the draft carries. */
+    recipient?: { scope: 'other_team' | 'external'; label: string; internal: string[] } | null;
 };
 
 const updatedFormat = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
@@ -225,9 +229,13 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const [relayText, setRelayText] = useState(props.proposal?.redirect?.text ?? '');
     const [editing, setEditing] = useState(false);
 
-    const send = async () => {
+    // Internal data going outside the person's circle: the server asks for one more "sí".
+    const [confirmInternal, setConfirmInternal] = useState<string | null>(null);
+
+    const send = async (internalSeen = false) => {
         setBusy(true);
         setSendError(null);
+        setConfirmInternal(null);
 
         try {
             setSent(
@@ -237,11 +245,18 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                         text: replyText !== (props.proposal?.reply?.text ?? '') ? replyText : null,
                         relay_text: relayText !== (props.proposal?.redirect?.text ?? '') ? relayText : null,
                         exclude: excluded,
+                        confirm_internal: internalSeen,
                     })
                 ).actions,
             );
             setEditing(false);
         } catch (error) {
+            if (error instanceof HttpError && error.status === 409) {
+                setConfirmInternal(error.message);
+
+                return;
+            }
+
             setSendError(error instanceof Error ? error.message : 'No se ha podido enviar.');
         } finally {
             setBusy(false);
@@ -447,6 +462,14 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                             </Button>
                                         )}
                                         <span className="text-[12px] text-muted">{editing ? 'Cambia el texto y envía' : 'o dime qué cambio'}</span>
+                                        {confirmInternal && (
+                                            <span className="flex basis-full flex-wrap items-center gap-2 text-[12.5px] text-warn">
+                                                {confirmInternal}
+                                                <Button variant="secondary" destructive disabled={busy} onClick={() => void send(true)}>
+                                                    Enviar igualmente
+                                                </Button>
+                                            </span>
+                                        )}
                                         {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
                                     </Buttons>
                                 )
@@ -485,6 +508,32 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                             </li>
                                         ))}
                                 </ul>
+                            )}
+
+                            {props.proposal.recipient && (
+                                <p className="text-[12.5px] text-warn">
+                                    {props.proposal.recipient.label}
+                                    {props.proposal.recipient.internal.length > 0 && `: la respuesta lleva datos internos (${props.proposal.recipient.internal.join(', ')}).`}
+                                </p>
+                            )}
+
+                            {(props.proposal.sources ?? []).length > 0 && research?.outcome !== 'found' && (
+                                <p className="text-[12px] text-muted">
+                                    Fuentes:{' '}
+                                    {(props.proposal.sources ?? []).map((source, position) => (
+                                        <span key={source.title}>
+                                            {position > 0 && ' · '}
+                                            {source.url ? (
+                                                <a href={source.url} target="_blank" rel="noreferrer noopener" className="hover:text-accent hover:underline">
+                                                    {source.title}
+                                                </a>
+                                            ) : (
+                                                source.title
+                                            )}
+                                            {source.updated_at && ` (${updatedFormat.format(new Date(source.updated_at))})`}
+                                        </span>
+                                    ))}
+                                </p>
                             )}
 
                             {research?.outcome === 'several' && questionAction && pending && (

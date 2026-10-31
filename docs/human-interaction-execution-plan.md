@@ -227,7 +227,7 @@ Pasos:
 | 4 · Llamadas | Hecho |
 | 5 · Tareas | Hecho |
 | 6 · Preguntas | Hecho |
-| 7 · Fuente, fecha y destinatario | Pendiente |
+| 7 · Fuente, fecha y destinatario | Hecho |
 | 8 · Ciclo de vida del aviso | Pendiente |
 | 9 · Aprender de cada interacción | Pendiente |
 | 10 · Métricas | Pendiente |

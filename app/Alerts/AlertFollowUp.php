@@ -13,6 +13,7 @@ use App\Alerts\Intents\SlackDraftBrief;
 use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Questions\QuestionAnswer;
 use App\Alerts\Questions\QuestionResearch;
+use App\Alerts\Recipients\RecipientScope;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\ReplyPlan;
 use App\Alerts\Replies\ReplyPlanner;
@@ -35,6 +36,7 @@ use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\UsualDurations;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -61,6 +63,7 @@ class AlertFollowUp
         private ActionClassifier $classifier,
         private UsualDurations $durations,
         private QuestionResearch $questions,
+        private RecipientScope $recipients,
     ) {}
 
     /**
@@ -140,6 +143,11 @@ class AlertFollowUp
         if ($answer !== null) {
             $proposal = $this->withResearch($proposal, $answer);
         }
+
+        // Where each fact comes from, and whether the answer leaves the person's circle.
+        $proposal['sources'] = collect([...($answer?->sources ?? []), ...$this->research->sources($item->user, $brief)])
+            ->unique('title')->take(4)->map(fn (array $source): array => Arr::only($source, ['kind', 'title', 'url', 'updated_at']))->values()->all();
+        $proposal = $this->withRecipient($item, $proposal, $brief);
 
         $item->update(['proposal' => $proposal, 'planning' => false]);
         InboxItemUpdated::dispatch($item);
@@ -303,13 +311,13 @@ class AlertFollowUp
             return;
         }
 
-        $item->update(['proposal' => [
+        $item->update(['proposal' => $this->withRecipient($item, [
             ...($item->proposal ?? []),
             'summary' => $plan->summary,
             'reply' => $plan->reply,
             'reaction' => null,
             'question' => $plan->question,
-        ]]);
+        ], $brief)]);
         InboxItemUpdated::dispatch($item);
     }
 
@@ -329,16 +337,32 @@ class AlertFollowUp
         $answer = $this->questions->from($item->user, $source);
         $plan = $this->planner->plan($item->user, $brief->withFindings(trim("{$brief->findings}\n\n{$answer->findings}")));
 
-        $item->update(['proposal' => $this->withResearch([
+        $proposal = $this->withResearch([
             ...($item->proposal ?? []),
             'summary' => $plan->summary,
             'reply' => $plan->reply,
             'reaction' => null,
             'question' => $plan->question,
-        ], $answer)]);
+        ], $answer);
+        $proposal['sources'] = collect([...$answer->sources, ...($proposal['sources'] ?? [])])->unique('title')->take(4)->map(fn (array $source): array => Arr::only($source, ['kind', 'title', 'url', 'updated_at']))->values()->all();
+        $item->update(['proposal' => $this->withRecipient($item, $proposal, $brief)]);
         InboxItemUpdated::dispatch($item);
 
         return true;
+    }
+
+    /**
+     * Whom the reply goes to, when that is outside the person's circle, and
+     * the internal data the draft would take there.
+     *
+     * @param  array<string, mixed>  $proposal
+     * @return array<string, mixed>
+     */
+    private function withRecipient(InboxItem $item, array $proposal, AlertBrief $brief): array
+    {
+        $email = $item->source === AlertSource::Gmail ? (MailAddress::parseList($brief->from)[0]->email ?? null) : null;
+
+        return [...$proposal, 'recipient' => $this->recipients->check($item, $proposal['reply']['text'] ?? null, $email)];
     }
 
     /**

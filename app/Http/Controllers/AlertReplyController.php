@@ -6,6 +6,7 @@ use App\Actions\Actions;
 use App\Actions\ActionStatus;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Alerts\Recipients\RecipientScope;
 use App\Connectors\Chat\ChatReactions;
 use App\Connectors\Chat\Chats;
 use App\Models\InboxItem;
@@ -24,12 +25,13 @@ use Illuminate\Support\Str;
  * or everyone on it), in Slack the message to pass on to someone else, and the
  * call or task proposed for the calendar, go out once the undo window closes,
  * as every confirmed action does. What the person unticks is left out.
+ * Internal data going outside the person's circle asks for one more "sí".
  */
 class AlertReplyController extends Controller
 {
     public function __construct(private Chats $chats) {}
 
-    public function __invoke(Request $request, int $item, Toolbox $toolbox, Actions $actions): JsonResponse
+    public function __invoke(Request $request, int $item, Toolbox $toolbox, Actions $actions, RecipientScope $scope): JsonResponse
     {
         $alert = $request->user()->inboxItems()->findOrFail($item);
         $edits = $request->validate([
@@ -37,12 +39,27 @@ class AlertReplyController extends Controller
             'relay_text' => ['nullable', 'string', 'max:4000'],
             'exclude' => ['nullable', 'array'],
             'exclude.*' => ['string', 'in:reply,relay,task'],
+            'confirm_internal' => ['nullable', 'boolean'],
         ]);
         $excluded = $edits['exclude'] ?? [];
         $messages = $alert->status === AlertStatus::Pending ? $this->messages($request->user(), $alert, $edits, $excluded) : [];
         $booking = $alert->status === AlertStatus::Pending && ! in_array('task', $excluded, true) ? $this->booking($alert) : null;
 
         abort_if($messages === [] && $booking === null, 422, 'Este aviso no tiene nada que enviar.');
+
+        // Internal data to someone outside the person's circle: one more "sí", having seen it marked.
+        $recipient = $alert->proposal['recipient'] ?? null;
+        $internal = $recipient !== null && ! in_array('reply', $excluded, true)
+            ? $scope->internalData((string) (filled($edits['text'] ?? null) ? $edits['text'] : ($alert->proposal['reply']['text'] ?? '')))
+            : [];
+
+        if ($internal !== [] && ! $request->boolean('confirm_internal')) {
+            return response()->json([
+                'message' => "{$recipient['label']} y la respuesta lleva datos internos (".implode(', ', $internal).'). ¿La envías igualmente?',
+                'needs_confirmation' => true,
+                'internal' => $internal,
+            ], 409);
+        }
 
         $timezone = $request->string('timezone', config('agenda.timezone'))->toString();
         $context = new ToolContext(CarbonImmutable::now(in_array($timezone, timezone_identifiers_list(), true) ? $timezone : config('agenda.timezone')));
