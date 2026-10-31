@@ -6,7 +6,7 @@ Cuando llega un mensaje (Slack o email), el sistema decide **si hay que hacer al
 
 Complementa a [Pilares de producto: triaje agéntico de Slack](Pilares%20de%20producto%20triaje%20agéntico%20de%20Slack.md), que decide **si un mensaje importa y a quién le toca**. Este documento empieza donde aquel acaba: **qué acción toca y cómo interviene la persona**.
 
-Documento vivo: se actualiza cada vez que se implementa o cambia un comportamiento (ver el registro al final). Copia editable: [Pilares de interacción humana](https://claude.ai/artifact/4XTh1jfyqa3AgQinn9ZhJZ).
+Documento vivo: se actualiza cada vez que se implementa o cambia un comportamiento (ver el registro al final). Copia editable: [Pilares de interacción humana](https://claude.ai/artifact/4XTh1jfyqa3AgQinn9ZhJZ). Plan de ejecución: [human-interaction-execution-plan.md](human-interaction-execution-plan.md).
 
 ## Principios transversales
 
@@ -175,6 +175,7 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-10-31 | Plan de ejecución por etapas (0 a 10) en `human-interaction-execution-plan.md`. |
 | 2026-10-31 | Excepción del principio 1 para la autonomía «Hacer» de Slack. Ventana para deshacer: 6 segundos en toda la app (antes 8). Estado del pilar 4: la caducidad ya existe en parte. |
 | 2026-10-31 | Revisión: principios transversales; la duda pasa a ser nivel de confianza por clase; varias clases por aviso; criterio de tarea con tres condiciones y huecos antes del plazo; guardarraíles en preguntas; motivo al descartar; ciclo de vida del aviso; pesos de las señales; métricas; propuestas para las decisiones abiertas. |
 | 2026-10-31 | Documento creado con los pilares 0 a 5 y el estado actual. |
