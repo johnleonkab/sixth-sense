@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -46,6 +47,16 @@ class InboxItem extends Model
             'resolved_at' => 'immutable_datetime',
             'received_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * What happened to what was proposed for it.
+     *
+     * @return HasMany<ProposalOutcome, $this>
+     */
+    public function outcomes(): HasMany
+    {
+        return $this->hasMany(ProposalOutcome::class);
     }
 
     /**

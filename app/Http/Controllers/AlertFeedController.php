@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Alerts\AlertFeed;
 use App\Alerts\AlertStatus;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Events\InboxItemUpdated;
+use App\Models\ProposalOutcome;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,13 +36,15 @@ class AlertFeedController extends Controller
     /**
      * The person dismissed an alert from the screen (its button, or swiping it away).
      */
-    public function dismiss(Request $request, int $item): JsonResponse
+    public function dismiss(Request $request, int $item, ProposalOutcomes $outcomes): JsonResponse
     {
         $item = $request->user()->inboxItems()->findOrFail($item);
+        $reason = $request->validate(['reason' => ['nullable', 'in:'.implode(',', ProposalOutcome::REASONS)]])['reason'] ?? null;
 
         if (! in_array($item->status, [AlertStatus::Resolved, AlertStatus::Dismissed], true)) {
             $item->update(['status' => AlertStatus::Dismissed, 'resolution' => 'dismissed', 'resolved_at' => now(), 'planning' => false]);
             InboxItemUpdated::dispatch($item);
+            $outcomes->discarded($item, $reason);
         }
 
         return response()->json(['item' => $item->toAlert()]);

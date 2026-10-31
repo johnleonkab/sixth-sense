@@ -221,7 +221,7 @@ Pasos:
 | Etapa | Estado |
 | --- | --- |
 | 0 · Tareas solo tras el «sí» | Hecho |
-| 1 · Resultado de cada propuesta | Pendiente |
+| 1 · Resultado de cada propuesta | Hecho |
 | 2 · Descartar con motivo y resolver | Pendiente |
 | 3 · Clasificador de acciones | Pendiente |
 | 4 · Llamadas | Pendiente |

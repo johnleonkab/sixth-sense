@@ -106,12 +106,26 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 : 'Enviar en Slack';
 
     /** One tap is the "sí": it goes out when the undo window closes. */
+    // What goes out: the proposal as it is, or as the person edited it before sending.
+    const [replyText, setReplyText] = useState(props.proposal?.reply?.text ?? '');
+    const [relayText, setRelayText] = useState(props.proposal?.redirect?.text ?? '');
+    const [editing, setEditing] = useState(false);
+
     const send = async () => {
         setBusy(true);
         setSendError(null);
 
         try {
-            setSent((await postJson<{ actions: ActionState[] }>(`/alerts/${alert.id}/reply`, { timezone: browserTimezone() })).actions);
+            setSent(
+                (
+                    await postJson<{ actions: ActionState[] }>(`/alerts/${alert.id}/reply`, {
+                        timezone: browserTimezone(),
+                        text: replyText !== (props.proposal?.reply?.text ?? '') ? replyText : null,
+                        relay_text: relayText !== (props.proposal?.redirect?.text ?? '') ? relayText : null,
+                    })
+                ).actions,
+            );
+            setEditing(false);
         } catch (error) {
             setSendError(error instanceof Error ? error.message : 'No se ha podido enviar.');
         } finally {
@@ -224,9 +238,17 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             {props.proposal.reply && (
                                 <div className="rounded-lg bg-soft px-3 py-2.5">
                                     <p className="text-[12px] text-muted">{audience[props.proposal.reply.to]}</p>
-                                    <p className="mt-1 max-h-[22vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">
-                                        {props.proposal.reply.text}
-                                    </p>
+                                    {editing ? (
+                                        <textarea
+                                            aria-label="Respuesta"
+                                            value={replyText}
+                                            onChange={(event) => setReplyText(event.target.value)}
+                                            rows={Math.min(10, Math.max(3, replyText.split('\n').length + 1))}
+                                            className="mt-1 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-2 text-[13.5px] leading-[1.5] outline-none focus:border-accent"
+                                        />
+                                    ) : (
+                                        <p className="mt-1 max-h-[22vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">{replyText}</p>
+                                    )}
                                 </div>
                             )}
 
@@ -242,9 +264,17 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             {props.proposal.redirect?.text && (
                                 <div className="rounded-lg bg-soft px-3 py-2.5">
                                     <p className="text-[12px] text-muted">Pasárselo a {props.proposal.redirect.to ?? 'otra persona'}</p>
-                                    <p className="mt-1 max-h-[16vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">
-                                        {props.proposal.redirect.text}
-                                    </p>
+                                    {editing && slack ? (
+                                        <textarea
+                                            aria-label="Mensaje para pasarlo"
+                                            value={relayText}
+                                            onChange={(event) => setRelayText(event.target.value)}
+                                            rows={Math.min(8, Math.max(3, relayText.split('\n').length + 1))}
+                                            className="mt-1 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-2 text-[13.5px] leading-[1.5] outline-none focus:border-accent"
+                                        />
+                                    ) : (
+                                        <p className="mt-1 max-h-[16vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">{relayText}</p>
+                                    )}
                                 </div>
                             )}
 
@@ -263,7 +293,12 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                         <Button variant="primary" disabled={busy} onClick={() => void send()}>
                                             {busy ? 'Enviando…' : sendLabel}
                                         </Button>
-                                        <span className="text-[12px] text-muted">o dime qué cambio</span>
+                                        {(props.proposal.reply || relay) && !editing && (
+                                            <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
+                                                Modificar
+                                            </Button>
+                                        )}
+                                        <span className="text-[12px] text-muted">{editing ? 'Cambia el texto y envía' : 'o dime qué cambio'}</span>
                                         {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
                                     </Buttons>
                                 )

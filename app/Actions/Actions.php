@@ -17,6 +17,7 @@ use App\Actions\Handlers\ScheduleAgendaTask;
 use App\Actions\Handlers\SendChatMessage;
 use App\Actions\Handlers\SendEmail;
 use App\Alerts\Intents\SlackAutonomy;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Jobs\ExecutePendingAction;
 use App\Models\PendingAction;
 use App\Models\User;
@@ -101,6 +102,7 @@ class Actions
         ]);
 
         $this->container->make(SlackAutonomy::class)->note($action);
+        $this->container->make(ProposalOutcomes::class)->confirmed($action);
 
         ExecutePendingAction::dispatch($action)->delay(now()->addSeconds(self::UNDO_WINDOW));
 
@@ -123,6 +125,7 @@ class Actions
     {
         if ($action->status === ActionStatus::Confirmed) {
             $action->update(['status' => ActionStatus::Undone]);
+            $this->container->make(ProposalOutcomes::class)->undone($action);
         }
 
         return $action;

@@ -94,6 +94,14 @@ class ProposeSlackMessage implements VoiceTool
             $payload['autonomy'] = 'propose';
         }
 
+        // An answer to an alert: what happens to it is recorded against that alert.
+        $alert = filled($arguments['reply_to'] ?? null) ? $user->inboxItems()->where('external_id', $arguments['reply_to'])->first() : null;
+
+        if ($alert !== null) {
+            $payload['inbox_item_id'] = $alert->id;
+            $payload['proposed_text'] ??= $alert->proposal['reply']['text'] ?? $arguments['text'];
+        }
+
         $action = $this->actions->propose($user, 'chat.send', ($threadRef ? 'Responder en el hilo de ' : 'Mensaje a ').$label, $payload);
         $history = $this->history($user, $to, $label, filled($arguments['reply_to'] ?? null) ? (string) $arguments['reply_to'] : null, $threadRef, $context);
 

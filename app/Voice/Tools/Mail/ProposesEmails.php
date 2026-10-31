@@ -19,7 +19,10 @@ trait ProposesEmails
 {
     use ProposesChanges;
 
-    private function propose(Actions $actions, User $user, OutgoingEmail $email, string $message, ?MailMessage $original = null, ?string $timezone = null): ToolResult
+    /**
+     * @param  array<string, mixed>  $extra  More for the action's payload (the alert it answers).
+     */
+    private function propose(Actions $actions, User $user, OutgoingEmail $email, string $message, ?MailMessage $original = null, ?string $timezone = null, array $extra = []): ToolResult
     {
         $label = match ($email->mode) {
             'reply' => 'Responder a '.MailAddress::names($email->to),
@@ -28,7 +31,7 @@ trait ProposesEmails
             default => 'Email a '.MailAddress::names($email->to),
         };
 
-        $action = $actions->propose($user, 'mail.send', $label, ['email' => $email->toArray()]);
+        $action = $actions->propose($user, 'mail.send', $label, ['email' => $email->toArray(), ...$extra]);
         $people = fn (array $addresses): array => array_map(fn (MailAddress $address): array => $address->toArray(), $addresses);
 
         return new ToolResult(

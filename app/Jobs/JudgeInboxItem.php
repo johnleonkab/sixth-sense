@@ -6,6 +6,7 @@ use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
 use App\Alerts\Judgement;
 use App\Alerts\Judges\RuleRelevanceJudge;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Triage;
 use App\Events\InboxItemUpdated;
@@ -103,6 +104,7 @@ class JudgeInboxItem implements ShouldBeUnique, ShouldQueue
                 ->each(function (InboxItem $older): void {
                     $older->close(AlertStatus::Dismissed, 'superseded');
                     InboxItemUpdated::dispatch($older);
+                    app(ProposalOutcomes::class)->expired($older, 'superseded');
                 });
         }
 

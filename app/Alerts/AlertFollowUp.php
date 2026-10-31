@@ -8,6 +8,7 @@ use App\Alerts\Intents\SlackAction;
 use App\Alerts\Intents\SlackAutonomy;
 use App\Alerts\Intents\SlackDraft;
 use App\Alerts\Intents\SlackDraftBrief;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\ReplyPlan;
 use App\Alerts\Replies\ReplyPlanner;
@@ -249,6 +250,7 @@ class AlertFollowUp
             if ($replied) {
                 $item->close(AlertStatus::Resolved, 'replied');
                 InboxItemUpdated::dispatch($item);
+                app(ProposalOutcomes::class)->resolved($item, 'replied_outside');
                 $resolved[] = $item;
             }
         }

@@ -4,8 +4,10 @@ namespace App\Voice\Tools\Alerts;
 
 use App\Alerts\AlertFollowUp;
 use App\Alerts\AlertStatus;
+use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Triage;
 use App\Events\InboxItemUpdated;
+use App\Models\ProposalOutcome;
 use App\Models\User;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
@@ -19,7 +21,7 @@ class ResolveAlert implements VoiceTool
 {
     use DescribesAlerts;
 
-    public function __construct(private AlertFollowUp $followUp) {}
+    public function __construct(private AlertFollowUp $followUp, private ProposalOutcomes $outcomes) {}
 
     public function name(): string
     {
@@ -39,6 +41,7 @@ class ResolveAlert implements VoiceTool
             'properties' => [
                 'alert_id' => ['type' => 'integer'],
                 'outcome' => ['type' => 'string', 'enum' => ['done', 'dismissed', 'reopen']],
+                'reason' => ['type' => 'string', 'enum' => ProposalOutcome::REASONS, 'description' => 'Al descartar, por qué: no_important (no era importante), not_for_me (no era para él), bad_proposal (importaba, pero la propuesta estaba mal).'],
             ],
             'required' => ['alert_id', 'outcome'],
         ];
@@ -46,7 +49,11 @@ class ResolveAlert implements VoiceTool
 
     public function rules(): array
     {
-        return ['alert_id' => ['required', 'integer'], 'outcome' => ['required', 'in:done,dismissed,reopen']];
+        return [
+            'alert_id' => ['required', 'integer'],
+            'outcome' => ['required', 'in:done,dismissed,reopen'],
+            'reason' => ['nullable', 'in:'.implode(',', ProposalOutcome::REASONS)],
+        ];
     }
 
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult
@@ -82,6 +89,12 @@ class ResolveAlert implements VoiceTool
         if ($changes !== null) {
             $item->update($changes);
             InboxItemUpdated::dispatch($item);
+
+            match ($arguments['outcome']) {
+                'done' => $this->outcomes->resolved($item, 'marked_done'),
+                'dismissed' => $this->outcomes->discarded($item, $arguments['reason'] ?? null),
+                default => $this->outcomes->reopened($item),
+            };
         }
 
         return new ToolResult(

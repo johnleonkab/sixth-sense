@@ -88,7 +88,7 @@ class Scheduler
         // Their own work or a meeting with others: both wait for the person's
         // "sí". Once confirmed, the task is marked as scheduled with its event.
         $label = $people !== [] ? "Convocar «{$event->title}»" : "Reservar «{$event->title}» en tu calendario";
-        $action = $this->actions->propose($user, 'calendar.change', $label, ['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze, 'agenda_task_id' => $task->id]);
+        $action = $this->actions->propose($user, 'calendar.change', $label, array_filter(['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze, 'agenda_task_id' => $task->id, 'inbox_item_id' => $task->inbox_item_id], fn (mixed $value): bool => $value !== null));
 
         // Stored in UTC: the database keeps no timezone.
         return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);

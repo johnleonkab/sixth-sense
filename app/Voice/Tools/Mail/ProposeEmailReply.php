@@ -85,6 +85,10 @@ class ProposeEmailReply implements VoiceTool
             return ToolResult::error('No hay a quién responder en ese email.');
         }
 
-        return $this->propose($this->actions, $user, $email, $arguments['body'], $original, $context->timezone());
+        // An answer to an alert: what happens to it is recorded against that alert.
+        $alert = $user->inboxItems()->where('external_id', $arguments['email_id'])->first();
+        $extra = $alert === null ? [] : ['inbox_item_id' => $alert->id, 'proposed_text' => $alert->proposal['reply']['text'] ?? $arguments['body']];
+
+        return $this->propose($this->actions, $user, $email, $arguments['body'], $original, $context->timezone(), $extra);
     }
 }

@@ -155,8 +155,8 @@ La última es la más difícil y la más importante: las demás solo miden preci
 | 1 · Llamadas | Si la tarea manual tiene personas, el agendador busca hueco (también en su ocupación) y propone la reunión, que espera el «sí» | Comprobar que la llamada le incluye; selector de personas; preguntar duración; respuesta en el mismo «sí»; ampliar ventana; mensaje cuando no hay hueco; externos |
 | 2 · Tareas | Una tarea propia se propone y solo llega al calendario tras el «sí»; el criterio de qué es una tarea es amplio | Criterio de tres condiciones; detectar sus compromisos (Slack y email); 3 huecos antes del plazo; seguimiento antes del plazo |
 | 3 · Preguntas | Antes de redactar se busca en el hilo, enlaces, archivo, documentos y respuestas anteriores | Índice de Jira con candidatos y búsqueda cerrada; Notion y contexto personal; aviso de datos viejos; control de destinatario |
-| 4 · Interacción | Aviso con propuesta; enviar con un toque (Slack y Gmail); descartar; marcar como resuelta. Caducidad en parte: el aviso se cierra solo si responde en Slack o Gmail, y un mensaje nuevo de la misma conversación sustituye al anterior | Motivo al descartar; inferir cómo se resolvió; caducidad cuando otro responde o la llamada ya pasó; orden y resumen agrupado |
-| 5 · Aprender | Lecciones del motor de respuestas; correcciones de triaje que proponen reglas; registro de cada ejecución de agente | Registrar el resultado de cada propuesta con su peso; convertirlo en lecciones y casos de evaluación; métricas |
+| 4 · Interacción | Aviso con propuesta; enviar con un toque (Slack y Gmail) o modificar el texto antes de enviarlo; descartar; marcar como resuelta. Caducidad en parte: el aviso se cierra solo si responde en Slack o Gmail, y un mensaje nuevo de la misma conversación sustituye al anterior | Motivo al descartar; inferir cómo se resolvió; caducidad cuando otro responde o la llamada ya pasó; orden y resumen agrupado |
+| 5 · Aprender | Lecciones del motor de respuestas; correcciones de triaje que proponen reglas; registro de cada ejecución de agente; resultado de cada propuesta (enviada, editada y cuánto, deshecha, descartada, resuelta, caducada) | Pesos de las señales; convertirlo en lecciones y casos de evaluación; métricas |
 
 ## Decisiones abiertas
 
@@ -175,6 +175,7 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-10-31 | Etapa 1: se registra qué pasa con cada propuesta de un aviso (enviada tal cual, editada y cuánto, deshecha, descartada, resuelta o caducada), venga del botón, de la voz o de un agente; la respuesta se puede modificar antes de enviarla. |
 | 2026-10-31 | Etapa 0: las tareas propias se proponen y solo se crean en el calendario tras el «sí»; al confirmarse quedan agendadas con su evento y se pueden quitar. |
 | 2026-10-31 | Plan de ejecución por etapas (0 a 10) en `human-interaction-execution-plan.md`. |
 | 2026-10-31 | Excepción del principio 1 para la autonomía «Hacer» de Slack. Ventana para deshacer: 6 segundos en toda la app (antes 8). Estado del pilar 4: la caducidad ya existe en parte. |

@@ -60,10 +60,12 @@ class ProposeSlackReaction implements VoiceTool
         }
 
         $emoji = ChatReactions::emoji($arguments['reaction']);
-        $action = $this->actions->propose($user, 'chat.react', "Reaccionar con {$emoji}", [
+        $alert = $user->inboxItems()->where('external_id', $arguments['message_id'])->first();
+        $action = $this->actions->propose($user, 'chat.react', "Reaccionar con {$emoji}", array_filter([
             'message_id' => $arguments['message_id'],
             'reaction' => $arguments['reaction'],
-        ]);
+            'inbox_item_id' => $alert?->id,
+        ]));
 
         return new ToolResult(
             output: $this->proposalOutput($action, ['reaction' => $emoji]),
