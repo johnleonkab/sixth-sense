@@ -11,6 +11,8 @@ use App\Alerts\Intents\SlackAutonomy;
 use App\Alerts\Intents\SlackDraft;
 use App\Alerts\Intents\SlackDraftBrief;
 use App\Alerts\Outcomes\ProposalOutcomes;
+use App\Alerts\Questions\QuestionAnswer;
+use App\Alerts\Questions\QuestionResearch;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\ReplyPlan;
 use App\Alerts\Replies\ReplyPlanner;
@@ -58,6 +60,7 @@ class AlertFollowUp
         private SlackAutonomy $autonomy,
         private ActionClassifier $classifier,
         private UsualDurations $durations,
+        private QuestionResearch $questions,
     ) {}
 
     /**
@@ -104,6 +107,19 @@ class AlertFollowUp
             $brief = $brief->withFindings($this->research->gather($item->user, $brief));
         }
 
+        $actions = $decision?->action === SlackAction::Redirect->value ? [] : array_map(
+            fn (ClassifiedAction $action): ClassifiedAction => $action->class === ClassifiedAction::CALL && $action->sure() ? $this->prepareCall($item, $action, $brief) : $action,
+            $this->classify($item, $brief),
+        );
+
+        // A question someone asked: the answer is looked for before drafting.
+        $question = collect($actions)->first(fn (ClassifiedAction $action): bool => $action->class === ClassifiedAction::QUESTION && $action->sure());
+        $answer = $question !== null ? $this->questions->answer($item->user, $question, $brief) : null;
+
+        if ($answer !== null) {
+            $brief = $brief->withFindings(trim("{$brief->findings}\n\n{$answer->findings}"));
+        }
+
         $plan = $this->planner->plan($item->user, $brief);
 
         if (filled($plan->learned)) {
@@ -119,11 +135,11 @@ class AlertFollowUp
             $proposal = $this->proposal($plan, $decision, $draft);
         }
 
-        $actions = $decision?->action === SlackAction::Redirect->value ? [] : array_map(
-            fn (ClassifiedAction $action): ClassifiedAction => $action->class === ClassifiedAction::CALL && $action->sure() ? $this->prepareCall($item, $action, $brief) : $action,
-            $this->classify($item, $brief),
-        );
         $proposal['actions'] = array_map(fn (ClassifiedAction $action, int $index): array => $action->toArray("a{$index}"), $actions, array_keys($actions));
+
+        if ($answer !== null) {
+            $proposal = $this->withResearch($proposal, $answer);
+        }
 
         $item->update(['proposal' => $proposal, 'planning' => false]);
         InboxItemUpdated::dispatch($item);
@@ -295,6 +311,52 @@ class AlertFollowUp
             'question' => $plan->question,
         ]]);
         InboxItemUpdated::dispatch($item);
+    }
+
+    /**
+     * The person picked which of the candidates answers the question: the
+     * reply is drafted again with it.
+     */
+    public function answerQuestion(InboxItem $item, int $choice): bool
+    {
+        $source = $item->proposal['research']['sources'][$choice] ?? null;
+        $brief = $source !== null && ($item->proposal['research']['outcome'] ?? null) === QuestionAnswer::SEVERAL ? $this->brief($item) : null;
+
+        if ($brief === null) {
+            return false;
+        }
+
+        $answer = $this->questions->from($item->user, $source);
+        $plan = $this->planner->plan($item->user, $brief->withFindings(trim("{$brief->findings}\n\n{$answer->findings}")));
+
+        $item->update(['proposal' => $this->withResearch([
+            ...($item->proposal ?? []),
+            'summary' => $plan->summary,
+            'reply' => $plan->reply,
+            'reaction' => null,
+            'question' => $plan->question,
+        ], $answer)]);
+        InboxItemUpdated::dispatch($item);
+
+        return true;
+    }
+
+    /**
+     * What the search found goes with the proposal. Several candidates: no
+     * draft until the person says which. Nothing found: it says so.
+     *
+     * @param  array<string, mixed>  $proposal
+     * @return array<string, mixed>
+     */
+    private function withResearch(array $proposal, QuestionAnswer $answer): array
+    {
+        $proposal['research'] = $answer->toArray();
+
+        return match ($answer->outcome) {
+            QuestionAnswer::SEVERAL => [...$proposal, 'reply' => null, 'reaction' => null, 'question' => '¿Cuál de estos responde a lo que pregunta?'],
+            QuestionAnswer::NONE => [...$proposal, 'question' => $proposal['question'] ?? 'No he encontrado la respuesta: dime qué le contesto.'],
+            default => $proposal,
+        };
     }
 
     /**

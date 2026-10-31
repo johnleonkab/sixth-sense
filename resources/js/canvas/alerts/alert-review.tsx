@@ -29,7 +29,15 @@ type Proposal = {
     context?: string | null;
     /** What the message asks of the person, as the classifier saw it. */
     actions?: ProposedAction[];
+    /** What the search found for a question: one source, several to choose from, or nothing. */
+    research?: {
+        outcome: 'found' | 'several' | 'none';
+        sources: { kind: string; title: string; url: string | null; updated_at: string | null; status?: string | null }[];
+        stale: string | null;
+    };
 };
+
+const updatedFormat = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
 
 type ProposedAction = {
     key: string;
@@ -288,8 +296,10 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
 
     /** A doubt of the classifier, settled with one tap: "sí" prepares it, "no" takes it off. */
     const taskAction = (props.proposal?.actions ?? []).find((action) => action.class === 'task' && action.confidence === 'sure');
+    const questionAction = (props.proposal?.actions ?? []).find((action) => action.class === 'question');
+    const research = props.proposal?.research;
 
-    const settle = (action: ProposedAction, answer: 'yes' | 'no' | null, changes: { people?: string[]; duration_minutes?: number; slot?: number } = {}) => {
+    const settle = (action: ProposedAction, answer: 'yes' | 'no' | null, changes: { people?: string[]; duration_minutes?: number; slot?: number; choice?: number } = {}) => {
         setBusy(true);
         runTool('settle_alert_action', { alert_id: alert.id, action: action.key, ...(answer ? { answer } : {}), ...changes });
     };
@@ -476,6 +486,35 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                         ))}
                                 </ul>
                             )}
+
+                            {research?.outcome === 'several' && questionAction && pending && (
+                                <div role="group" aria-label="Candidatos" className="grid gap-1.5">
+                                    {research.sources.map((source, position) => (
+                                        <Button key={source.title} variant="secondary" disabled={busy} onClick={() => settle(questionAction, null, { choice: position })}>
+                                            {source.title}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {research?.outcome === 'found' && research.sources[0] && (
+                                <p className="text-[12.5px] text-muted">
+                                    Fuente:{' '}
+                                    {research.sources[0].url ? (
+                                        <a href={research.sources[0].url} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">
+                                            {research.sources[0].title}
+                                        </a>
+                                    ) : (
+                                        research.sources[0].title
+                                    )}
+                                    {research.sources[0].status && ` · ${research.sources[0].status}`}
+                                    {research.sources[0].updated_at && ` · actualizado el ${updatedFormat.format(new Date(research.sources[0].updated_at))}`}
+                                </p>
+                            )}
+
+                            {research?.stale && <p className="text-[12.5px] text-warn">{research.stale}</p>}
+
+                            {research?.outcome === 'none' && <p className="text-[12.5px] text-warn">No he encontrado la respuesta en Jira, el archivo ni Notion.</p>}
 
                             {props.proposal.question && <p className="text-[13px] text-accent">{props.proposal.question}</p>}
 

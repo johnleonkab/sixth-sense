@@ -43,7 +43,7 @@ class KnowledgeBase
      * when it is one of the most used.
      *
      * @param  list<KnowledgeSource>  $sources  Empty for all of them.
-     * @return list<array{id: int, source: string, title: string, url: ?string, ref: string, summary: ?string}>
+     * @return list<array{id: int, source: string, title: string, url: ?string, ref: string, summary: ?string, updated_at: ?string}>
      */
     public function search(User $user, string $query, array $sources = [], int $limit = 8): array
     {
@@ -54,6 +54,7 @@ class KnowledgeBase
             'url' => $document->url,
             'ref' => $document->ref,
             'summary' => $document->summary,
+            'updated_at' => $document->source_updated_at?->toIso8601String(),
         ], $this->matches($user, $query, $sources, $limit));
     }
 

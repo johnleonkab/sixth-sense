@@ -226,7 +226,7 @@ Pasos:
 | 3 · Clasificador de acciones | Hecho |
 | 4 · Llamadas | Hecho |
 | 5 · Tareas | Hecho |
-| 6 · Preguntas | Pendiente |
+| 6 · Preguntas | Hecho |
 | 7 · Fuente, fecha y destinatario | Pendiente |
 | 8 · Ciclo de vida del aviso | Pendiente |
 | 9 · Aprender de cada interacción | Pendiente |

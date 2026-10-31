@@ -30,7 +30,8 @@ class AlertActions
 
     /**
      * @param  ?bool  $yes  The answer to a doubt; null when only completing the action.
-     * @param  array{people?: list<string>, duration_minutes?: int, slot?: int}  $changes  slot: another of the slots offered for a task.
+     * @param  array{people?: list<string>, duration_minutes?: int, slot?: int, choice?: int}  $changes  slot: another of the slots offered for a task;
+     *                                                                                                   choice: which of several candidates answers a question.
      * @return ?ClassifiedAction The action as it now stands, or null when it is not on the alert (or was taken off).
      */
     public function settle(InboxItem $item, string $key, ?bool $yes, array $changes = []): ?ClassifiedAction
@@ -44,6 +45,10 @@ class AlertActions
         }
 
         $action = ClassifiedAction::fromArray($actions[$index]);
+
+        if (isset($changes['choice'])) {
+            return $this->followUp->answerQuestion($item, $changes['choice']) ? $action : null;
+        }
 
         if (isset($changes['slot'])) {
             $task = $this->openTask($item);
