@@ -11,8 +11,8 @@ use App\Voice\Tools\Canvas;
 
 /**
  * The scheduler's answer about one task: where it went (or why it could
- * not), how urgent it judged it and why, and how to undo it. A meeting with
- * others waits for the "sí" before anyone is invited.
+ * not), how urgent it judged it and why, and how to undo it. Nothing reaches
+ * the calendar before the "sí": a meeting invites no one, a task books no time.
  */
 class AgendaTaskView
 {
@@ -60,7 +60,9 @@ class AgendaTaskView
         }
 
         if ($task->status === AgendaTaskStatus::Proposed && $task->pendingAction) {
-            $view->proposal($task->pendingAction, 'convocar', 'Reunión convocada');
+            $task->kind === 'meeting'
+                ? $view->proposal($task->pendingAction, 'convocar', 'Reunión convocada')
+                : $view->proposal($task->pendingAction, 'reservar', 'En tu calendario');
         }
 
         return $view->canvas($user, 'Agendador', 'focus');

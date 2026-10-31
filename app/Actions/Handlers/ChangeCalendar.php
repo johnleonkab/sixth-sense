@@ -7,8 +7,10 @@ use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
+use App\Events\InboxItemUpdated;
 use App\Models\PendingAction;
 use App\Models\User;
+use App\Scheduling\AgendaTaskStatus;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
@@ -37,7 +39,9 @@ class ChangeCalendar implements ActionHandler
 
     /**
      * A meeting may have taken its time from one of the person's own tasks.
-     * That task is shortened first, then the meeting is created.
+     * That task is shortened first, then the event is created. When it came
+     * from the scheduler, its task is marked as scheduled with that event, so
+     * it can be taken off the calendar later.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -51,6 +55,17 @@ class ChangeCalendar implements ActionHandler
             ));
         }
 
-        return $this->calendar->create($user, NewEvent::fromArray($payload['event']))->url;
+        $created = $this->calendar->create($user, NewEvent::fromArray($payload['event']));
+        $task = isset($payload['agenda_task_id']) ? $user->agendaTasks()->find($payload['agenda_task_id']) : null;
+
+        if ($task !== null) {
+            $task->update(['status' => AgendaTaskStatus::Scheduled, 'event_ref' => $created->ref, 'event_url' => $created->url]);
+
+            if ($task->inboxItem) {
+                InboxItemUpdated::dispatch($task->inboxItem);
+            }
+        }
+
+        return $created->url;
     }
 }

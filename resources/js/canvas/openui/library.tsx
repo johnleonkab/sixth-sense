@@ -2,8 +2,7 @@ import { useIsQueryLoading, useStateField, useTriggerAction } from '@openuidev/r
 import { useContext, useEffect, useState } from 'react';
 import type { ComponentRenderProps } from '@openuidev/react-lang';
 
-import ActionBar from '@/actions/action-bar';
-import type { ActionState } from '@/actions/types';
+import ProposalBar from '@/actions/proposal-bar';
 import { useCanvas } from '@/canvas/canvas-context';
 import { CanvasRendererContext } from '@/canvas/embedded';
 import { LiveItemsContext, openRef } from '@/canvas/openui/refs';
@@ -424,27 +423,7 @@ function Draft({ props }: Props<{ label: string; text: string }>) {
  * view the assistant writes can not make one up.
  */
 function Proposal({ props }: Props<{ action: number; verb?: string; done?: string }>) {
-    const { actions } = useCanvas();
-    const [state, setState] = useState<ActionState | null>(actions.actions[props.action] ?? null);
-    const [missing, setMissing] = useState(false);
-
-    useEffect(() => {
-        if (state === null) {
-            getJson<ActionState>(`/actions/${props.action}`).then(setState, () => setMissing(true));
-        }
-    }, [props.action]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    if (missing) {
-        return <p className="text-[12.5px] text-muted">Esta propuesta ya no existe.</p>;
-    }
-
-    if (state === null) {
-        return <div className="alerts-shimmer h-9 w-48 rounded-full" />;
-    }
-
-    const verb = props.verb ?? 'aplicar';
-
-    return <ActionBar initial={state} verb={verb} doneLabel={props.done ?? 'Hecho'} countdownLabel={verb === 'enviar' ? undefined : `Se va a ${verb}`} />;
+    return <ProposalBar action={props.action} verb={props.verb} done={props.done} />;
 }
 
 type Item = {

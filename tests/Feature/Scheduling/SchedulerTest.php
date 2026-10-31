@@ -28,6 +28,7 @@ use App\Scheduling\SlotFinder;
 use App\Scheduling\TaskAssessment;
 use App\Scheduling\TaskAssessor;
 use App\Scheduling\Urgency;
+use App\Voice\OpenUi\Views\AgendaTaskView;
 use Carbon\CarbonImmutable;
 use Illuminate\Testing\TestResponse;
 
@@ -51,6 +52,17 @@ function slot(int $minutes, string $from, string $to, array $others = []): ?arra
     $found = app(SlotFinder::class)->find(test()->user, CarbonImmutable::parse($from, 'Europe/Madrid'), CarbonImmutable::parse($to, 'Europe/Madrid'), $minutes, $others);
 
     return $found ? [$found[0]->format('D H:i'), $found[1]->format('H:i')] : null;
+}
+
+/**
+ * The person says "sí" to the task's proposal and the undo window passes.
+ */
+function confirmTask(AgendaTask $task): AgendaTask
+{
+    app(Actions::class)->confirm($task->pendingAction);
+    (new ExecutePendingAction($task->pendingAction->refresh()))->handle(app(Actions::class));
+
+    return $task->refresh();
 }
 
 function scheduleFor(string $title, array $request = []): AgendaTask
@@ -93,8 +105,11 @@ test('a task of the person is shortened when that is the only room', function ()
 
     $task = scheduleFor('Preparar la demo', ['effortMinutes' => 60, 'urgency' => Urgency::Today]);
 
-    expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
+    expect($task->status)->toBe(AgendaTaskStatus::Proposed)
         ->and($task->starts_at->setTimezone('Europe/Madrid')->format('H:i'))->toBe('08:30')
+        ->and($this->writer->changes)->toBe([]);
+
+    expect(confirmTask($task)->status)->toBe(AgendaTaskStatus::Scheduled)
         ->and($this->writer->changes[0][0])->toBe('update')
         ->and($this->writer->changes[0][1]['ref'])->toBe('demo:focus')
         ->and($this->writer->changes[0][1]['start'])->toContain('09:30')
@@ -150,12 +165,18 @@ function blockTheMorning(): void
     ];
 }
 
-test('the person own work is booked at once, marked as a task', function () {
+test('the person own work is proposed, and reaches the calendar only after the yes, marked as a task', function () {
     $task = scheduleFor('Revisar el PRD del prepago', ['context' => 'Marta lo pide antes del jueves.']);
 
-    expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
+    expect($task->status)->toBe(AgendaTaskStatus::Proposed)
         ->and($task->urgency)->toBe(Urgency::ThisWeek)
         ->and($task->starts_at->setTimezone('Europe/Madrid')->format('D H:i'))->toBe('Wed 10:00')
+        ->and($task->pendingAction->label)->toBe('Reservar «Revisar el PRD del prepago» en tu calendario')
+        ->and($this->writer->changes)->toBe([]);
+
+    $task = confirmTask($task);
+
+    expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
         ->and($task->event_ref)->toBe('demo:primary:new-1')
         ->and($this->writer->changes[0][0])->toBe('create')
         ->and($this->writer->changes[0][1])->toMatchArray(['title' => 'Revisar el PRD del prepago', 'attendees' => [], 'task' => true, 'video_call' => false]);
@@ -196,7 +217,7 @@ test('when the assessor can not answer, it is looked for this week with what was
 
     $task = scheduleFor('Preparar la demo', ['effortMinutes' => 45]);
 
-    expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
+    expect($task->status)->toBe(AgendaTaskStatus::Proposed)
         ->and($task->duration_minutes)->toBe(45)
         ->and($task->urgency_reason)->toContain('No he podido valorarlo');
 });
@@ -210,11 +231,18 @@ test('the assessor gets the person work context and how busy the coming days are
         ->and($this->assessor->assessed[0]['load'][0])->toBe('mié. 14 oct.: 5 reuniones, 3.3 h ocupadas');
 });
 
-test('what was booked can be taken off the calendar', function () {
-    $task = app(Scheduler::class)->cancel(scheduleFor('Revisar el PRD'));
+test('what was booked can be taken off the calendar, and what was only proposed is withdrawn', function () {
+    $task = app(Scheduler::class)->cancel(confirmTask(scheduleFor('Revisar el PRD')));
 
     expect($task->status)->toBe(AgendaTaskStatus::Cancelled)
         ->and($this->writer->changes[1])->toBe(['cancel', ['ref' => 'demo:primary:new-1']]);
+
+    $proposed = scheduleFor('Preparar la demo');
+    $withdrawn = app(Scheduler::class)->cancel($proposed);
+
+    expect($withdrawn->status)->toBe(AgendaTaskStatus::Cancelled)
+        ->and($proposed->pendingAction->refresh()->status->value)->toBe('cancelled')
+        ->and($this->writer->changes)->toHaveCount(2);
 });
 
 test('an alert that asks for work of the person own gets time in the calendar, when the scheduler is on', function (bool $on) {
@@ -229,10 +257,10 @@ test('an alert that asks for work of the person own gets time in the calendar, w
     expect($task !== null)->toBe($on);
 
     if ($on) {
-        expect($task->status)->toBe(AgendaTaskStatus::Scheduled)
+        expect($task->status)->toBe(AgendaTaskStatus::Proposed)
             ->and($task->origin)->toBe('alert')
             ->and($task->title)->toBe('Revisar lo que pide Marta')
-            ->and($item->refresh()->toAlert()['task']['status'])->toBe('scheduled');
+            ->and($item->refresh()->toAlert()['task']['status'])->toBe('proposed');
     }
 })->with(['on' => true, 'off' => false]);
 
@@ -246,14 +274,25 @@ test('by voice: it says when, and why that urgency, and it can be undone', funct
         ->assertJsonPath('canvas.view', 'openui.view')
         ->assertJsonPath('output.when', 'miércoles 14 de octubre, 10:00')
         ->assertJsonPath('output.urgency', 'Esta semana')
-        ->assertJsonPath('output.say', 'Agendado: «Revisar el PRD del prepago», miércoles 14 de octubre, 10:00.')
+        ->assertJsonPath('output.say', 'Te propongo reservar «Revisar el PRD del prepago» el miércoles 14 de octubre, 10:00. Dime si lo pongo en tu calendario.')
         ->assertJsonPath('beside', null);
 
-    // Taking it off the calendar is a button on the view, without the assistant.
+    $task = AgendaTask::query()->findOrFail($booked->json('output.task_id'));
+
+    // Nothing is booked until the yes, which is on the view.
     expect($booked->json('canvas.props.ui'))
+        ->toContain('Chips(["Propuesta", "Esta semana", "30 min"])')
+        ->toContain('Proposal('.$task->pending_action_id.', "reservar", "En tu calendario")')
+        ->not->toContain('Quitar del calendario')
+        ->toBeValidOpenUi()
+        ->and($this->writer->changes)->toBe([]);
+
+    // Once booked, taking it off the calendar is a button on the view, without the assistant.
+    confirmTask($task);
+
+    expect(AgendaTaskView::canvas($this->user, $task->refresh(), 'Europe/Madrid')->props['ui'])
         ->toContain('Chips(["Agendada", "Esta semana", "30 min"])')
-        ->toContain('Button("Quitar del calendario", @Do("task-cancel:'.$booked->json('output.task_id').'"), "tertiary")')
-        ->toBeValidOpenUi();
+        ->toContain('Button("Quitar del calendario", @Do("task-cancel:'.$task->id.'"), "tertiary")');
 
     $cancelled = runAgendaTool('cancel_scheduled_task', ['task_id' => $booked->json('output.task_id')])
         ->assertJsonPath('output.say', 'Quitado: «Revisar el PRD del prepago» ya no está en tu calendario.');

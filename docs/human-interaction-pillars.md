@@ -146,14 +146,14 @@ La última es la más difícil y la más importante: las demás solo miden preci
 
 ## Estado actual frente a los pilares
 
-**Primero, lo urgente:** hoy una tarea propia se crea en el calendario sin «sí». Eso incumple el primer principio y es lo más visible para la persona, así que se corrige antes de construir nada nuevo.
+**Lo urgente ya está corregido:** ninguna tarea, propia o con otros, llega al calendario sin el «sí».
 
 | Pilar | Hoy | Falta |
 | --- | --- | --- |
-| Principios | El agendador espera el «sí» para reuniones; ventana para deshacer de 6 s en toda la app; la autonomía «Hacer» es la excepción del principio 1 | **Tareas sin «sí» (incumple el principio 1)**; citar fuente y fecha; control de destinatario |
+| Principios | El agendador espera el «sí» para reuniones y para tareas propias; ventana para deshacer de 6 s en toda la app; la autonomía «Hacer» es la excepción del principio 1 | Citar fuente y fecha; control de destinatario |
 | 0 · Clasificación | El juez y el triaje deciden si importa y a quién le toca; el motor de respuestas propone respuesta, reacción, encargo a otro y una «tarea manual» con un criterio amplio | Clases llamada / tarea / pregunta con nivel de confianza; avisos en duda por clase; varias clases en un aviso |
 | 1 · Llamadas | Si la tarea manual tiene personas, el agendador busca hueco (también en su ocupación) y propone la reunión, que espera el «sí» | Comprobar que la llamada le incluye; selector de personas; preguntar duración; respuesta en el mismo «sí»; ampliar ventana; mensaje cuando no hay hueco; externos |
-| 2 · Tareas | Una tarea propia se crea directamente en el calendario; el criterio de qué es una tarea es amplio | Criterio de tres condiciones; detectar sus compromisos (Slack y email); 3 huecos antes del plazo; crear solo tras el «sí»; seguimiento antes del plazo |
+| 2 · Tareas | Una tarea propia se propone y solo llega al calendario tras el «sí»; el criterio de qué es una tarea es amplio | Criterio de tres condiciones; detectar sus compromisos (Slack y email); 3 huecos antes del plazo; seguimiento antes del plazo |
 | 3 · Preguntas | Antes de redactar se busca en el hilo, enlaces, archivo, documentos y respuestas anteriores | Índice de Jira con candidatos y búsqueda cerrada; Notion y contexto personal; aviso de datos viejos; control de destinatario |
 | 4 · Interacción | Aviso con propuesta; enviar con un toque (Slack y Gmail); descartar; marcar como resuelta. Caducidad en parte: el aviso se cierra solo si responde en Slack o Gmail, y un mensaje nuevo de la misma conversación sustituye al anterior | Motivo al descartar; inferir cómo se resolvió; caducidad cuando otro responde o la llamada ya pasó; orden y resumen agrupado |
 | 5 · Aprender | Lecciones del motor de respuestas; correcciones de triaje que proponen reglas; registro de cada ejecución de agente | Registrar el resultado de cada propuesta con su peso; convertirlo en lecciones y casos de evaluación; métricas |
@@ -175,6 +175,7 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-10-31 | Etapa 0: las tareas propias se proponen y solo se crean en el calendario tras el «sí»; al confirmarse quedan agendadas con su evento y se pueden quitar. |
 | 2026-10-31 | Plan de ejecución por etapas (0 a 10) en `human-interaction-execution-plan.md`. |
 | 2026-10-31 | Excepción del principio 1 para la autonomía «Hacer» de Slack. Ventana para deshacer: 6 segundos en toda la app (antes 8). Estado del pilar 4: la caducidad ya existe en parte. |
 | 2026-10-31 | Revisión: principios transversales; la duda pasa a ser nivel de confianza por clase; varias clases por aviso; criterio de tarea con tres condiciones y huecos antes del plazo; guardarraíles en preguntas; motivo al descartar; ciclo de vida del aviso; pesos de las señales; métricas; propuestas para las decisiones abiertas. |

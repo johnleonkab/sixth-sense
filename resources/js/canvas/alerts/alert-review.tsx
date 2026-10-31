@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import ActionBar from '@/actions/action-bar';
+import ProposalBar from '@/actions/proposal-bar';
 import type { ActionState } from '@/actions/types';
 import { StateChip } from '@/alerts/alert-center';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
@@ -296,6 +297,14 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 <section aria-label="Agendado" className="mt-4 rounded-xl border border-line p-4">
                     <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
                     <AgendaTaskSummary task={props.task} compact />
+                    {/* Nothing reaches the calendar before the "sí". */}
+                    {props.task.status === 'proposed' && props.task.pending_action_id && (
+                        <ProposalBar
+                            action={props.task.pending_action_id}
+                            verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
+                            done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
+                        />
+                    )}
                 </section>
             )}
 

@@ -20,6 +20,7 @@ export type AgendaTaskCard = {
     starts_at: string | null;
     ends_at: string | null;
     event_url: string | null;
+    pending_action_id: number | null;
     error: string | null;
 };
 

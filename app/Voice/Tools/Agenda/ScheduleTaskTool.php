@@ -95,7 +95,9 @@ class ScheduleTaskTool implements VoiceTool
                 'pending_action_id' => $task->pending_action_id,
                 'say' => match ($task->status) {
                     AgendaTaskStatus::Scheduled => "Agendado: «{$task->title}», {$when}.",
-                    AgendaTaskStatus::Proposed => "Te propongo «{$task->title}» el {$when}. Es un borrador: necesita tu «sí» para enviar las invitaciones.",
+                    AgendaTaskStatus::Proposed => $task->kind === 'meeting'
+                        ? "Te propongo «{$task->title}» el {$when}. Es un borrador: necesita tu «sí» para enviar las invitaciones."
+                        : "Te propongo reservar «{$task->title}» el {$when}. Dime si lo pongo en tu calendario.",
                     AgendaTaskStatus::Conflict => "No encuentro hueco para «{$task->title}» a tiempo. Te he dejado un aviso: dime qué muevo.",
                     default => $task->error,
                 },

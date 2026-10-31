@@ -7,7 +7,6 @@ use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
 use App\Connectors\Calendar\CalendarWriter;
-use App\Connectors\Calendar\EventUpdate;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Mail\RecipientNotResolved;
@@ -15,16 +14,15 @@ use App\Connectors\Mail\RecipientResolver;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Models\AgendaTask;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Throwable;
 
 /**
  * The scheduler agent: for something the person has to do, it decides how
  * urgent it is and how long it takes (TaskAssessor), finds a slot in their
- * calendars (SlotFinder) and puts it there. Their own work is booked straight
- * away (they can undo it); meetings with others are proposed and wait for
- * their "sí"; when nothing fits before it is due, they get an alert.
+ * calendars (SlotFinder) and proposes it there. Nothing reaches the calendar
+ * without the person's "sí", neither their own work nor a meeting with others;
+ * when nothing fits before it is due, they get an alert.
  */
 class Scheduler
 {
@@ -87,24 +85,13 @@ class Scheduler
             task: $people === [],
         );
 
-        // With other people, an invitation goes out: it waits for the person's "sí".
-        if ($people !== []) {
-            $action = $this->actions->propose($user, 'calendar.change', "Convocar «{$event->title}»", ['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze]);
-
-            return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);
-        }
-
-        try {
-            $this->applySqueeze($user, $squeeze);
-            $created = $this->calendar->create($user, $event);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Failed, 'error' => 'Google Calendar no ha aceptado el evento: '.$exception->getMessage()]);
-        }
+        // Their own work or a meeting with others: both wait for the person's
+        // "sí". Once confirmed, the task is marked as scheduled with its event.
+        $label = $people !== [] ? "Convocar «{$event->title}»" : "Reservar «{$event->title}» en tu calendario";
+        $action = $this->actions->propose($user, 'calendar.change', $label, ['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze, 'agenda_task_id' => $task->id]);
 
         // Stored in UTC: the database keeps no timezone.
-        return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Scheduled, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'event_ref' => $created->ref, 'event_url' => $created->url]);
+        return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);
     }
 
     /**
@@ -121,22 +108,6 @@ class Scheduler
         }
 
         return $this->finish($task, ['status' => AgendaTaskStatus::Cancelled]);
-    }
-
-    /**
-     * Shorten the person's own tasks that gave up their time for this one.
-     *
-     * @param  list<array{ref: string, start: string, end: string}>  $squeeze
-     */
-    private function applySqueeze(User $user, array $squeeze): void
-    {
-        foreach ($squeeze as $change) {
-            $this->calendar->update($user, $change['ref'], new EventUpdate(
-                start: CarbonImmutable::parse($change['start']),
-                end: CarbonImmutable::parse($change['end']),
-                notify: false,
-            ));
-        }
     }
 
     /**
