@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Urgency;
+use Carbon\CarbonImmutable;
 use Database\Factories\AgendaTaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * their calendar (their own tasks), proposed (meetings with others), or
  * without a slot (they are alerted).
  */
-#[Fillable(['inbox_item_id', 'origin', 'title', 'context', 'status', 'kind', 'urgency', 'urgency_reason', 'duration_minutes', 'deadline', 'attendees', 'starts_at', 'ends_at', 'event_ref', 'event_url', 'pending_action_id', 'error'])]
+#[Fillable(['inbox_item_id', 'origin', 'title', 'context', 'status', 'kind', 'urgency', 'urgency_reason', 'duration_minutes', 'deadline', 'attendees', 'starts_at', 'ends_at', 'options', 'event_ref', 'event_url', 'pending_action_id', 'error'])]
 class AgendaTask extends Model
 {
     /** @use HasFactory<AgendaTaskFactory> */
@@ -39,6 +40,7 @@ class AgendaTask extends Model
             'status' => AgendaTaskStatus::class,
             'urgency' => Urgency::class,
             'attendees' => 'array',
+            'options' => 'array',
             'deadline' => 'immutable_date',
             'starts_at' => 'immutable_datetime',
             'ends_at' => 'immutable_datetime',
@@ -82,6 +84,7 @@ class AgendaTask extends Model
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
             'kind' => $this->kind,
+            'origin' => $this->origin,
             'urgency' => $this->urgency?->value,
             'urgency_label' => $this->urgency?->label(),
             'urgency_reason' => $this->urgency_reason,
@@ -90,6 +93,7 @@ class AgendaTask extends Model
             'attendees' => $this->attendees ?? [],
             'starts_at' => $this->starts_at?->setTimezone($timezone)->toIso8601String(),
             'ends_at' => $this->ends_at?->setTimezone($timezone)->toIso8601String(),
+            'options' => array_map(fn (array $option): array => array_map(fn (string $at): string => CarbonImmutable::parse($at)->setTimezone($timezone)->toIso8601String(), $option), $this->options ?? []),
             'event_url' => $this->event_url,
             'pending_action_id' => $this->pending_action_id,
             'error' => $this->error,

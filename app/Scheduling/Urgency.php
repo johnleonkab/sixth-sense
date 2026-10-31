@@ -47,4 +47,32 @@ enum Urgency: string
     {
         return $this === self::NextWeek ? $now->addWeek()->startOfWeek() : $now;
     }
+
+    /**
+     * How far a call is looked for: sooner than work of the person's own, as
+     * someone is waiting to talk.
+     */
+    public function callUntil(CarbonImmutable $now): CarbonImmutable
+    {
+        return match ($this) {
+            self::Now => $now->endOfDay(),
+            self::Today => $now->addDay(),
+            self::ThisWeek => $now->addWeekdays(5)->endOfDay(),
+            self::NextWeek => $now->addWeek()->endOfWeek(),
+            self::Whenever => $now->addWeeks(3)->endOfWeek(),
+        };
+    }
+
+    /**
+     * The next level, to widen the window once when nothing fits.
+     */
+    public function wider(): self
+    {
+        return match ($this) {
+            self::Now => self::Today,
+            self::Today => self::ThisWeek,
+            self::ThisWeek => self::NextWeek,
+            self::NextWeek, self::Whenever => self::Whenever,
+        };
+    }
 }

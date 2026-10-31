@@ -99,7 +99,7 @@ test('a doubt is settled with one word: yes prepares it, no takes it off and tea
     Queue::fake([ScheduleTask::class]);
     $item = InboxItem::factory()->for($this->user)->create(['actor_name' => 'Lucía Pons', 'title' => 'Reembolsos', 'proposal' => ['summary' => 'Responder.', 'actions' => [
         (new ClassifiedAction(ClassifiedAction::TASK, ClassifiedAction::DOUBT, 'Documentar los reembolsos', 'Parece una tarea para ti, ¿lo es?'))->toArray('a0'),
-        (new ClassifiedAction(ClassifiedAction::CALL, ClassifiedAction::DOUBT, 'Hablarlo con producto', 'No sé si te incluye.', ['people' => ['Lucía']]))->toArray('a1'),
+        (new ClassifiedAction(ClassifiedAction::CALL, ClassifiedAction::DOUBT, 'Hablarlo con producto', 'No sé si te incluye.', ['people' => ['Lucía'], 'people_sure' => true, 'duration_minutes' => 30]))->toArray('a1'),
     ]]]);
     $settle = fn (string $key, string $answer) => $this->actingAs($this->user)->postJson(route('voice.tools.run', 'settle_alert_action'), ['arguments' => ['alert_id' => $item->id, 'action' => $key, 'answer' => $answer]]);
 

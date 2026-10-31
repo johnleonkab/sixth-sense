@@ -52,6 +52,48 @@ class SlotFinder
     }
 
     /**
+     * A few free slots to offer, one per day where possible, never moving
+     * anything of the person's: for people whose calendar can not be seen.
+     *
+     * @param  list<string>  $others  Emails of other people who must be free too.
+     * @return list<array{0: CarbonImmutable, 1: CarbonImmutable}>
+     */
+    public function options(User $user, CarbonImmutable $from, CarbonImmutable $to, int $minutes, array $others = [], int $count = 3): array
+    {
+        $minutes = max(5, $minutes);
+        $busy = $this->blocked($this->map($user, $from, $to, $others), tight: false);
+        $options = [];
+
+        // One per day first; then, if the days run out, more on the same days.
+        foreach ([true, false] as $spread) {
+            $start = $from;
+
+            while (count($options) < $count && $start->lessThan($to) && ($slot = $this->scan($start, $to, $minutes, $busy, stretch: false)) !== null) {
+                if (! in_array($slot[0], array_column($options, 0), false)) {
+                    $options[] = [$slot[0], $slot[1]];
+                }
+
+                $start = $spread ? $slot[0]->addDay()->startOfDay() : $slot[1];
+            }
+        }
+
+        usort($options, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        return array_slice($options, 0, $count);
+    }
+
+    /**
+     * Of these people, whose calendar the person can see.
+     *
+     * @param  list<string>  $emails
+     * @return list<string>
+     */
+    public function visible(User $user, array $emails, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return $emails === [] ? [] : array_keys($this->calendar->busy($user, $emails, $from, $to));
+    }
+
+    /**
      * How busy each of the coming days is, one line each, for the assessor.
      *
      * @return list<string>

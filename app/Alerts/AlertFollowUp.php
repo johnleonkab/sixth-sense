@@ -29,6 +29,10 @@ use App\Models\InboxItem;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
 use App\Scenes\SceneMatch;
+use App\Scheduling\AgendaTaskStatus;
+use App\Scheduling\UsualDurations;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -53,6 +57,7 @@ class AlertFollowUp
         private ProductAnalytics $analytics,
         private SlackAutonomy $autonomy,
         private ActionClassifier $classifier,
+        private UsualDurations $durations,
     ) {}
 
     /**
@@ -114,7 +119,10 @@ class AlertFollowUp
             $proposal = $this->proposal($plan, $decision, $draft);
         }
 
-        $actions = $decision?->action === SlackAction::Redirect->value ? [] : $this->classify($item, $brief);
+        $actions = $decision?->action === SlackAction::Redirect->value ? [] : array_map(
+            fn (ClassifiedAction $action): ClassifiedAction => $action->class === ClassifiedAction::CALL && $action->sure() ? $this->prepareCall($item, $action, $brief) : $action,
+            $this->classify($item, $brief),
+        );
         $proposal['actions'] = array_map(fn (ClassifiedAction $action, int $index): array => $action->toArray("a{$index}"), $actions, array_keys($actions));
 
         $item->update(['proposal' => $proposal, 'planning' => false]);
@@ -170,11 +178,62 @@ class AlertFollowUp
     }
 
     /**
-     * Sends a call or a task to the scheduler, once per alert.
+     * What a call still needs before looking for a slot: who (when the
+     * classifier is not sure, the people in the conversation are ticked and
+     * the person's usual colleagues suggested) and how long (15 to 60 minutes
+     * inferred are used as they are; else the usual length with those people,
+     * once it has been the same three times; else it asks).
+     */
+    public function prepareCall(InboxItem $item, ClassifiedAction $action, AlertBrief $brief): ClassifiedAction
+    {
+        $data = $action->data;
+        $people = $data['people'] ?? [];
+        $minutes = $data['duration_minutes'] ?? null;
+        $needs = [];
+
+        if (! ($data['people_sure'] ?? false) || $people === []) {
+            $needs[] = 'people';
+            $asked = array_values(array_unique(array_filter(array_map(fn (string $name): string => trim(Str::before($name, '<')), [$brief->from, ...$brief->participants, ...$people]))));
+            $asked = array_values(array_diff($asked, [$item->user->name]));
+            $suggested = collect($this->chats->familiar($item->user, 8)['people'])
+                ->map(fn ($person): string => $person->name)
+                ->reject(fn (string $name): bool => $name === $item->user->name || in_array($name, $asked, true))
+                ->take(5);
+            $data['candidates'] = [
+                ...array_map(fn (string $name): array => ['name' => $name, 'checked' => true], $asked),
+                ...$suggested->map(fn (string $name): array => ['name' => $name, 'checked' => false])->values()->all(),
+            ];
+            $data['people'] = $asked;
+        }
+
+        if ($minutes === null || $minutes < 15 || $minutes > 60) {
+            $usual = $this->durations->forCall($item->user, $data['people']);
+
+            if ($usual !== null) {
+                $data['duration_minutes'] = $usual;
+            } else {
+                unset($data['duration_minutes']);
+                $needs[] = 'duration';
+            }
+        }
+
+        if ($needs !== []) {
+            $data['needs'] = $needs;
+        }
+
+        return new ClassifiedAction($action->class, $action->confidence, $action->summary, $action->doubt, $data);
+    }
+
+    /**
+     * Sends a call or a task to the scheduler, once per alert, when nothing is
+     * missing for it.
      */
     public function schedule(InboxItem $item, ClassifiedAction $action, ?AlertBrief $brief = null): void
     {
-        if (! in_array($action->class, [ClassifiedAction::CALL, ClassifiedAction::TASK], true) || ! $item->user->wantsAlertsFrom(AlertSource::Agenda) || AgendaTask::where('inbox_item_id', $item->id)->exists()) {
+        if (! in_array($action->class, [ClassifiedAction::CALL, ClassifiedAction::TASK], true)
+            || ($action->data['needs'] ?? []) !== []
+            || ! $item->user->wantsAlertsFrom(AlertSource::Agenda)
+            || AgendaTask::where('inbox_item_id', $item->id)->where('status', '!=', AgendaTaskStatus::Cancelled)->exists()) {
             return;
         }
 
@@ -187,7 +246,55 @@ class AlertFollowUp
             'context' => trim("{$item->actor_name}: {$item->why}\n".(filled($action->data['deliverable'] ?? null) ? "Entregable: {$action->data['deliverable']}\n" : '')."\n".mb_substr($brief?->text ?? (string) $item->body, 0, 1500)),
         ]);
 
-        ScheduleTask::dispatch($task, $action->data['duration_minutes'] ?? null, $action->data['deadline'] ?? null, $people);
+        ScheduleTask::dispatch($task, $action->data['duration_minutes'] ?? null, $action->data['deadline'] ?? null, $people, $action->data['urgency'] ?? null, $call);
+    }
+
+    /**
+     * Once the scheduler has looked for the call, the reply engine writes the
+     * answer with what it found: the slot, a few to choose from when someone's
+     * calendar can not be seen, or a question about when they are flexible.
+     */
+    public function answerCall(AgendaTask $task): void
+    {
+        $item = $task->inboxItem;
+        $brief = $item?->status === AlertStatus::Pending ? $this->brief($item) : null;
+
+        if ($brief === null) {
+            return;
+        }
+
+        $timezone = config('agenda.timezone');
+        $when = fn (CarbonInterface|string $at): string => CarbonImmutable::parse($at)->setTimezone($timezone)->locale('es')->isoFormat('dddd D [de] MMMM, HH:mm');
+        $names = implode(', ', array_filter(array_map(fn (array $person): ?string => $person['name'] ?? $person['email'] ?? null, $task->attendees ?? []))) ?: $item->actor_name;
+        $note = match ($task->status) {
+            AgendaTaskStatus::Proposed => "Llamada preparada: el {$when($task->starts_at)} ({$task->duration_minutes} min) con {$names}. La invitación sale con el mismo «sí». "
+                .'La respuesta le propone ese hueco, en una o dos frases, y le dice que le manda la invitación.',
+            AgendaTaskStatus::Offered => 'En la llamada hay alguien de fuera cuya agenda no se ve. La respuesta le propone estos huecos para que elija uno, sin invitación todavía: '
+                .implode('; ', array_map(fn (array $option): string => $when($option[0]), $task->options ?? [])).'.',
+            AgendaTaskStatus::Conflict => 'No hay hueco para la llamada en los próximos días. La respuesta lo dice con naturalidad y le pregunta qué días o franjas tiene más flexibles.',
+            default => null,
+        };
+
+        if ($note === null) {
+            return;
+        }
+
+        try {
+            $plan = $this->planner->plan($item->user, $brief->withFindings(trim("{$brief->findings}\n\n{$note}")));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return;
+        }
+
+        $item->update(['proposal' => [
+            ...($item->proposal ?? []),
+            'summary' => $plan->summary,
+            'reply' => $plan->reply,
+            'reaction' => null,
+            'question' => $plan->question,
+        ]]);
+        InboxItemUpdated::dispatch($item);
     }
 
     /**

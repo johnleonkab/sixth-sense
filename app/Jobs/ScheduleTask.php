@@ -2,10 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Alerts\AlertFollowUp;
 use App\Models\AgendaTask;
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Scheduler;
 use App\Scheduling\SchedulingRequest;
+use App\Scheduling\Urgency;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -32,6 +34,8 @@ class ScheduleTask implements ShouldBeUnique, ShouldQueue
         public ?int $effortMinutes = null,
         public ?string $deadline = null,
         public array $people = [],
+        public ?string $urgency = null,
+        public bool $call = false,
     ) {}
 
     public function uniqueId(): string
@@ -39,7 +43,7 @@ class ScheduleTask implements ShouldBeUnique, ShouldQueue
         return (string) $this->task->id;
     }
 
-    public function handle(Scheduler $scheduler): void
+    public function handle(Scheduler $scheduler, AlertFollowUp $followUp): void
     {
         $task = $this->task->fresh();
 
@@ -47,7 +51,12 @@ class ScheduleTask implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $scheduler->schedule($task, new SchedulingRequest($task->title, $task->context, $this->effortMinutes, $this->deadline, $this->people));
+        $task = $scheduler->schedule($task, new SchedulingRequest($task->title, $task->context, $this->effortMinutes, $this->deadline, $this->people, Urgency::tryFrom((string) $this->urgency), $this->call));
+
+        // A call asked for in a message: the answer to it says when, or asks.
+        if ($this->call && $task->inboxItem !== null) {
+            $followUp->answerCall($task);
+        }
     }
 
     public function failed(?Throwable $exception): void

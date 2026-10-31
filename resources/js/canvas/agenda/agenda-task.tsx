@@ -8,9 +8,10 @@ import { Button } from '@/components/button';
 export type AgendaTaskCard = {
     id: number;
     title: string;
-    status: 'assessing' | 'scheduled' | 'proposed' | 'conflict' | 'cancelled' | 'failed';
+    status: 'assessing' | 'scheduled' | 'proposed' | 'offered' | 'conflict' | 'cancelled' | 'failed';
     status_label: string;
     kind: 'task' | 'meeting' | null;
+    origin?: string;
     urgency: string | null;
     urgency_label: string | null;
     urgency_reason: string | null;
@@ -19,6 +20,8 @@ export type AgendaTaskCard = {
     attendees: { name: string | null; email: string | null }[];
     starts_at: string | null;
     ends_at: string | null;
+    /** Slots offered to people whose calendar can not be seen: [start, end]. */
+    options?: [string, string][];
     event_url: string | null;
     pending_action_id: number | null;
     error: string | null;
@@ -31,6 +34,7 @@ const statusStyle: Record<AgendaTaskCard['status'], string> = {
     assessing: 'alerts-shimmer text-muted',
     scheduled: 'bg-ok/10 text-ok',
     proposed: 'bg-accent-soft text-accent',
+    offered: 'bg-accent-soft text-accent',
     conflict: 'bg-warn-soft text-warn',
     cancelled: 'bg-soft text-faint',
     failed: 'bg-crit-soft text-crit',
@@ -76,7 +80,22 @@ export function AgendaTaskSummary({ task, compact = false }: { task: AgendaTaskC
             )}
 
             {task.status === 'assessing' && <p className="text-[13px] text-muted">Valorando la urgencia y buscando hueco…</p>}
-            {task.status === 'conflict' && (
+            {task.status === 'offered' && (task.options ?? []).length > 0 && (
+                <div className="text-[13px]">
+                    <p className="text-muted">Su agenda no se ve: la respuesta le ofrece elegir entre</p>
+                    <ul className="mt-1 space-y-0.5">
+                        {(task.options ?? []).map(([start, end]) => (
+                            <li key={start} className="font-medium">
+                                {when({ ...task, starts_at: start, ends_at: end })}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {task.status === 'conflict' && task.kind === 'meeting' && task.origin === 'alert' && (
+                <p className="text-[13px] text-warn">No hay hueco en los próximos días: la respuesta le pregunta cuándo le viene mejor.</p>
+            )}
+            {task.status === 'conflict' && (task.kind !== 'meeting' || task.origin !== 'alert') && (
                 <p className="text-[13px] text-warn">No hay hueco a tiempo{task.deadline ? ` (antes del ${task.deadline})` : ''}. Dime qué muevo.</p>
             )}
             {task.error && <p className="text-[13px] text-crit">{task.error}</p>}

@@ -6,6 +6,7 @@ use App\Actions\Actions;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
+use App\Connectors\Calendar\CalendarAccount;
 use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\NewEvent;
 use App\Connectors\Mail\MailAddress;
@@ -15,6 +16,7 @@ use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Models\AgendaTask;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -52,6 +54,12 @@ class Scheduler
             return $this->finish($task, [...$this->decided($assessment), 'status' => AgendaTaskStatus::Failed, 'error' => $exception->getMessage()]);
         }
 
+        $decided = [...$this->decided($assessment), 'attendees' => array_map(fn (MailAddress $person): array => $person->toArray(), $people)];
+
+        if ($request->call && $people !== []) {
+            return $this->call($task, $assessment, $people, $accounts, $now, $decided);
+        }
+
         $from = $assessment->urgency->earliestStart($now)->max($now->addMinutes((int) config('agenda.lead_minutes')));
         $until = $assessment->urgency->latestEnd($now);
 
@@ -63,8 +71,6 @@ class Scheduler
             ? $this->slots->find($user, $from, $until, $assessment->durationMinutes, array_map(fn (MailAddress $person): string => (string) $person->email, $people))
             : null;
 
-        $decided = [...$this->decided($assessment), 'attendees' => array_map(fn (MailAddress $person): array => $person->toArray(), $people)];
-
         if ($slot === null) {
             $task = $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Conflict]);
             $this->alertConflict($task, $until);
@@ -72,6 +78,71 @@ class Scheduler
             return $task;
         }
 
+        return $this->propose($task, $assessment, $people, $accounts, $slot, $decided);
+    }
+
+    /**
+     * A call someone asked the person for. It is looked for within a window
+     * set by its urgency, widened once when nothing fits. With people whose
+     * calendar can not be seen (outside the organisation), nothing is booked:
+     * the reply offers them a few slots free for everyone else. With no slot,
+     * the reply says so and asks when they are more flexible: no other alert.
+     *
+     * @param  list<MailAddress>  $people
+     * @param  list<CalendarAccount>  $accounts
+     * @param  array<string, mixed>  $decided
+     */
+    private function call(AgendaTask $task, TaskAssessment $assessment, array $people, array $accounts, CarbonImmutable $now, array $decided): AgendaTask
+    {
+        $user = $task->user;
+        $from = $assessment->urgency->earliestStart($now)->max($now->addMinutes((int) config('agenda.lead_minutes')));
+        $window = fn (Urgency $urgency): CarbonImmutable => $assessment->deadline !== null
+            ? $urgency->callUntil($now)->min($assessment->deadline->setTimezone($now->getTimezone())->endOfDay())
+            : $urgency->callUntil($now);
+        $wider = $assessment->urgency->wider();
+        $emails = array_map(fn (MailAddress $person): string => (string) $person->email, $people);
+        $visible = $this->slots->visible($user, $emails, $from, $window($wider));
+        $ours = array_map(fn (CalendarAccount $account): string => Str::after($account->email, '@'), $accounts);
+        $outside = array_values(array_filter($emails, fn (string $email): bool => ! in_array($email, $visible, true) && ! in_array(Str::after($email, '@'), $ours, true)));
+        $inside = array_values(array_diff($emails, $outside));
+        $widened = ['urgency_reason' => trim("{$assessment->reason} No había hueco: lo busco hasta {$wider->label()}.")];
+
+        if ($outside !== []) {
+            $options = $this->slots->options($user, $from, $window($assessment->urgency), $assessment->durationMinutes, $inside);
+
+            if ($options === []) {
+                $options = $this->slots->options($user, $from, $window($wider), $assessment->durationMinutes, $inside);
+                $decided = [...$decided, ...$widened];
+            }
+
+            return $this->finish($task, $options === []
+                ? [...$decided, 'status' => AgendaTaskStatus::Conflict]
+                : [...$decided, 'status' => AgendaTaskStatus::Offered, 'options' => array_map(fn (array $option): array => [$option[0]->utc()->toIso8601String(), $option[1]->utc()->toIso8601String()], $options)]);
+        }
+
+        $slot = $this->slots->find($user, $from, $window($assessment->urgency), $assessment->durationMinutes, $emails);
+
+        if ($slot === null && $window($wider)->greaterThan($window($assessment->urgency))) {
+            $slot = $this->slots->find($user, $from, $window($wider), $assessment->durationMinutes, $emails);
+            $decided = [...$decided, ...$widened];
+        }
+
+        return $slot === null
+            ? $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Conflict])
+            : $this->propose($task, $assessment, $people, $accounts, $slot, $decided);
+    }
+
+    /**
+     * Their own work or a meeting with others: both wait for the person's
+     * "sí". Once confirmed, the task is marked as scheduled with its event.
+     *
+     * @param  list<MailAddress>  $people
+     * @param  list<CalendarAccount>  $accounts
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable, 2?: list<array{ref: string, start: string, end: string}>}  $slot
+     * @param  array<string, mixed>  $decided
+     */
+    private function propose(AgendaTask $task, TaskAssessment $assessment, array $people, array $accounts, array $slot, array $decided): AgendaTask
+    {
         [$start, $end] = $slot;
         $squeeze = $slot[2] ?? [];
         $event = new NewEvent(
@@ -85,10 +156,8 @@ class Scheduler
             task: $people === [],
         );
 
-        // Their own work or a meeting with others: both wait for the person's
-        // "sí". Once confirmed, the task is marked as scheduled with its event.
         $label = $people !== [] ? "Convocar «{$event->title}»" : "Reservar «{$event->title}» en tu calendario";
-        $action = $this->actions->propose($user, 'calendar.change', $label, array_filter(['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze, 'agenda_task_id' => $task->id, 'inbox_item_id' => $task->inbox_item_id], fn (mixed $value): bool => $value !== null));
+        $action = $this->actions->propose($task->user, 'calendar.change', $label, array_filter(['kind' => 'create', 'event' => $event->toArray(), 'squeeze' => $squeeze, 'agenda_task_id' => $task->id, 'inbox_item_id' => $task->inbox_item_id], fn (mixed $value): bool => $value !== null));
 
         // Stored in UTC: the database keeps no timezone.
         return $this->finish($task, [...$decided, 'status' => AgendaTaskStatus::Proposed, 'starts_at' => $start->utc(), 'ends_at' => $end->utc(), 'pending_action_id' => $action->id]);

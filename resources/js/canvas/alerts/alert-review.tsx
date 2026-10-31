@@ -37,7 +37,69 @@ type ProposedAction = {
     confidence: 'sure' | 'doubt';
     summary: string;
     doubt?: string;
+    data?: {
+        /** What a call still needs before looking for a slot. */
+        needs?: ('people' | 'duration')[];
+        candidates?: { name: string; checked: boolean }[];
+        people?: string[];
+        duration_minutes?: number;
+    };
 };
+
+const callLengths = [15, 30, 45, 60];
+
+/**
+ * What a call is missing, settled with taps: who goes (the people in the
+ * conversation ticked, usual colleagues suggested) and how long it lasts.
+ */
+function CallNeeds({ action, busy, onSettle }: { action: ProposedAction; busy: boolean; onSettle: (changes: { people?: string[]; duration_minutes?: number }) => void }) {
+    const needs = action.data?.needs ?? [];
+    const [people, setPeople] = useState<string[]>((action.data?.candidates ?? []).filter((candidate) => candidate.checked).map((candidate) => candidate.name));
+    const [minutes, setMinutes] = useState<number | null>(action.data?.duration_minutes ?? null);
+    const ready = (!needs.includes('people') || people.length > 0) && (!needs.includes('duration') || minutes !== null);
+
+    return (
+        <div className="mt-2 grid gap-2">
+            {needs.includes('people') && (
+                <fieldset>
+                    <legend className="text-[12px] text-muted">¿Quiénes van?</legend>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {(action.data?.candidates ?? []).map((candidate) => (
+                            <label key={candidate.name} className="flex items-center gap-1.5 text-[13px]">
+                                <input
+                                    type="checkbox"
+                                    checked={people.includes(candidate.name)}
+                                    onChange={() => setPeople((current) => (current.includes(candidate.name) ? current.filter((name) => name !== candidate.name) : [...current, candidate.name]))}
+                                    className="accent-[var(--color-accent)]"
+                                />
+                                <span className={candidate.checked ? '' : 'text-muted'}>{candidate.name}</span>
+                            </label>
+                        ))}
+                    </div>
+                </fieldset>
+            )}
+            {needs.includes('duration') && (
+                <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[12px] text-muted">¿Cuánto dura?</span>
+                    {callLengths.map((length) => (
+                        <Button key={length} variant={minutes === length ? 'primary' : 'secondary'} disabled={busy} onClick={() => setMinutes(length)}>
+                            {length} min
+                        </Button>
+                    ))}
+                </div>
+            )}
+            <div>
+                <Button
+                    variant="secondary"
+                    disabled={busy || !ready}
+                    onClick={() => onSettle({ ...(needs.includes('people') ? { people } : {}), ...(needs.includes('duration') && minutes !== null ? { duration_minutes: minutes } : {}) })}
+                >
+                    Buscar hueco
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 const actionClass: Record<ProposedAction['class'], string> = {
     call: 'Llamada',
@@ -219,9 +281,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     };
 
     /** A doubt of the classifier, settled with one tap: "sí" prepares it, "no" takes it off. */
-    const settle = (action: ProposedAction, answer: 'yes' | 'no') => {
+    const settle = (action: ProposedAction, answer: 'yes' | 'no' | null, changes: { people?: string[]; duration_minutes?: number } = {}) => {
         setBusy(true);
-        runTool('settle_alert_action', { alert_id: alert.id, action: action.key, answer });
+        runTool('settle_alert_action', { alert_id: alert.id, action: action.key, ...(answer ? { answer } : {}), ...changes });
     };
 
     /** Ticked, it goes out with the "sí"; shown only when the "sí" covers more than one thing. */
@@ -398,6 +460,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                                             No
                                                         </Button>
                                                     </span>
+                                                )}
+                                                {action.confidence === 'sure' && pending && (action.data?.needs ?? []).length > 0 && (
+                                                    <CallNeeds action={action} busy={busy} onSettle={(changes) => settle(action, null, changes)} />
                                                 )}
                                             </li>
                                         ))}

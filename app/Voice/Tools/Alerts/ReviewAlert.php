@@ -109,6 +109,8 @@ class ReviewAlert implements VoiceTool
                     $item->status !== AlertStatus::Pending => "Este aviso ya está {$item->status->label()}.",
                     $item->planning => 'La propuesta se está preparando y aparecerá en pantalla en cuanto esté: mientras, pregúntale cómo quiere responder.',
                     $item->proposal === null => 'No hay propuesta: pregúntale cómo quiere responder.',
+                    ($missing = collect($item->proposal['actions'] ?? [])->first(fn (array $action): bool => ($action['data']['needs'] ?? []) !== [])) !== null => "A la llamada ({$missing['key']}) le falta saber "
+                        .implode(' y ', array_map(fn (string $need): string => $need === 'people' ? 'quiénes van' : 'cuánto dura', $missing['data']['needs'])).'. Pregúntaselo y usa settle_alert_action con people o duration_minutes.',
                     ($doubt = collect($item->proposal['actions'] ?? [])->firstWhere('confidence', 'doubt')) !== null => "Hay una duda ({$doubt['key']}): {$doubt['doubt']} Pregúntasela y, con su respuesta, usa settle_alert_action.",
                     default => null,
                 },

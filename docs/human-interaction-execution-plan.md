@@ -224,7 +224,7 @@ Pasos:
 | 1 · Resultado de cada propuesta | Hecho |
 | 2 · Descartar con motivo y resolver | Hecho |
 | 3 · Clasificador de acciones | Hecho |
-| 4 · Llamadas | Pendiente |
+| 4 · Llamadas | Hecho |
 | 5 · Tareas | Pendiente |
 | 6 · Preguntas | Pendiente |
 | 7 · Fuente, fecha y destinatario | Pendiente |
