@@ -80,6 +80,14 @@ export class GeminiTransport implements VoiceTransport {
     }
 
     private handle(message: LiveServerMessage, events: VoiceTransportEvents): void {
+        const content = message.serverContent;
+
+        // The words of this message have to be known before its tool calls,
+        // so a bare "sí" is applied and those calls are not run.
+        if (content?.inputTranscription?.text) {
+            events.onUserTranscript(content.inputTranscription.text);
+        }
+
         const calls = message.toolCall?.functionCalls ?? [];
 
         if (calls.length > 0) {
@@ -92,18 +100,12 @@ export class GeminiTransport implements VoiceTransport {
             events.onToolCallsCancelled(message.toolCallCancellation.ids);
         }
 
-        const content = message.serverContent;
-
         if (!content) {
             return;
         }
 
         if (content.interrupted) {
             events.onInterrupted();
-        }
-
-        if (content.inputTranscription?.text) {
-            events.onUserTranscript(content.inputTranscription.text);
         }
 
         if (content.outputTranscription?.text) {

@@ -33,6 +33,12 @@ class Actions
     /** Seconds between "sí" and the change actually happening. */
     public const UNDO_WINDOW = 6;
 
+    /**
+     * How long an identical change that just ran still counts as the same one.
+     * A second proposal in this window is the voice repeating the "sí".
+     */
+    public const DUPLICATE_WINDOW = 60;
+
     /** A proposal left unanswered for this long can no longer be confirmed. */
     public const PROPOSAL_LIFETIME = 600;
 
@@ -74,6 +80,12 @@ class Actions
             throw new InvalidArgumentException("Unknown action type [{$type}].");
         }
 
+        $existing = $this->openDuplicate($user, $type, $payload);
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
         return $user->pendingActions()->create([
             'type' => $type,
             'label' => $label,
@@ -81,6 +93,60 @@ class Actions
             'status' => ActionStatus::Pending,
             'expires_at' => now()->addSeconds(self::PROPOSAL_LIFETIME),
         ]);
+    }
+
+    /**
+     * The same change already waiting, in its undo window, or just applied.
+     * Key order and nulls do not make it a different change.
+     */
+    private function openDuplicate(User $user, string $type, array $payload): ?PendingAction
+    {
+        $fingerprint = $this->fingerprint($payload);
+
+        return $user->pendingActions()
+            ->where('type', $type)
+            ->where(function ($query): void {
+                $query->whereIn('status', [ActionStatus::Pending, ActionStatus::Confirmed, ActionStatus::Executing])
+                    ->orWhere(fn ($query) => $query->where('status', ActionStatus::Executed)->where('executed_at', '>=', now()->subSeconds(self::DUPLICATE_WINDOW)));
+            })
+            ->latest('id')
+            ->limit(20)
+            ->get()
+            ->first(fn (PendingAction $action): bool => $this->fingerprint($action->payload) === $fingerprint);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function fingerprint(array $payload): string
+    {
+        return hash('sha256', (string) json_encode($this->canonical($payload)));
+    }
+
+    private function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            $items = array_map($this->canonical(...), $value);
+            usort($items, fn (mixed $left, mixed $right): int => strcmp((string) json_encode($left), (string) json_encode($right)));
+
+            return $items;
+        }
+
+        $entries = [];
+
+        foreach ($value as $key => $item) {
+            if ($item !== null) {
+                $entries[$key] = $this->canonical($item);
+            }
+        }
+
+        ksort($entries);
+
+        return $entries;
     }
 
     /**

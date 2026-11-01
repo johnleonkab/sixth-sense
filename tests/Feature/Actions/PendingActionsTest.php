@@ -97,6 +97,60 @@ test('the assistant has no tool to confirm anything', function () {
     expect(array_filter($names, fn (string $name) => preg_match('/confirm|approve|execute|apply/', $name)))->toBe([]);
 });
 
+test('proposing the same change again returns the one already waiting', function () {
+    $first = commentAction($this->user);
+    $again = app(Actions::class)->propose($this->user, 'docs.comment', 'Otra etiqueta', [
+        'url' => null, 'quote' => null, 'content' => 'Revisado, ok.', 'ref' => 'demo.'.FakeDocuments::PREPAGO_ID,
+    ]);
+
+    expect($again->is($first))->toBeTrue()
+        ->and($this->user->pendingActions()->count())->toBe(1);
+});
+
+test('a different change is its own proposal', function () {
+    commentAction($this->user);
+
+    $other = app(Actions::class)->propose($this->user, 'docs.comment', 'Comentar en «PRD»', [
+        'ref' => 'demo.'.FakeDocuments::PREPAGO_ID, 'content' => 'Otra nota.', 'quote' => null, 'url' => null,
+    ]);
+
+    expect($this->user->pendingActions()->count())->toBe(2)
+        ->and($other->payload['content'])->toBe('Otra nota.');
+});
+
+test('a change that just ran is not proposed a second time', function () {
+    $action = commentAction($this->user);
+    $this->actingAs($this->user)->postJson(route('actions.confirm', $action));
+
+    $again = commentAction($this->user);
+
+    expect($action->refresh()->status)->toBe(ActionStatus::Executed)
+        ->and($again->is($action))->toBeTrue()
+        ->and($this->user->pendingActions()->count())->toBe(1);
+
+    $this->travel(Actions::DUPLICATE_WINDOW + 1)->seconds();
+
+    commentAction($this->user);
+
+    expect($this->user->pendingActions()->count())->toBe(2);
+});
+
+test('a cancelled proposal can be proposed again', function () {
+    $action = commentAction($this->user);
+    $this->actingAs($this->user)->postJson(route('actions.cancel', $action));
+
+    commentAction($this->user);
+
+    expect($this->user->pendingActions()->count())->toBe(2);
+});
+
+test('another person proposing the same change gets their own', function () {
+    $action = commentAction($this->user);
+    $other = commentAction(User::factory()->create());
+
+    expect($other->is($action))->toBeFalse();
+});
+
 test('the screen counts down the same undo window the server waits, six seconds', function () {
     preg_match('/export const UNDO_SECONDS = (\d+);/', (string) file_get_contents(resource_path('js/actions/types.ts')), $screen);
 

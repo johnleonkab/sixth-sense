@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
-import { answerIn } from '@/actions/answers';
+import { answerIn, bareAnswer, type Answer } from '@/actions/answers';
 import AlertCenter from '@/alerts/alert-center';
 import type { Alert } from '@/alerts/types';
 import { alertArrivedNote, tellMeNote } from '@/alerts/notes';
@@ -148,9 +148,14 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
         return () => window.removeEventListener('popstate', onPop);
     }, []);
 
-    /** "sí", "cancela" or "deshaz" answer the change on screen; only the person can. */
-    const answer = async (text: string): Promise<void> => {
+    /**
+     * "sí", "cancela" or "deshaz" answer the change on screen; only the person can.
+     * Returns that answer when the whole phrase was just that and it was applied,
+     * so the voice model does not treat it as a new ask.
+     */
+    const answer = async (text: string): Promise<Answer | null> => {
         const reply = answerIn(text);
+        const ownsTheTurn = (): Answer | null => (reply !== null && bareAnswer(text) === reply ? reply : null);
 
         if (reply === 'undo') {
             const action = actions.undoable();
@@ -159,7 +164,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                 await actions.undo(action.id);
             }
 
-            return;
+            return action ? ownsTheTurn() : null;
         }
 
         if (reply === 'yes') {
@@ -175,9 +180,10 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                     }
                 } catch {
                     // The cards stay pending; the person can say sí again.
+                    return null;
                 }
 
-                return;
+                return ownsTheTurn();
             }
         }
 
@@ -186,6 +192,8 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
         if (action) {
             await (reply === 'yes' ? actions.confirm(action.id) : actions.cancel(action.id));
         }
+
+        return action ? ownsTheTurn() : null;
     };
 
     // A conversation that starts, or picks up after dropping, knows what is on screen.

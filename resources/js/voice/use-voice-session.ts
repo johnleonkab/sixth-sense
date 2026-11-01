@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
+import type { Answer } from '@/actions/answers';
 import type { CanvasDirective } from '@/canvas/types';
 import { activityFor } from '@/voice/activity';
 import { playHalo } from '@/voice/audio/chimes';
@@ -31,8 +32,11 @@ const MAX_RECONNECTS = 3;
 type VoiceSessionOptions = {
     /** The assistant asked to put something on screen, and maybe a second canvas beside it. */
     onCanvas?: (canvas: CanvasDirective, beside?: CanvasDirective | null) => void;
-    /** The person finished saying something (used to recognise "sí", "cancela", "deshaz"). */
-    onUtterance?: (text: string) => Promise<void> | void;
+    /**
+     * The person finished saying something (used to recognise "sí", "cancela", "deshaz").
+     * A returned answer means that phrase was only the answer and the app already applied it.
+     */
+    onUtterance?: (text: string) => Promise<Answer | null> | Answer | null;
     /** What is on screen now, for a conversation that starts or picks up again. */
     screen?: () => string | null;
 };
@@ -90,16 +94,26 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
     const onUtteranceRef = useRef(onUtterance);
     onUtteranceRef.current = onUtterance;
     const utterance = useRef('');
+    /** A bare "sí", "cancela" or "deshaz" the app just applied. Holds until the next phrase. */
+    const answeredTurn = useRef<Answer | null>(null);
 
-    /** The person stopped talking once the assistant answers or the turn ends. */
-    const finishUtterance = useCallback(async (): Promise<void> => {
+    /**
+     * The person stopped talking once the assistant answers or the turn ends.
+     * When the phrase was only "sí", "cancela" or "deshaz" and the app applied it,
+     * that answer stays until the next phrase so a late tool call is still dropped.
+     */
+    const finishUtterance = useCallback(async (): Promise<Answer | null> => {
         const text = utterance.current.trim();
         utterance.current = '';
 
-        if (text) {
-            memory.current.add('user', text);
-            await onUtteranceRef.current?.(text);
+        if (text === '') {
+            return answeredTurn.current;
         }
+
+        memory.current.add('user', text);
+        answeredTurn.current = (await onUtteranceRef.current?.(text)) ?? null;
+
+        return answeredTurn.current;
     }, []);
 
     /** The assistant's answer, once complete, is remembered. */
@@ -213,26 +227,43 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
             }
 
             const cancelledCalls = new Set<string>();
+            const alreadyApplied: Record<Answer, string> = {
+                yes: 'La persona ha dicho que sí y la aplicación ya ha confirmado el borrador. Empieza la cuenta atrás para deshacer. No llames a ninguna herramienta, no crees otra propuesta y no vuelvas a describirla. Calla.',
+                no: 'La persona ha cancelado y la aplicación ya ha descartado el borrador. No llames a ninguna herramienta ni prepares otro. Calla.',
+                undo: 'La persona ha deshecho el cambio y la aplicación ya lo ha anulado. No llames a ninguna herramienta ni lo vuelvas a proponer. Calla.',
+            };
 
             // Tools run in Laravel; the assistant waits for every response before speaking again.
-            const runToolCalls = async (calls: ToolCall[], answered: Promise<void>) => {
+            const runToolCalls = async (calls: ToolCall[], answered: Promise<Answer | null>) => {
                 // Whatever the person just answered ("sí", "deshaz") is recorded before any tool reads it.
-                await answered.catch(() => undefined);
-                const outcomes = await Promise.all(calls.map(async (call) => ({ call, outcome: await runTool(call) })));
-                const pending = outcomes.filter(({ call }) => !cancelledCalls.has(call.id));
+                const handled = await answered.catch(() => null);
+                const pending = calls.filter((call) => !cancelledCalls.has(call.id));
 
                 if (!isCurrent() || pending.length === 0) {
                     return;
                 }
 
-                const shown = canvasesToShow(pending.map(({ outcome }) => outcome));
+                if (handled) {
+                    transport.sendToolResponses(
+                        pending.map((call) => ({
+                            id: call.id,
+                            name: call.name,
+                            output: { status: 'ya resuelto por la app', answer: handled, next_step: alreadyApplied[handled] },
+                        })),
+                    );
+                    setActivity(null);
+                    setStatus(typed ? 'idle' : settled());
+
+                    return;
+                }
+
+                const outcomes = await Promise.all(pending.map(async (call) => ({ call, outcome: await runTool(call) })));
+                const shown = canvasesToShow(outcomes.map(({ outcome }) => outcome));
 
                 if (shown.length > 0) {
                     onCanvasRef.current?.(shown[0], shown[1] ?? null);
                 }
-                transport.sendToolResponses(
-                    pending.map(({ call, outcome }) => ({ id: call.id, name: call.name, output: outcome.output })),
-                );
+                transport.sendToolResponses(outcomes.map(({ call, outcome }) => ({ id: call.id, name: call.name, output: outcome.output })));
                 setActivity(null);
                 setStatus(typed ? 'thinking' : settled());
             };
@@ -382,14 +413,20 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
             dispatch({ type: 'turn-ended' });
 
             // Typed "sí", "cancela" or "deshaz" answer a proposal, exactly as said ones do.
-            await onUtteranceRef.current?.(typed);
+            const handled = (await onUtteranceRef.current?.(typed)) ?? null;
+            answeredTurn.current = handled;
 
             const open = resources.current?.transport ? true : await start('text');
 
             // Remembered once the conversation is open, so its opening note does not repeat it.
             memory.current.add('user', typed);
 
-            if (open) {
+            if (open && handled) {
+                resources.current?.transport?.sendContext(
+                    '[Nota de la app, no la dice el usuario.] Esa frase ya la ha aplicado la aplicación. No llames a herramientas ni crees otra propuesta. Calla.',
+                    false,
+                );
+            } else if (open) {
                 setStatus((current) => (resources.current?.mode === 'text' ? 'thinking' : current));
                 resources.current?.transport?.sendContext(typed, true);
             }

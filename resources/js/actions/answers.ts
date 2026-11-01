@@ -18,6 +18,11 @@ const UNDO = /\b(deshaz|deshazlo|deshacer|revierte|revertir|vuelve atras|marcha 
 const YES = /^(si|vale|ok|okay|adelante|hazlo|dale|confirmo|confirma|confirmado|aplicalo|aplica|aplicar|perfecto|correcto|de acuerdo|publicalo|publica)\b/;
 const NO = /^(no|cancela|cancelalo|cancelar|dejalo|olvidalo|mejor no|para)\b/;
 
+/** The whole utterance is only the answer, with nothing else to do. */
+const BARE_UNDO = /^(deshaz|deshazlo|deshacer|revierte|revertir|vuelve atras|marcha atras)$/;
+const BARE_YES = /^(si|vale|ok|okay|adelante|hazlo|dale|confirmo|confirma|confirmado|aplicalo|aplica|aplicar|perfecto|correcto|de acuerdo|publicalo|publica)$/;
+const BARE_NO = /^(no|cancela|cancelalo|cancelar|dejalo|olvidalo|mejor no|para)$/;
+
 export function answerIn(text: string): Answer | null {
     const words = normalise(text);
 
@@ -30,6 +35,28 @@ export function answerIn(text: string): Answer | null {
     }
 
     if (NO.test(words)) {
+        return 'no';
+    }
+
+    return null;
+}
+
+/**
+ * An utterance the fast loop owns entirely: "sí", "cancela", "deshaz".
+ * "Sí, pero el martes" is not one of these — the rest is still an ask.
+ */
+export function bareAnswer(text: string): Answer | null {
+    const words = normalise(text);
+
+    if (BARE_UNDO.test(words)) {
+        return 'undo';
+    }
+
+    if (BARE_YES.test(words)) {
+        return 'yes';
+    }
+
+    if (BARE_NO.test(words)) {
         return 'no';
     }
 
