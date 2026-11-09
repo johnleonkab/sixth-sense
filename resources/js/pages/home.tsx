@@ -15,6 +15,7 @@ import type { CanvasDirective } from '@/canvas/types';
 import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
+import IntentBoard, { type IntentGroups } from '@/intents/intent-board';
 import { echoConnection } from '@/lib/echo';
 import { postJson } from '@/lib/http';
 import { activityFor } from '@/voice/activity';
@@ -94,7 +95,15 @@ type OpenAlert = {
     starts_at: string | null;
 };
 
-export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; openAlert?: OpenAlert | null }) {
+const emptyIntents: IntentGroups = { waiting_on_me: [], waiting_on_others: [], quiet: [] };
+
+type OpenComms = {
+    proposal_id: number | null;
+    question: string | null;
+    undo: boolean;
+};
+
+export default function Home({ alerts, openAlert = null, openComms = null, intents = emptyIntents }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; intents?: IntentGroups }) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
     const nextCanvasId = useRef(1);
@@ -162,9 +171,17 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
 
             if (action) {
                 await actions.undo(action.id);
+
+                return ownsTheTurn();
             }
 
-            return action ? ownsTheTurn() : null;
+            if (openComms?.undo && openComms.proposal_id !== null) {
+                await postJson(`/comms/proposals/${openComms.proposal_id}/undo`, {});
+
+                return ownsTheTurn();
+            }
+
+            return null;
         }
 
         if (reply === 'yes') {
@@ -191,9 +208,17 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
 
         if (action) {
             await (reply === 'yes' ? actions.confirm(action.id) : actions.cancel(action.id));
+
+            return ownsTheTurn();
         }
 
-        return action ? ownsTheTurn() : null;
+        if ((reply === 'yes' || reply === 'no') && openComms?.proposal_id !== null && openComms?.proposal_id !== undefined) {
+            await postJson(`/comms/proposals/${openComms.proposal_id}/${reply === 'yes' ? 'approve' : 'reject'}`, {});
+
+            return ownsTheTurn();
+        }
+
+        return null;
     };
 
     // A conversation that starts, or picks up after dropping, knows what is on screen.
@@ -297,6 +322,7 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
     }, [openAlert]);
 
     const now = useNow();
+    const hasIntents = intents.waiting_on_me.length + intents.waiting_on_others.length + intents.quiet.length > 0;
 
     return (
         <>
@@ -330,6 +356,13 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                             onTellMe={(alert) => void voice.tell(tellMeNote(alert), true)}
                         />
                         <Link
+                            href="/shadow"
+                            viewTransition={!wide}
+                            className="hidden rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink sm:inline"
+                        >
+                            Sombra
+                        </Link>
+                        <Link
                             href="/settings"
                             viewTransition={!wide}
                             onClick={() => {
@@ -357,11 +390,14 @@ export default function Home({ alerts, openAlert = null }: { alerts: Alert[]; op
                 <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 pt-3 ${canvases.length > 1 ? 'overflow-auto pb-(--dock-room) md:flex md:flex-col md:overflow-hidden md:pb-0' : 'overflow-auto pb-(--dock-room)'}`}>
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
-                        !opening && (
+                        !opening &&
+                        (hasIntents ? (
+                            <IntentBoard intents={intents} />
+                        ) : (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
                             </p>
-                        )
+                        ))
                     ) : (
                         <CanvasContext value={{ runTool: runFromScreen, tell: (text) => void voice.tell(text, true), actions }}>
                             <div

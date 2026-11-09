@@ -18,6 +18,7 @@ use App\Actions\Handlers\SendChatMessage;
 use App\Actions\Handlers\SendEmail;
 use App\Alerts\Intents\SlackAutonomy;
 use App\Alerts\Outcomes\ProposalOutcomes;
+use App\Comms\Gate\ExecuteProposal;
 use App\Jobs\ExecutePendingAction;
 use App\Models\PendingAction;
 use App\Models\User;
@@ -67,6 +68,17 @@ class Actions
         'sense.delete' => ChangeSense::class,
         'slack.preference' => AcceptSlackPreference::class,
         'slack.autonomy' => AcceptSlackAutonomy::class,
+        'comms.send_slack' => ExecuteProposal::class,
+        'comms.send_email_reply' => ExecuteProposal::class,
+        'comms.send_email_new' => ExecuteProposal::class,
+        'comms.jira_comment' => ExecuteProposal::class,
+        'comms.notion_comment' => ExecuteProposal::class,
+        'comms.calendar_create' => ExecuteProposal::class,
+        'comms.calendar_update' => ExecuteProposal::class,
+        'comms.notion_create_page' => ExecuteProposal::class,
+        'comms.drive_share' => ExecuteProposal::class,
+        'comms.jira_update' => ExecuteProposal::class,
+        'comms.notion_edit' => ExecuteProposal::class,
     ];
 
     public function __construct(private Container $container) {}

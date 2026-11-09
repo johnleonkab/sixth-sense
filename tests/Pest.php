@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -17,6 +18,17 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+pest()->beforeEach(function () {
+    Http::allowStrayRequests([
+        'http://[::1]:5173/*',
+        'http://127.0.0.1:5173/*',
+        'http://localhost:5173/*',
+        'http://[::1]:5175/*',
+        'http://127.0.0.1:5175/*',
+        'http://localhost:5175/*',
+    ]);
+})->in('Feature');
 
 /*
 |--------------------------------------------------------------------------

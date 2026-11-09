@@ -4,6 +4,7 @@ namespace App\Voice;
 
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Comms\Cutover\OpenItem;
 use App\Connectors\Chat\ChatConversation;
 use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
@@ -63,6 +64,7 @@ final readonly class AssistantProfile
     {
         return trim(implode("\n", array_filter([
             $chats ? self::familiarChats($chats->familiar($user)) : '',
+            app(OpenItem::class)->say($user),
             self::workContext($user),
             self::sense($user),
             self::knowledge($user),

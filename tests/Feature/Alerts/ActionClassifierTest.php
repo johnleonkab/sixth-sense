@@ -127,9 +127,9 @@ test('one "sí" sends the reply and books the proposed task, and what is unticke
         'external_id' => 'demo:C01:1001.000400',
         'proposal' => ['summary' => 'Confirmarle que lo revisas.', 'reply' => ['to' => 'thread', 'text' => 'Lo reviso y te confirmo.']],
     ]);
-    $booking = fn () => $this->user->agendaTasks()->create([
-        'inbox_item_id' => $alert->id, 'origin' => 'alert', 'title' => 'Revisar el contrato', 'status' => AgendaTaskStatus::Proposed,
-        'pending_action_id' => app(Actions::class)->propose($this->user, 'calendar.change', 'Reservar «Revisar el contrato» en tu calendario', ['kind' => 'create', 'event' => ['title' => 'Revisar el contrato']])->id,
+    $booking = fn (string $title = 'Revisar el contrato') => $this->user->agendaTasks()->create([
+        'inbox_item_id' => $alert->id, 'origin' => 'alert', 'title' => $title, 'status' => AgendaTaskStatus::Proposed,
+        'pending_action_id' => app(Actions::class)->propose($this->user, 'calendar.change', "Reservar «{$title}» en tu calendario", ['kind' => 'create', 'event' => ['title' => $title]])->id,
     ]);
     $task = $booking();
 
@@ -138,7 +138,7 @@ test('one "sí" sends the reply and books the proposed task, and what is unticke
     expect($task->pendingAction->refresh()->status)->toBe(ActionStatus::Confirmed);
 
     $task->delete();
-    $task = $booking();
+    $task = $booking('Revisar el anexo');
 
     $this->actingAs($this->user)->postJson(route('alerts.reply', $alert), ['exclude' => ['task']])->assertOk()->assertJsonCount(1, 'actions')->assertJsonPath('actions.0.type', 'chat.send');
 

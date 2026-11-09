@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Alerts\AlertFeed;
 use App\Alerts\AlertStatus;
 use App\Alerts\Outcomes\ProposalOutcomes;
+use App\Comms\Cutover\HomeFeed;
 use App\Events\InboxItemUpdated;
 use App\Models\ProposalOutcome;
 use Illuminate\Http\JsonResponse;
@@ -15,9 +16,9 @@ class AlertFeedController extends Controller
     /**
      * Everything that came in lately and where each stands.
      */
-    public function __invoke(Request $request, AlertFeed $feed): JsonResponse
+    public function __invoke(Request $request, HomeFeed $feed): JsonResponse
     {
-        return response()->json(['items' => $feed->for($request->user())]);
+        return response()->json(['items' => $feed->items($request->user())]);
     }
 
     /**

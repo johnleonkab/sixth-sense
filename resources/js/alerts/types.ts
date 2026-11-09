@@ -31,6 +31,8 @@ export type Alert = {
     proposal: { summary: string | null } | null;
     /** What the scheduler did about it, if it asks for work of the person's own. */
     task?: { id: number; status: string; status_label: string; title: string; starts_at: string | null } | null;
+    /** A communications notification shown in place of an old alert. */
+    comms?: boolean;
     /** Meetings only. */
     starts_at: string | null;
     meeting_url: string | null;

@@ -2,6 +2,8 @@
 
 namespace App\Alerts;
 
+use App\Comms\Cutover\CandidateHandoff;
+use App\Comms\Pipeline;
 use App\Jobs\AssignIntent;
 use App\Models\ConnectedAccount;
 use App\Models\InboxItem;
@@ -19,6 +21,8 @@ class AlertInbox
     public function __construct(
         private InboxWatchers $watchers,
         private NoiseFilter $noise,
+        private Pipeline $pipeline,
+        private CandidateHandoff $handoff,
     ) {}
 
     /**
@@ -40,6 +44,13 @@ class AlertInbox
             }
 
             $this->remember($user, $candidate);
+
+            if ($this->pipeline->enabled($candidate->source->value)) {
+                $this->handoff->accept($account, $candidate);
+
+                continue;
+            }
+
             $noise = $this->noise->noise($user, $candidate);
 
             if ($noise !== null) {

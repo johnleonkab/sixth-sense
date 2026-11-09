@@ -22,8 +22,9 @@ class MeetingActions
 
         $pending = $this->actions->propose($action->meeting->user, $action->type, $action->label, $action->payload);
         $action->update(['pending_action_id' => $pending->id, 'dismissed_at' => null]);
+        $action->setRelation('pendingAction', $pending);
 
-        return $action->refresh();
+        return $action;
     }
 
     public function dismiss(WingmanAction $action, bool $dismissed): WingmanAction

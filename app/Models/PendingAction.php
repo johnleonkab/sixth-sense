@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\ActionStatus;
+use App\Models\Comms\CommsProposal;
 use Database\Factories\PendingActionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A change to an external service the assistant proposed. It only happens
  * after the person confirms, once the undo window has closed.
  */
-#[Fillable(['type', 'label', 'payload', 'status', 'expires_at', 'undo_until', 'executed_at', 'result', 'error'])]
+#[Fillable(['type', 'label', 'payload', 'status', 'expires_at', 'undo_until', 'executed_at', 'result', 'error', 'proposal_id'])]
 class PendingAction extends Model
 {
     /** @use HasFactory<PendingActionFactory> */
@@ -42,6 +43,14 @@ class PendingAction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<CommsProposal, $this>
+     */
+    public function proposal(): BelongsTo
+    {
+        return $this->belongsTo(CommsProposal::class, 'proposal_id');
     }
 
     /**

@@ -4,11 +4,10 @@ namespace App\Providers;
 
 use App\Agents\Models\FakeToolModel;
 use App\Ai\AiObservability;
-use App\Ai\DeepSeekTextModel;
-use App\Ai\GeminiTextModel;
 use App\Ai\JobOwner;
 use App\Ai\ProviderKeys;
 use App\Ai\TextModel;
+use App\Ai\TextModelFactory;
 use App\Alerts\Actions\ActionClassifier;
 use App\Alerts\Actions\FakeActionClassifier;
 use App\Alerts\Actions\LlmActionClassifier;
@@ -31,6 +30,13 @@ use App\Alerts\Replies\LlmReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Analytics\PostHogProductAnalytics;
 use App\Analytics\ProductAnalytics;
+use App\Comms\Ingestion\AccountInboundFeed;
+use App\Comms\Ingestion\FakeInboundFeed;
+use App\Comms\Ingestion\InboundFeed;
+use App\Comms\Jobs\Consuming;
+use App\Comms\Models\CompletesTasks;
+use App\Comms\Models\FakeCompleter;
+use App\Comms\Models\TextModelCompleter;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\FakeCalendarReader;
@@ -102,6 +108,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ProviderKeys::class);
+        $this->app->singleton(Consuming::class);
+        $this->app->bind(CompletesTasks::class, $this->app->environment('testing') ? FakeCompleter::class : TextModelCompleter::class);
+        $this->app->bind(InboundFeed::class, fn (): InboundFeed => config('connectors.demo')
+            ? new FakeInboundFeed
+            : $this->app->make(AccountInboundFeed::class));
         $this->app->bind(PushSender::class, WebPushSender::class);
 
         $this->app->bind(CalendarReader::class, fn (): CalendarReader => config('connectors.demo')
@@ -271,34 +282,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function textModel(string $tier, ?int $timeout = null, ?string $model = null, ?string $provider = null): TextModel
     {
-        $provider ??= config('ai.text');
-        $config = config("ai.providers.{$provider}");
-
-        if (! is_array($config)) {
-            throw new InvalidArgumentException("Unsupported text provider [{$provider}].");
-        }
-
-        $options = [
-            'api_key' => app(ProviderKeys::class)->own($provider) ?? $config['api_key'],
-            'base_url' => $config['base_url'],
-            'model' => filled($model) ? $model : ($tier === 'light' ? $config['light_model'] : $config['model']),
-            'fallback_model' => $config['fallback_model'],
-            'timeout' => $timeout ?? $config['timeout'],
-        ];
-
-        if ($provider === 'deepseek') {
-            return new DeepSeekTextModel([
-                ...$options,
-                'max_tokens' => $tier === 'light' ? $config['light_max_tokens'] : $config['max_tokens'],
-                'thinking' => $tier === 'light' ? 'disabled' : $config['thinking'],
-            ], $this->app->make(AiObservability::class));
-        }
-
-        if ($provider === 'gemini') {
-            return new GeminiTextModel([...$options, 'thinking_level' => $config['thinking_level']], $this->app->make(AiObservability::class));
-        }
-
-        throw new InvalidArgumentException("Unsupported text provider [{$provider}].");
+        return $this->app->make(TextModelFactory::class)->make($tier, $timeout, $model, $provider);
     }
 
     /**

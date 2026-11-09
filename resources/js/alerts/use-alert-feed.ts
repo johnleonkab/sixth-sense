@@ -210,7 +210,9 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
             setItems((list) => list.map((item) => (item.id === id ? { ...item, status: 'dismissed', state: 'dismissed', resolution: 'dismissed' } : item)));
 
             try {
-                const { item } = await postJson<{ item: Alert }>(`/alerts/${id}/dismiss`, {});
+                const current = items.find((item) => item.id === id);
+                const url = current?.comms ? `/comms/notifications/${Math.abs(id)}/dismiss` : `/alerts/${id}/dismiss`;
+                const { item } = await postJson<{ item: Alert }>(url, {});
                 take(item, false);
                 setItems((list) => list.map((other) => (other.id === id ? item : other)));
             } catch (error) {
@@ -218,7 +220,7 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
                 void resync();
             }
         },
-        [take, resync],
+        [items, take, resync],
     );
 
     return { items, live, fresh, dismissFresh, dismiss };
