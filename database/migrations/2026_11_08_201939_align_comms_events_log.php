@@ -12,19 +12,45 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::rename('events', 'comms_events');
+        if (Schema::hasTable('events')) {
+            Schema::rename('events', 'comms_events');
+        }
 
-        Schema::table('comms_events', function (Blueprint $table) {
+        Schema::whenTableDoesntHaveColumn('comms_events', 'revision', function (Blueprint $table) {
             $table->string('revision', 64)->default('');
-            $table->boolean('sensitive')->default(false);
-            $table->timestamp('processed_at')->nullable();
+        });
 
+        Schema::whenTableDoesntHaveColumn('comms_events', 'sensitive', function (Blueprint $table) {
+            $table->boolean('sensitive')->default(false);
+        });
+
+        Schema::whenTableDoesntHaveColumn('comms_events', 'processed_at', function (Blueprint $table) {
+            $table->timestamp('processed_at')->nullable();
+        });
+
+        // utf8mb4 indexes stop at 3072 bytes. source, type and external_id at
+        // varchar(255), plus revision, exceed that. source and type are short codes.
+        Schema::table('comms_events', function (Blueprint $table) {
+            $table->string('source', 32)->nullable(false)->change();
+            $table->string('type', 64)->nullable(false)->change();
+        });
+
+        Schema::whenTableHasIndex('comms_events', 'events_dedupe_unique', function (Blueprint $table) {
             $table->dropUnique('events_dedupe_unique');
+        });
+
+        Schema::whenTableDoesntHaveIndex('comms_events', 'comms_events_dedupe_unique', function (Blueprint $table) {
             $table->unique(
                 ['user_id', 'source', 'type', 'external_id', 'revision'],
                 'comms_events_dedupe_unique',
             );
+        });
+
+        Schema::whenTableDoesntHaveIndex('comms_events', ['user_id', 'processed_at'], function (Blueprint $table) {
             $table->index(['user_id', 'processed_at']);
+        });
+
+        Schema::whenTableDoesntHaveIndex('comms_events', ['user_id', 'type', 'occurred_at'], function (Blueprint $table) {
             $table->index(['user_id', 'type', 'occurred_at']);
         });
 
@@ -111,6 +137,8 @@ return new class extends Migration
             $table->dropIndex(['user_id', 'processed_at']);
             $table->dropIndex(['user_id', 'type', 'occurred_at']);
             $table->dropColumn(['revision', 'sensitive', 'processed_at']);
+            $table->string('source')->nullable(false)->change();
+            $table->string('type')->nullable(false)->change();
             $table->unique(['user_id', 'source', 'type', 'external_id'], 'events_dedupe_unique');
         });
 
