@@ -3,6 +3,9 @@
 namespace App\Connectors\Slack;
 
 use App\Alerts\Intents\SlackPreference;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Connections\Capability;
 use App\Connectors\Chat\ChatMessage;
 use App\Models\SlackAttentionProfile;
@@ -54,6 +57,15 @@ class SlackAttention
             'built_at' => now(),
         ]);
         $this->preferences->rewrite($user);
+        app(ContextWriter::class)->record($user, FactOrigin::Observed, [[
+            'op' => 'set',
+            'kind' => 'channel',
+            'subject' => 'slack',
+            'attribute' => 'profile',
+            'value' => ['text' => $body],
+            'audiences' => [Audience::Triage->value],
+            'origin' => 'observed',
+        ]]);
 
         return $user->slackAttentionProfile()->first();
     }

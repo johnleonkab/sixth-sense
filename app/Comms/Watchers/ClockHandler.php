@@ -2,6 +2,7 @@
 
 namespace App\Comms\Watchers;
 
+use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventType;
 use App\Comms\Gate\ProposalExpiry;
 use App\Comms\Intents\ImportanceCalculator;
@@ -28,6 +29,7 @@ class ClockHandler
         private Notifier $notifier,
         private ProposalExpiry $expiry,
         private Briefing $briefing,
+        private ContextProjector $context,
     ) {}
 
     public function apply(CommsEvent $event): void
@@ -143,6 +145,7 @@ class ClockHandler
             ->update(['delivered_at' => $event->occurred_at]);
 
         $this->expiry->expire($event->user);
+        $this->context->expire($event->user, CarbonImmutable::parse($event->occurred_at));
     }
 
     private function question(CommsWatcher $watcher, CommsEvent $event): CommsQuestion

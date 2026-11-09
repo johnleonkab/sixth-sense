@@ -6,6 +6,8 @@ use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Triage;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Knowledge\KnowledgeSync;
@@ -69,6 +71,15 @@ class GapQuestions
     public function answer(KnowledgeGap $gap, string $answer): void
     {
         $gap->update(['status' => GapStatus::Answered, 'answer' => trim($answer), 'answered_at' => now()]);
+        app(ContextWriter::class)->record($gap->user, FactOrigin::User, [[
+            'op' => 'set',
+            'kind' => 'term',
+            'subject' => 'term:'.$gap->subject_key,
+            'attribute' => 'meaning',
+            'value' => ['text' => trim($answer)],
+            'audiences' => [],
+            'origin' => 'user',
+        ]]);
         $this->close($gap, AlertStatus::Resolved, 'answered');
         $this->sync->syncMemory($gap->user);
 

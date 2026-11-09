@@ -2,13 +2,17 @@
 
 namespace App\Comms\Context;
 
+use App\Models\Comms\CommsContextFact;
+use App\Models\Comms\CommsContextUse;
 use App\Models\Comms\CommsDocument;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsSearch;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 /**
  * The only read API a playbook uses. Every item carries a ref.
@@ -78,7 +82,9 @@ class ContextEngine
             ->when($kinds !== [], fn ($query) => $query->whereIn('kind', $kinds))
             ->orderByDesc('updated_at')
             ->limit(30)
-            ->get();
+            ->get()
+            ->concat($this->knowledge($user, $kinds))
+            ->take(30);
         $ranked = [];
 
         foreach ($documents as $document) {
@@ -113,5 +119,118 @@ class ContextEngine
             fn (array $row): array => ['document' => $row['document'], 'similarity' => $row['similarity']],
             array_slice($ranked, 0, $limit),
         );
+    }
+
+    /**
+     * Everything this audience may read: stored facts, then the lessons,
+     * digest and Slack profile that have not been imported yet.
+     */
+    public function pack(User $user, ContextRequest $request): ContextPack
+    {
+        $facts = CommsContextFact::query()
+            ->whereBelongsTo($user)
+            ->where('status', 'active')
+            ->where('sensitive', false)
+            ->orderByDesc('confirmed_at')
+            ->limit(80)
+            ->get()
+            ->filter(fn (CommsContextFact $fact): bool => $this->visible($fact, $request->audience));
+
+        $rules = [];
+        $seen = [];
+        $ids = [];
+        $summary = '';
+        $attention = (string) ($user->slackAttentionProfile?->body ?? '');
+
+        foreach ($facts as $fact) {
+            $ids[] = $fact->id;
+            $text = $fact->text();
+
+            if ($fact->attribute === 'summary' && $summary === '') {
+                $summary = $text;
+            }
+
+            if ($fact->attribute === 'rule' && $text !== '' && ! isset($seen[$text])) {
+                $seen[$text] = true;
+                $rules[] = ['ref' => 'fact:'.$fact->id, 'text' => $text, 'id' => $fact->id];
+            }
+        }
+
+        $layer = $request->audience->lessonLayer();
+        $lessons = $user->intentLessons()
+            ->when($layer !== null, fn ($query) => $query->where(fn ($inner) => $inner->whereNull('layer')->orWhere('layer', $layer)))
+            ->where(fn ($query) => $query->where('last_used_at', '>=', now()->subDays(60))
+                ->orWhere(fn ($fresh) => $fresh->whereNull('last_used_at')->where('created_at', '>=', now()->subDays(60))))
+            ->latest('id')
+            ->limit(8)
+            ->get();
+
+        foreach ($lessons as $lesson) {
+            if (isset($seen[$lesson->body])) {
+                continue;
+            }
+
+            if ($request->about !== null && $lesson->about !== null && ! str_contains(Str::lower($lesson->about), Str::lower((string) strtok($request->about, ' <')))) {
+                continue;
+            }
+
+            $seen[$lesson->body] = true;
+            $rules[] = ['ref' => 'lesson:'.$lesson->id, 'text' => $lesson->body, 'id' => null];
+        }
+
+        if ($summary === '' && $user->workContext?->usable()) {
+            $summary = (string) $user->workContext->summary;
+        }
+
+        if ($ids !== []) {
+            CommsContextFact::query()->whereKey($ids)->incrementEach(['uses' => 1], ['last_used_at' => now()]);
+            foreach ($ids as $id) {
+                CommsContextUse::query()->create([
+                    'fact_id' => $id,
+                    'audience' => $request->audience->value,
+                    'model_call_ref' => $request->callRef,
+                ]);
+            }
+        }
+
+        return new ContextPack($request->audience, $summary, $attention, array_slice($rules, 0, 8), $ids);
+    }
+
+    private function visible(CommsContextFact $fact, Audience $audience): bool
+    {
+        $audiences = $fact->audiences ?? [];
+
+        return $audiences === [] || in_array($audience->value, $audiences, true);
+    }
+
+    /**
+     * @param  list<string>  $kinds
+     * @return list<CommsDocument>
+     */
+    private function knowledge(User $user, array $kinds): array
+    {
+        return KnowledgeDocument::query()
+            ->whereBelongsTo($user)
+            ->orderByDesc('updated_at')
+            ->limit(30)
+            ->get()
+            ->map(function (KnowledgeDocument $document) use ($user): CommsDocument {
+                $copy = new CommsDocument([
+                    'user_id' => $user->id,
+                    'ref' => $document->source->value.':'.$document->ref,
+                    'kind' => $document->source->value,
+                    'title' => $document->title,
+                    'body' => trim((string) $document->summary.' '.(string) $document->terms),
+                    'topic' => $document->topic,
+                ]);
+                $copy->updated_at = $document->updated_at;
+
+                return $copy;
+            })
+            ->when($kinds !== [], fn ($documents) => $documents->filter(
+                fn (CommsDocument $document): bool => in_array($document->kind, $kinds, true),
+            ))
+            ->values()
+            ->all();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Comms\Events;
 
+use App\Models\Comms\CommsContextFact;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIdentity;
@@ -25,6 +26,7 @@ class Projections
 {
     public function clear(User $user): void
     {
+        CommsContextFact::query()->whereBelongsTo($user)->delete();
         CommsNotification::query()->whereBelongsTo($user)->delete();
         CommsQuestion::query()->whereBelongsTo($user)->delete();
         CommsWatcher::query()->whereBelongsTo($user)->delete();

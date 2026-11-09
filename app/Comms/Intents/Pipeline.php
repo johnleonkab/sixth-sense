@@ -3,6 +3,7 @@
 namespace App\Comms\Intents;
 
 use App\Comms\Calendar\CalendarBoard;
+use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Models\ModelAnswerKind;
@@ -43,6 +44,7 @@ class Pipeline
         private Runs $runs,
         private TranscriptActions $transcripts,
         private CloseTheLoop $close,
+        private ContextProjector $context,
     ) {}
 
     public function advance(CommsEvent $event): void
@@ -50,6 +52,7 @@ class Pipeline
         match ($event->type) {
             EventType::MessageReceived, EventType::MessageSent => $this->onMessage($event),
             EventType::UserConfigured => $this->archive->apply($event),
+            EventType::ContextCorrected, EventType::ContextObserved, EventType::ContextInferred => $this->context->apply($event),
             EventType::UserCorrected => $this->machine->correct($event),
             EventType::ClockDue, EventType::ClockStale, EventType::ClockDigest, EventType::ClockLookahead => $this->clock->apply($event),
             EventType::SourceChanged => $this->onSource($event),

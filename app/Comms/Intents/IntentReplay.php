@@ -2,6 +2,7 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventType;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\CloseTheLoop;
@@ -27,6 +28,7 @@ class IntentReplay
         private PlaybookRunner $playbooks,
         private Runs $runs,
         private CloseTheLoop $close,
+        private ContextProjector $context,
     ) {}
 
     public function apply(CommsEvent $event): void
@@ -35,6 +37,7 @@ class IntentReplay
             EventType::MessageFlagged => $this->flag($event),
             EventType::StateApplied => $this->applied($event),
             EventType::UserConfigured => $this->archive->apply($event),
+            EventType::ContextCorrected, EventType::ContextObserved, EventType::ContextInferred => $this->context->apply($event),
             EventType::UserCorrected => $this->machine->correct($event),
             EventType::ClockDue, EventType::ClockStale, EventType::ClockDigest, EventType::ClockLookahead => $this->clock->apply($event),
             EventType::SourceChanged => $this->sourced($event),

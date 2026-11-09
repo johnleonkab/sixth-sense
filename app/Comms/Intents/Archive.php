@@ -2,6 +2,7 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -18,7 +19,7 @@ use Illuminate\Support\Str;
  */
 class Archive
 {
-    public function __construct(private EventLog $log, private PersonRef $people) {}
+    public function __construct(private EventLog $log, private PersonRef $people, private ContextProjector $context) {}
 
     /**
      * @param  array<string, mixed>  $normalized
@@ -45,6 +46,7 @@ class Archive
         }
 
         $data = $event->normalized ?? [];
+        $this->context->apply($event);
 
         match ($data['kind'] ?? '') {
             'person' => $this->person($event->user, $data),

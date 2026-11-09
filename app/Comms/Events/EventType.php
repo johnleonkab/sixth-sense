@@ -18,6 +18,9 @@ enum EventType: string
     case PersonIdentified = 'person.identified';
     case StateApplied = 'state.applied';
     case UserConfigured = 'user.configured';
+    case ContextCorrected = 'context.corrected';
+    case ContextObserved = 'context.observed';
+    case ContextInferred = 'context.inferred';
     case SourceChanged = 'source.changed';
     case ModelDecided = 'model.decided';
     case ClockDue = 'clock.due';

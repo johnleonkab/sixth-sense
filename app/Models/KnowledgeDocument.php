@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * service. It keeps no text: the title, the link, the distinct words, and a
  * short summary only while it is among the most used.
  */
-#[Fillable(['source', 'ref', 'title', 'url', 'version', 'source_updated_at', 'terms', 'summary', 'summarized_version', 'views', 'last_viewed_at', 'indexed_at', 'seen_at'])]
+#[Fillable(['source', 'ref', 'title', 'url', 'version', 'source_updated_at', 'terms', 'summary', 'summarized_version', 'views', 'last_viewed_at', 'indexed_at', 'seen_at', 'topic'])]
 class KnowledgeDocument extends Model
 {
     /** @use HasFactory<KnowledgeDocumentFactory> */

@@ -2,6 +2,11 @@
 
 namespace App\Alerts\Lessons;
 
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
+use App\Comms\Context\ContextWriter;
 use App\Models\IntentLesson;
 use App\Models\ProposalOutcome;
 use App\Models\User;
@@ -33,7 +38,7 @@ class Lessons
             $user->intentLessons()->where('layer', $layer)->where('about', $about)->where('topic', $topic)->delete();
         }
 
-        return $user->intentLessons()->create([
+        $lesson = $user->intentLessons()->create([
             'inbox_item_id' => $alertId ?? $outcome?->inbox_item_id,
             'proposal_outcome_id' => $outcome?->id,
             'layer' => $layer,
@@ -41,6 +46,10 @@ class Lessons
             'topic' => $topic,
             'body' => Str::limit($body, 240),
         ]);
+
+        app(ContextWriter::class)->rule($user, $lesson->body, $layer, $lesson->about, $topic);
+
+        return $lesson;
     }
 
     /**
@@ -74,8 +83,13 @@ class Lessons
      */
     public function render(User $user, string $layer, ?string $about = null): string
     {
-        $lessons = $this->for($user, $layer, $about)->pluck('body');
+        $this->for($user, $layer, $about);
 
-        return $lessons->isEmpty() ? '' : "\nAprendido de avisos anteriores (datos):\n- ".$lessons->implode("\n- ");
+        return app(ContextRenderer::class)->rules(
+            app(ContextEngine::class)->pack($user, new ContextRequest(
+                audience: Audience::fromLayer($layer),
+                about: $about,
+            )),
+        );
     }
 }

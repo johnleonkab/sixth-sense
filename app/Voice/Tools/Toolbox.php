@@ -24,6 +24,8 @@ use App\Voice\Tools\Calendar\ProposeEventSummary;
 use App\Voice\Tools\Calendar\ProposeEventUpdate;
 use App\Voice\Tools\Calendar\ProposeNewEvent;
 use App\Voice\Tools\Calendar\ShowCalendar;
+use App\Voice\Tools\Context\RememberFact;
+use App\Voice\Tools\Context\WhatDoYouKnow;
 use App\Voice\Tools\Docs\FindFiles;
 use App\Voice\Tools\Docs\OpenDocument;
 use App\Voice\Tools\Docs\ProposeCommentReply;
@@ -125,6 +127,8 @@ class Toolbox
         ShowSlackDigest::class,
         CorrectSlackTriage::class,
         AnswerSlackAttention::class,
+        WhatDoYouKnow::class,
+        RememberFact::class,
         ShowSlackAutonomy::class,
         ProposeSlackAutonomy::class,
         LowerSlackAutonomy::class,

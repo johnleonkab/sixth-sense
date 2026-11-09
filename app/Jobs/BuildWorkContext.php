@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Models\User;
 use App\Models\WorkContext;
 use App\Sense\PublishContext;
@@ -77,6 +79,18 @@ class BuildWorkContext implements ShouldBeUnique, ShouldQueue
             $archive->publish($this->user, $digest);
         } catch (Throwable $exception) {
             report($exception);
+        }
+
+        if ($digest->summary !== '') {
+            app(ContextWriter::class)->record($this->user, FactOrigin::Inferred, [[
+                'op' => 'set',
+                'kind' => 'summary',
+                'subject' => 'user',
+                'attribute' => 'summary',
+                'value' => ['text' => $digest->summary],
+                'audiences' => [],
+                'origin' => 'inferred',
+            ]]);
         }
     }
 

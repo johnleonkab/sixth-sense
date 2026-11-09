@@ -153,6 +153,9 @@ Route::middleware('auth')->group(function () {
         Route::post('context/build', [WorkContextController::class, 'build'])
             ->middleware('throttle:5,10')
             ->name('context.build');
+        Route::post('context/facts/{fact}/reject', [WorkContextController::class, 'reject'])
+            ->whereNumber('fact')
+            ->name('context.facts.reject');
         Route::redirect('archive', '/settings/archive/agents')->name('archive.index');
         Route::get('archive/agents', [ArchiveAgentController::class, 'index'])->name('archive.agents.index');
         Route::post('archive/agents/sync', [ArchiveAgentController::class, 'sync'])->name('archive.agents.sync');

@@ -4,6 +4,7 @@ namespace App\Voice;
 
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
+use App\Comms\Context\ContextRenderer;
 use App\Comms\Cutover\OpenItem;
 use App\Connectors\Chat\ChatConversation;
 use App\Connectors\Chat\ChatPerson;
@@ -14,7 +15,6 @@ use App\Knowledge\Gaps\GapStatus;
 use App\Models\KnowledgeGap;
 use App\Models\User;
 use App\Voice\Tools\Toolbox;
-use App\WorkContext\WorkDigest;
 use Carbon\CarbonImmutable;
 
 /**
@@ -152,13 +152,7 @@ final readonly class AssistantProfile
      */
     private static function workContext(User $user): string
     {
-        $context = $user->workContext;
-
-        if ($context === null || ! $context->usable()) {
-            return '';
-        }
-
-        return WorkDigest::fromArray($context->digest ?? ['summary' => $context->summary])->forAssistant($context->generated_at);
+        return app(ContextRenderer::class)->forVoice($user);
     }
 
     /**

@@ -306,7 +306,19 @@ function Digest({ digest, usable }: { digest: NonNullable<WorkContext['digest']>
     );
 }
 
-export default function Context({ context, run_at: runAt, knowledge }: { context: WorkContext; run_at: string; knowledge: KnowledgeSource[] }) {
+type ContextFact = { id: number; text: string; origin: string; status: string; subject: string };
+
+export default function Context({
+    context,
+    run_at: runAt,
+    knowledge,
+    facts = [],
+}: {
+    context: WorkContext;
+    run_at: string;
+    knowledge: KnowledgeSource[];
+    facts?: ContextFact[];
+}) {
     const building = context.status === 'running';
     const { start, stop } = usePoll(3000, { only: ['context'] }, { autoStart: false });
 
@@ -345,6 +357,40 @@ export default function Context({ context, run_at: runAt, knowledge }: { context
                     </header>
 
                     <Status context={context} runAt={runAt} />
+                </section>
+
+                <section aria-labelledby="context-facts" className="rounded-2xl border border-line bg-surface px-[22px] py-[18px]">
+                    <h2 id="context-facts" className="text-[15px] font-medium tracking-[-0.01em]">
+                        Lo que sé
+                    </h2>
+                    <p className="mt-0.5 max-w-[480px] text-[13px] text-muted">
+                        Personas, horario, reglas y lo que se ha deducido. Lo que dices tú gana. Borrar algo hace que no vuelva.
+                    </p>
+                    {facts.length === 0 ? (
+                        <p className="mt-4 text-[13px] text-muted">Todavía no hay nada guardado aquí.</p>
+                    ) : (
+                        <ul className="mt-4 divide-y divide-line">
+                            {facts.map((fact) => (
+                                <li key={fact.id} className="flex items-start gap-3 py-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[14px]">{fact.text}</p>
+                                        <p className="mt-0.5 text-[12px] text-muted">
+                                            {fact.subject} · {fact.origin} · {fact.status}
+                                        </p>
+                                    </div>
+                                    {fact.status === 'active' && (
+                                        <button
+                                            type="button"
+                                            className="text-[13px] text-muted"
+                                            onClick={() => router.post(`/settings/context/facts/${fact.id}/reject`, {}, { preserveScroll: true })}
+                                        >
+                                            Borrar
+                                        </button>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </section>
 
                 <Knowledge sources={knowledge} />

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Http\Controllers\Controller;
 use App\Jobs\BuildWorkContext;
 use App\Knowledge\KnowledgeBase;
+use App\Models\Comms\CommsContextFact;
 use App\Models\WorkContext;
 use App\Services\PostHogService;
 use App\WorkContext\WorkContextStatus;
@@ -45,7 +48,36 @@ class WorkContextController extends Controller
             ],
             'run_at' => config('work_context.run_at'),
             'knowledge' => $knowledge->status($request->user()),
+            'facts' => CommsContextFact::query()
+                ->whereBelongsTo($request->user())
+                ->whereIn('status', ['active', 'proposed'])
+                ->latest('id')
+                ->limit(40)
+                ->get()
+                ->map(fn (CommsContextFact $fact): array => [
+                    'id' => $fact->id,
+                    'text' => $fact->text() !== '' ? $fact->text() : $fact->attribute,
+                    'origin' => $fact->origin->value,
+                    'status' => $fact->status,
+                    'subject' => $fact->subject,
+                ])->all(),
         ]);
+    }
+
+    public function reject(Request $request, ContextWriter $context, CommsContextFact $fact): RedirectResponse
+    {
+        abort_unless($fact->user_id === $request->user()->id, 404);
+
+        $context->record($request->user(), FactOrigin::User, [[
+            'op' => 'reject',
+            'kind' => $fact->kind,
+            'subject' => $fact->subject,
+            'attribute' => $fact->attribute,
+            'value' => $fact->value,
+            'origin' => 'user',
+        ]]);
+
+        return back();
     }
 
     /**

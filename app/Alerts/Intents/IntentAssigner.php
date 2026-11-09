@@ -7,6 +7,10 @@ use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
 use App\Alerts\Lessons\Lessons;
 use App\Alerts\Triage;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\PlanAlertReply;
@@ -126,26 +130,14 @@ class IntentAssigner
 
     private function context(User $user): string
     {
-        $parts = [];
-        $work = $user->workContext;
+        app(Lessons::class)->for($user, 'triage');
 
-        if ($work !== null && $work->usable()) {
-            $parts[] = $work->summary;
-        }
-
-        $attention = $user->slackAttentionProfile;
-
-        if ($attention !== null && filled($attention->body)) {
-            $parts[] = "Política de atención en Slack, aprendida de cómo ha respondido:\n".$attention->body;
-        }
-
-        $lessons = app(Lessons::class)->for($user, 'triage')->pluck('body');
-
-        if ($lessons->isNotEmpty()) {
-            $parts[] = "Aprendido al resolver avisos anteriores:\n".$lessons->implode("\n");
-        }
-
-        return implode("\n\n", $parts);
+        return app(ContextRenderer::class)->triage(
+            $user,
+            app(ContextEngine::class)->pack($user, new ContextRequest(
+                audience: Audience::Triage,
+            )),
+        );
     }
 
     /**

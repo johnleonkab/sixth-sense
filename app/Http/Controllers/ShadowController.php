@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Actions\ActionStatus;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Comms\Cutover\HomeFeed;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
@@ -121,7 +124,7 @@ class ShadowController extends Controller
         return response()->json(['item' => $feed->card($notification)]);
     }
 
-    public function feedback(Request $request, EventLog $log, CommsNotification $notification): RedirectResponse
+    public function feedback(Request $request, EventLog $log, ContextWriter $context, CommsNotification $notification): RedirectResponse
     {
         abort_unless($notification->user_id === $request->user()?->id, 404);
 
@@ -144,6 +147,16 @@ class ShadowController extends Controller
             occurredAt: now(),
             revision: (string) Str::uuid(),
         );
+
+        $context->record($request->user(), FactOrigin::Correction, [[
+            'op' => 'add',
+            'kind' => 'rule',
+            'subject' => 'notification:'.$notification->id,
+            'attribute' => 'rule',
+            'value' => ['text' => $feedback],
+            'audiences' => [Audience::Importance->value],
+            'origin' => FactOrigin::Correction->value,
+        ]]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Anotado.']);
 
