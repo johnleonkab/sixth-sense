@@ -35,6 +35,29 @@ test('a fact the person stated wins over one the model guessed', function () {
         ->and(CommsContextFact::query()->where('status', 'proposed')->sole()->text())->toBe('boss');
 });
 
+test('a full name brings that person first, not everyone with the same first name', function () {
+    $user = User::factory()->create();
+    $writer = app(ContextWriter::class);
+    $note = fn (string $subject, string $text): array => [[
+        'op' => 'set',
+        'kind' => 'person',
+        'subject' => $subject,
+        'attribute' => 'note',
+        'value' => ['text' => $text, 'name' => Str::headline(Str::after($subject, 'person:'))],
+        'audiences' => [],
+    ]];
+
+    $writer->record($user, FactOrigin::Inferred, $note('person:marta-prueba', 'Prueba de sixth-sense.'));
+    $this->travel(1)->minute();
+    $writer->record($user, FactOrigin::Inferred, $note('person:marta-bellido', 'Colega del equipo.'));
+
+    $engine = app(ContextEngine::class);
+
+    expect($engine->pack($user, new ContextRequest(Audience::Match, about: 'Marta Prueba'))->facts[0]['subject'])->toBe('person:marta-prueba')
+        ->and($engine->pack($user, new ContextRequest(Audience::Match, about: 'Marta Prueba <marta@example.com>'))->facts[0]['subject'])->toBe('person:marta-prueba')
+        ->and($engine->pack($user, new ContextRequest(Audience::Match, about: 'Marta'))->facts[0]['subject'])->toStartWith('person:marta-');
+});
+
 test('a rejected fact is not brought back by a later guess', function () {
     $user = User::factory()->create();
     $writer = app(ContextWriter::class);

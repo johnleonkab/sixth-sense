@@ -40,13 +40,23 @@ class ContextEngine
     public function pack(User $user, ContextRequest $request): ContextPack
     {
         $audience = $request->audience;
-        $about = $request->about !== null ? Str::lower((string) strtok(trim($request->about), ' <')) : null;
+        $about = Str::slug(trim((string) strtok(trim((string) $request->about), '<')));
         $subjects = array_map(fn (string $subject): string => Str::lower($subject), $request->subjects);
         $first = function (CommsContextFact $fact) use ($subjects, $about): bool {
             $subject = Str::lower($fact->subject);
 
-            return in_array($subject, $subjects, true)
-                || ($about !== null && $about !== '' && str_starts_with($subject, 'person:') && str_contains($subject, $about));
+            if (in_array($subject, $subjects, true)) {
+                return true;
+            }
+
+            if ($about === '' || ! str_starts_with($subject, 'person:')) {
+                return false;
+            }
+
+            // A full name is one person. A first name alone may be any of them.
+            return str_contains($about, '-')
+                ? $subject === 'person:'.$about
+                : in_array($about, explode('-', Str::after($subject, 'person:')), true);
         };
 
         $facts = $this->active($user)
