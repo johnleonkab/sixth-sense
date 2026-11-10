@@ -3,6 +3,7 @@ import AlertReview from '@/canvas/alerts/alert-review';
 import AgendaTask from '@/canvas/agenda/agenda-task';
 import AlertsHistory from '@/canvas/alerts/alerts-history';
 import AlertsList from '@/canvas/alerts/alerts-list';
+import CommsReview from '@/canvas/alerts/comms-review';
 import CalendarAgenda from '@/canvas/calendar/calendar-agenda';
 import CalendarChange from '@/canvas/calendar/calendar-change';
 import CalendarDay from '@/canvas/calendar/calendar-day';
@@ -74,6 +75,7 @@ const canvases: Record<string, CanvasComponent<any>> = {
     'image.viewer': ImageViewer,
     'alerts.list': AlertsList,
     'alerts.review': AlertReview,
+    'comms.review': CommsReview,
     'agents.run': AgentRun,
     'alerts.history': AlertsHistory,
     'agenda.task': AgendaTask,

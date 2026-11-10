@@ -67,6 +67,7 @@ class MatchStage
             "Hoy es {$today} ({$timezone}). La persona usuaria es ".($self->display_name ?? 'la usuaria').'.',
             'Un mensaje puede llevar varias operaciones.',
             "En requesters, responders y possible_responders van ids de persona, nunca nombres: «{$authorKey}» es quien escribe el mensaje, «self» es la persona usuaria, y los demás ids salen de people: en los candidatos. Si no tienes el id de alguien, no lo pongas.",
+            'En kind va uno de estos, o null: question si le preguntan algo que se responde con información; review_comment si es un comentario en una revisión que espera respuesta; choice si tiene que elegir entre opciones; prepare si le piden hacer o preparar un trabajo (revisar un PR, escribir un documento, preparar una presentación).',
             $this->context->block($user, new ContextRequest(Audience::Match, about: $author?->display_name)),
             '<source id="evt:'.$event->id.'" kind="'.$kind.'" author="'.$authorKey.'">',
             $message->text,

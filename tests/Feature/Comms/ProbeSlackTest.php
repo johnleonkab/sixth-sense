@@ -8,10 +8,13 @@ use App\Comms\Messages\Party;
 use App\Comms\Models\CompletesTasks;
 use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
+use App\Comms\Playbooks\Steps\Propose;
 use App\Connections\Provider;
 use App\Events\CommsNotificationDelivered;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
+use App\Models\Comms\CommsMessage;
+use App\Models\Comms\CommsNotification;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -149,4 +152,45 @@ test('without a text or a message to send again it says what to pass', function 
     $this->artisan('comms:probe-slack', ['user' => $user->id])
         ->expectsOutputToContain('pass a text, --rerun=N or --event=ID')
         ->assertFailed();
+});
+
+test('opening a comms alert shows the ask, its messages and the proposal waiting for a yes', function () {
+    $user = probeUser();
+    $models = probeScript([
+        ['label' => 'possible_intent', 'urgent' => true, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [[
+            'op' => 'open',
+            'what' => 'Revisar el PR de pagos',
+            'quote' => '¿Me revisas el PR de pagos?',
+            'confidence' => 0.9,
+            'requesters' => ['slack:probe-marta-prueba'],
+            'responders' => ['self'],
+        ]], 'confidence' => 0.9],
+    ]);
+    $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => '¿Me revisas el PR de pagos?', '--from' => 'Marta Prueba', '--wait' => 1])->assertSuccessful();
+
+    $intent = CommsIntent::query()->sole();
+    $message = CommsMessage::query()->sole();
+    $proposal = app(Propose::class)->submit($user, $intent, $message, 'Lo miro esta tarde.', []);
+    $notification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'intent')->firstOrFail();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('voice.tools.run', 'review_alert'), ['arguments' => ['alert_id' => -$notification->id], 'timezone' => 'Europe/Madrid'])
+        ->assertOk()
+        ->assertJsonPath('canvas.view', 'comms.review')
+        ->assertJsonPath('canvas.props.what', 'Revisar el PR de pagos')
+        ->assertJsonPath('canvas.props.requester', 'Marta Prueba')
+        ->assertJsonPath('canvas.props.messages.0.text', '¿Me revisas el PR de pagos?')
+        ->assertJsonPath('canvas.props.proposal.id', $proposal->id)
+        ->assertJsonPath('canvas.props.proposal.text', 'Lo miro esta tarde.')
+        ->assertJsonPath('output.proposal.text', 'Lo miro esta tarde.');
+
+    expect($response->json('canvas.props.alert.why'))->toBe('Urgente. Te lo pide Marta Prueba.')
+        ->and($response->json('output.note'))->toContain('propuesta')
+        ->and($notification->fresh()->seen_at)->not->toBeNull()
+        ->and($models->calls[1]['input'])->toContain('prepare si le piden hacer o preparar un trabajo');
+
+    $this->actingAs($user)->postJson(route('comms.proposals.edit', $proposal), ['text' => 'Lo miro a las 16h.'])
+        ->assertOk()
+        ->assertJson(['ok' => true]);
 });

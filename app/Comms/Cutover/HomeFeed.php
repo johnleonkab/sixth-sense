@@ -10,6 +10,7 @@ use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
 /**
@@ -84,7 +85,7 @@ class HomeFeed
             'source_label' => AlertSource::from($source)->label(),
             'actor_name' => $requester ?? 'sixth-sense',
             'title' => Str::limit($text, 120, ''),
-            'why' => $notification->urgency === 'now' ? 'Te lo digo ahora.' : 'Para el resumen.',
+            'why' => $this->why($notification, $intent, $requester),
             'received_at' => $received,
             'external_id' => 'comms:'.$notification->id,
             'external_url' => null,
@@ -113,6 +114,31 @@ class HomeFeed
             'task' => null,
             'comms' => true,
         ];
+    }
+
+    /**
+     * Why it is on the list, in a line: who asks, by when, and whether it is urgent.
+     */
+    private function why(CommsNotification $notification, ?CommsIntent $intent, ?string $requester): string
+    {
+        if ($intent === null) {
+            return match ($notification->kind) {
+                'question' => 'Necesito que me lo confirmes.',
+                'proposal' => 'Tengo una propuesta lista para enviar.',
+                'batch' => 'Llevan días sin moverse.',
+                default => $notification->urgency === 'now' ? 'Quiere tu atención.' : 'Para el resumen.',
+            };
+        }
+
+        $parts = [$requester !== null ? "Te lo pide {$requester}" : 'Espera tu respuesta'];
+
+        if ($intent->deadline !== null) {
+            $parts[] = 'para el '.CarbonImmutable::parse($intent->deadline)->locale('es')->isoFormat('dddd D [de] MMMM');
+        }
+
+        $line = implode(', ', $parts).'.';
+
+        return ($intent->flags['urgent'] ?? false) === true ? 'Urgente. '.$line : $line;
     }
 
     /**

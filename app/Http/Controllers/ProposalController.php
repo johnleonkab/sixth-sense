@@ -34,7 +34,7 @@ class ProposalController extends Controller
         return $request->wantsJson() ? response()->json(['ok' => true]) : back();
     }
 
-    public function edit(Request $request, Gate $gate, CommsProposal $proposal): RedirectResponse
+    public function edit(Request $request, Gate $gate, CommsProposal $proposal): RedirectResponse|JsonResponse
     {
         $this->owned($request, $proposal);
 
@@ -46,7 +46,7 @@ class ProposalController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Texto cambiado.']);
 
-        return back();
+        return $request->wantsJson() ? response()->json(['ok' => true]) : back();
     }
 
     public function undo(Request $request, Gate $gate, CommsProposal $proposal): RedirectResponse|JsonResponse
