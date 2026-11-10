@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'display_size', 'voice', 'wingman_enabled', 'wingman_settings', 'wingman_token_hash', 'wingman_token_used_at'])]
+#[Fillable(['name', 'email', 'google_id', 'password', 'display_size', 'voice', 'wingman_enabled', 'wingman_settings', 'wingman_token_hash', 'wingman_token_used_at'])]
 #[Hidden(['password', 'remember_token', 'wingman_token_hash', 'gemini_api_key', 'deepseek_api_key'])]
 class User extends Authenticatable
 {

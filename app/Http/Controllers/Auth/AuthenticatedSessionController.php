@@ -20,6 +20,7 @@ class AuthenticatedSessionController extends Controller
     {
         return Inertia::render('auth/login', [
             'canRegister' => (bool) config('auth.registration'),
+            'google' => filled(config('services.google.client_id')) && filled(config('services.google.client_secret')),
         ]);
     }
 

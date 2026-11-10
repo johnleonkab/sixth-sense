@@ -6,7 +6,7 @@ const inputClass =
     'w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] text-ink placeholder:text-faint ' +
     'transition-colors outline-none focus:border-accent aria-invalid:border-crit';
 
-export default function Login({ canRegister = false }: { canRegister?: boolean }) {
+export default function Login({ canRegister = false, google = false }: { canRegister?: boolean; google?: boolean }) {
     return (
         <>
             <Head title="Entrar" />
@@ -26,6 +26,19 @@ export default function Login({ canRegister = false }: { canRegister?: boolean }
                     >
                         {({ errors, processing }) => (
                             <div className="flex flex-col gap-5">
+                                {google && (
+                                    <>
+                                        <a
+                                            href="/auth/google"
+                                            className="rounded-[10px] border border-line bg-bg px-4 py-2.5 text-center font-medium transition-colors hover:bg-soft"
+                                        >
+                                            Continuar con Google
+                                        </a>
+                                        {errors.google && <p className="text-[12.5px] text-crit">{errors.google}</p>}
+                                        <p className="text-center text-[12px] text-faint">o con email</p>
+                                    </>
+                                )}
+                                {!google && errors.google && <p className="text-[12.5px] text-crit">{errors.google}</p>}
                                 <div className="flex flex-col gap-1.5">
                                     <label htmlFor="email" className="text-[13px] font-medium">
                                         Email
