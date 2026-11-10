@@ -3,6 +3,9 @@
 namespace App\Comms\Playbooks;
 
 use App\Comms\Calendar\SlotFinder;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
 use App\Comms\Gate\ActionClass;
 use App\Comms\Gate\Gate;
 use App\Comms\Models\ModelAnswerKind;
@@ -50,7 +53,7 @@ class PrepareWork
         $answer = $this->container->make(ModelRouter::class)->ask(
             user: $user,
             task: 'draft',
-            input: $message->text,
+            input: trim($this->container->make(ContextRenderer::class)->block($user, new ContextRequest(Audience::Scheduler, intent: $intent))."\n".$message->text),
             schema: [
                 'type' => 'object',
                 'required' => ['band', 'reason', 'underspecified'],

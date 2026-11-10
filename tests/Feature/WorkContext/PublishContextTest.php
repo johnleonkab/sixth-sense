@@ -1,8 +1,14 @@
 <?php
 
+use App\Comms\Context\ContextHarvest;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Models\GithubRepository;
+use App\Models\WorkContext;
 use App\Sense\PublishContext;
+use App\WorkContext\WorkContextStatus;
 use App\WorkContext\WorkDigest;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -40,12 +46,16 @@ test('the nightly context updates the archive and its agents', function () {
         return Http::response([], 404);
     });
 
-    app(PublishContext::class)->publish($repository->account->user, new WorkDigest(
+    $user = $repository->account->user;
+    WorkContext::factory()->for($user)->create(['status' => WorkContextStatus::Ready, 'generated_at' => now()]);
+    app(ContextWriter::class)->record($user, FactOrigin::Inferred, ContextHarvest::operations(new WorkDigest(
         summary: 'Cerrando el prepago.',
         writingSlack: 'Corto y directo.',
         writingGmail: 'Empieza por el motivo.',
         contacts: [['name' => 'Marta Ruiz', 'language' => 'español', 'where' => 'Slack', 'note' => 'Lleva el prepago']],
-    ));
+    ), CarbonImmutable::now()));
+
+    app(PublishContext::class)->publish($user);
 
     expect(array_keys($stored))->toEqualCanonicalizing([
         'now.md',

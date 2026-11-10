@@ -4,21 +4,26 @@ use App\Actions\Actions;
 use App\Agents\Evals\EvalCase;
 use App\Alerts\Actions\ClassifiedAction;
 use App\Alerts\AlertSource;
-use App\Alerts\Lessons\InertiaReview;
-use App\Alerts\Lessons\Lessons;
-use App\Alerts\Lessons\LlmLessonWriter;
 use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\LlmReplyPlanner;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextProjector;
+use App\Comms\Context\ContextRequest;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\InertiaReview;
+use App\Comms\Context\LlmRuleWriter;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
 use App\Jobs\ScheduleTask;
 use App\Models\AlertSetting;
+use App\Models\Comms\CommsContextFact;
 use App\Models\InboxItem;
-use App\Models\IntentLesson;
 use App\Models\ProposalOutcome;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\RecordingTextModel;
 
@@ -39,6 +44,14 @@ function replyInstructions(string $from = 'Marta Ruiz <marta@cm.com>'): string
     return $model->calls[0]['system'];
 }
 
+/**
+ * @return Collection<int, CommsContextFact>
+ */
+function learnedRules(User $user): Collection
+{
+    return CommsContextFact::query()->whereBelongsTo($user)->where('attribute', 'rule')->where('status', 'active')->get();
+}
+
 test('signals weigh as the pillars say', function (string $outcome, ?string $reason, string $weight) {
     expect(ProposalOutcome::factory()->make(['outcome' => $outcome, 'reason' => $reason])->weight())->toBe($weight);
 })->with([
@@ -54,33 +67,39 @@ test('signals weigh as the pillars say', function (string $outcome, ?string $rea
 test('an edit before sending becomes a lesson the reply engine reads next time, about that person', function () {
     $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert), ['text' => 'Ok, lo miro.'])->assertOk();
 
-    $lesson = $this->user->intentLessons()->sole();
+    $rule = learnedRules($this->user)->sole();
 
-    expect($lesson)->toMatchArray(['layer' => 'reply', 'about' => 'Marta Ruiz', 'topic' => 'draft'])
-        ->and($lesson->body)->toContain('«Ok, lo miro.»')
+    expect($rule->audiences)->toBe(['reply'])
+        ->and($rule->value)->toMatchArray(['name' => 'Marta Ruiz', 'topic' => 'draft'])
+        ->and($rule->text())->toContain('«Ok, lo miro.»')
+        ->and($rule->refs)->toContain('outcome:'.ProposalOutcome::sole()->id)
         ->and(ProposalOutcome::sole()->learned_at)->not->toBeNull()
-        ->and(replyInstructions())->toContain('Aprendido de avisos anteriores (datos):')->toContain('«Ok, lo miro.»')
-        ->and($lesson->refresh()->uses)->toBe(1);
+        ->and(replyInstructions())->toContain('Reglas aprendidas:')->toContain("[fact:{$rule->id}]")->toContain('«Ok, lo miro.»')
+        ->and($rule->refresh()->uses)->toBe(1);
 });
 
 test('each layer reads its own lessons, those about the sender first; a newer one on the same topic replaces the old, and unused ones fade', function () {
-    $lessons = app(Lessons::class);
-    $lessons->learn($this->user, 'Con Pablo, tono formal.', 'reply', 'Pablo Gil', 'tone');
-    $lessons->learn($this->user, 'Con Marta, tono formal.', 'reply', 'Marta Ruiz', 'tone');
-    $lessons->learn($this->user, 'Con Marta, tono informal y sin saludo.', 'reply', 'Marta Ruiz', 'tone');
-    $lessons->learn($this->user, 'Los avisos de facturación no importan.', 'judge');
-    $old = $lessons->learn($this->user, 'Algo de hace mucho.', 'reply');
-    $old->forceFill(['created_at' => now()->subDays(90)])->save();
+    $writer = app(ContextWriter::class);
+    $this->travelTo(now()->subDays(90));
+    $writer->rule($this->user, 'Algo de hace mucho.', 'reply');
+    $this->travelBack();
+    $writer->rule($this->user, 'Con Pablo, tono formal.', 'reply', 'Pablo Gil', 'tone');
+    $writer->rule($this->user, 'Con Marta, tono formal.', 'reply', 'Marta Ruiz', 'tone');
+    $writer->rule($this->user, 'Con Marta, tono informal y sin saludo.', 'reply', 'Marta Ruiz', 'tone');
+    $writer->rule($this->user, 'Los avisos de facturación no importan.', 'judge');
+    app(ContextProjector::class)->expire($this->user, CarbonImmutable::now());
 
-    expect($lessons->for($this->user, 'reply', 'Marta Ruiz <marta@cm.com>')->pluck('body')->all())->toBe(['Con Marta, tono informal y sin saludo.', 'Con Pablo, tono formal.'])
-        ->and($lessons->for($this->user, 'judge')->pluck('body')->all())->toBe(['Los avisos de facturación no importan.']);
+    $rules = fn (Audience $audience, ?string $about = null): array => app(ContextEngine::class)->pack($this->user, new ContextRequest($audience, about: $about))->rules();
+
+    expect($rules(Audience::Reply, 'Marta Ruiz <marta@cm.com>'))->toBe(['Con Marta, tono informal y sin saludo.', 'Con Pablo, tono formal.'])
+        ->and($rules(Audience::Importance))->toBe(['Los avisos de facturación no importan.']);
 });
 
 test('a discard with its reason teaches only its layer', function () {
     app(ProposalOutcomes::class)->discarded($this->alert, 'not_important');
 
-    expect($this->user->intentLessons()->sole()->layer)->toBe('judge')
-        ->and(replyInstructions())->not->toContain('Aprendido de avisos anteriores');
+    expect(learnedRules($this->user)->sole()->audiences)->toBe(['importance'])
+        ->and(replyInstructions())->not->toContain('Reglas aprendidas');
 });
 
 test('saying no to an action teaches the classifier and joins its evaluation set; yes to a doubt too', function () {
@@ -93,7 +112,7 @@ test('saying no to an action teaches the classifier and joins its evaluation set
     $settle('a0', 'no');
     $settle('a1', 'yes');
 
-    expect($this->user->intentLessons()->sole())->toMatchArray(['layer' => 'classifier', 'topic' => 'not-task'])
+    expect(learnedRules($this->user)->sole())->audiences->toBe(['classifier'])->value->toMatchArray(['topic' => 'not-task'])
         ->and(array_map(fn (EvalCase $case): array => [$case->ask, $case->classes, $case->confidence], array_slice(EvalCase::withLearned('clasificador'), 25)))->toBe([
             ['¿Lo vemos en una llamada?', ['call'], null],
             ['¿Lo vemos en una llamada?', ['call'], 'sure'],
@@ -108,10 +127,10 @@ test('changing a length teaches the scheduler', function () {
     $this->actingAs($this->user)->postJson(route('voice.tools.run', 'settle_alert_action'), ['arguments' => ['alert_id' => $this->alert->id, 'action' => 'a0', 'duration_minutes' => 45]])->assertOk();
 
     expect(ProposalOutcome::sole())->toMatchArray(['outcome' => ProposalOutcome::DURATION_CHANGED, 'detail' => ['minutes' => 45, 'was' => 30]])
-        ->and($this->user->intentLessons()->sole())->toMatchArray(['layer' => 'scheduler', 'about' => 'Marta Ruiz', 'body' => 'Con Marta Ruiz, las llamadas duran 45 minutos.']);
+        ->and(learnedRules($this->user)->sole())->audiences->toBe(['scheduler'])->value->toMatchArray(['name' => 'Marta Ruiz', 'text' => 'Con Marta Ruiz, las llamadas duran 45 minutos.']);
 });
 
-test('the lesson writer keeps only usable lessons, at most two', function () {
+test('the rule writer keeps only usable rules, at most two', function () {
     $outcome = ProposalOutcome::factory()->for($this->user)->create(['inbox_item_id' => $this->alert->id, 'outcome' => ProposalOutcome::EDITED, 'detail' => ['proposed' => 'Hola Marta, …', 'sent' => 'Ok']]);
     $model = new RecordingTextModel(['lessons' => [
         ['layer' => 'reply', 'about' => 'Marta Ruiz', 'topic' => 'Tone', 'body' => 'Con Marta, respuestas de una línea.'],
@@ -119,7 +138,7 @@ test('the lesson writer keeps only usable lessons, at most two', function () {
         ['layer' => 'reply', 'about' => '', 'topic' => 'length', 'body' => ''],
     ]]);
 
-    expect((new LlmLessonWriter($model))->write($outcome))->toBe([['layer' => 'reply', 'about' => 'Marta Ruiz', 'topic' => 'tone', 'body' => 'Con Marta, respuestas de una línea.']])
+    expect((new LlmRuleWriter($model))->write($outcome))->toBe([['layer' => 'reply', 'about' => 'Marta Ruiz', 'topic' => 'tone', 'body' => 'Con Marta, respuestas de una línea.']])
         ->and($model->calls[0]['user'])->toContain("Propuesto: Hola Marta, …\nEnviado: Ok");
 });
 
@@ -138,16 +157,13 @@ test('when nearly everything goes out untouched, a few of the week\'s sends are 
     'often edited' => [8, 2, 0],
 ]);
 
-test('lessons can be read, corrected and deleted in Settings, only one\'s own', function () {
-    $lesson = app(Lessons::class)->learn($this->user, 'Con Marta, tono informal.', 'reply', 'Marta Ruiz', 'tone');
-    $other = IntentLesson::query()->create(['user_id' => User::factory()->create()->id, 'body' => 'Ajena.']);
+test('rules and the inertia review are on the Reglas tab of Contexto', function () {
+    app(ContextWriter::class)->rule($this->user, 'Con Marta, tono informal.', 'reply', 'Marta Ruiz', 'tone');
 
-    $this->actingAs($this->user)->get(route('settings.lessons.index'))
-        ->assertInertia(fn ($page) => $page->component('settings/lessons')->where('lessons.0.body', 'Con Marta, tono informal.')->where('lessons.0.layer_label', 'Respuestas')->has('inertia.sample', 0));
-
-    $this->actingAs($this->user)->put(route('settings.lessons.update', $lesson->id), ['body' => 'Con Marta, tono informal y breve.'])->assertRedirect();
-    $this->actingAs($this->user)->delete(route('settings.lessons.destroy', $other->id))->assertNotFound();
-    $this->actingAs($this->user)->delete(route('settings.lessons.destroy', $lesson->id))->assertRedirect();
-
-    expect(IntentLesson::query()->pluck('body')->all())->toBe(['Ajena.']);
+    $this->actingAs($this->user)->get(route('settings.context.index', ['tab' => 'rules']))
+        ->assertInertia(fn ($page) => $page->component('settings/context')
+            ->where('rules.0.text', 'Con Marta, tono informal.')
+            ->where('rules.0.audience_labels', ['Respuestas'])
+            ->where('rules.0.origin', 'correction')
+            ->has('inertia.sample', 0));
 });

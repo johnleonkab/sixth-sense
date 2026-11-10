@@ -2,8 +2,10 @@
 
 namespace App\Alerts\Intents;
 
-use App\Alerts\Lessons\Lessons;
 use App\Alerts\Replies\AlertBrief;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\ChatSearch;
 use App\Connectors\Docs\Documents;
@@ -36,18 +38,7 @@ class IntentResearch
     public function gather(User $user, AlertBrief $brief): string
     {
         $query = Str::words(trim($brief->subject ?: $brief->text), 8, '');
-        $lines = [];
-        $work = $user->workContext;
-
-        if ($work !== null && $work->usable()) {
-            $lines[] = "Contexto de trabajo:\n".$work->summary;
-        }
-
-        $lessons = app(Lessons::class)->for($user, 'reply', $brief->from)->pluck('body');
-
-        if ($lessons->isNotEmpty()) {
-            $lines[] = "Ya aprendido:\n".$lessons->implode("\n");
-        }
+        $lines = [app(ContextRenderer::class)->block($user, new ContextRequest(Audience::Reply, about: $brief->from))];
 
         $lines[] = $this->safely(fn (): string => $this->knowledge->context($user, trim($brief->subject.' '.Str::limit($brief->text, 600, ''))));
 

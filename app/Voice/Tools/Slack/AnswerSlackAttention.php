@@ -55,7 +55,7 @@ class AnswerSlackAttention implements VoiceTool
 
         foreach ($this->parts($arguments['people'] ?? null) as $name) {
             $body = $this->preferences->phrase('always_notify', null, $name, []);
-            $this->preferences->acceptNow($user, 'always_notify', $body, null, $name, []);
+            $this->preferences->acceptNow($user, 'always_notify', null, $name, []);
             $lines[] = $body;
         }
 
@@ -73,14 +73,14 @@ class AnswerSlackAttention implements VoiceTool
             }
 
             $body = 'Este trimestre cuenta: '.implode(', ', $projects).'.';
-            $this->preferences->acceptNow($user, 'always_notify', $body, null, null, $words);
+            $this->preferences->acceptNow($user, 'always_notify', null, null, $words);
             $lines[] = $body;
         }
 
         foreach ($this->parts($arguments['channels'] ?? null) as $channel) {
             $label = str_starts_with($channel, '#') ? $channel : '#'.$channel;
             $body = $this->preferences->phrase('not_important', $label, null, []);
-            $this->preferences->acceptNow($user, 'not_important', $body, $label, null, []);
+            $this->preferences->acceptNow($user, 'not_important', $label, null, []);
             $lines[] = $body;
         }
 

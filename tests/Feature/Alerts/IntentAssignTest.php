@@ -7,7 +7,7 @@ use App\Alerts\Intents\IntentAssigner;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Connectors\Mail\MailAddress;
-use App\Models\IntentLesson;
+use App\Models\Comms\CommsContextFact;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -42,7 +42,7 @@ test('the same ask from another channel joins the one alert', function () {
         ->and($this->user->inboxItems()->count())->toBe(1)
         ->and($email->refresh()->source)->toBe(AlertSource::Slack)
         ->and(array_column($email->messages(), 'text'))->toContain('Necesito la firma del contrato antes del viernes')
-        ->and(IntentLesson::query()->whereBelongsTo($this->user)->count())->toBeGreaterThan(0);
+        ->and(CommsContextFact::query()->whereBelongsTo($this->user)->where('attribute', 'rule')->count())->toBeGreaterThan(0);
 });
 
 test('a resolved intent stays closed when the same conversation continues, and reopens from another channel when it matters', function () {

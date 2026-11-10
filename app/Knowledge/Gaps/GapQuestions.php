@@ -54,10 +54,11 @@ class GapQuestions
         $meetings = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Meeting)->orderBy('next_occurrence_at')->limit($budget)->get();
         $terms = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Term)->orderByDesc('priority')->limit($budget)->get();
         $resolutions = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Resolution)->latest('id')->limit(1)->get();
+        $facts = $user->knowledgeGaps()->where('status', GapStatus::Open)->where('kind', GapKind::Fact)->latest('id')->limit(1)->get();
 
         $asked = 0;
 
-        foreach ($meetings->concat($terms)->concat($resolutions)->take($budget) as $gap) {
+        foreach ($meetings->concat($facts)->concat($terms)->concat($resolutions)->take($budget) as $gap) {
             $this->raise($gap, $now);
             $asked++;
         }
@@ -71,21 +72,45 @@ class GapQuestions
     public function answer(KnowledgeGap $gap, string $answer): void
     {
         $gap->update(['status' => GapStatus::Answered, 'answer' => trim($answer), 'answered_at' => now()]);
-        app(ContextWriter::class)->record($gap->user, FactOrigin::User, [[
-            'op' => 'set',
-            'kind' => 'term',
-            'subject' => 'term:'.$gap->subject_key,
-            'attribute' => 'meaning',
-            'value' => ['text' => trim($answer)],
-            'audiences' => [],
-            'origin' => 'user',
-        ]]);
+        $this->remember($gap, trim($answer));
         $this->close($gap, AlertStatus::Resolved, 'answered');
         $this->sync->syncMemory($gap->user);
 
         if ($gap->kind === GapKind::Resolution && isset($gap->context['alert_id'])) {
             app(ProposalOutcomes::class)->explained((int) $gap->context['alert_id'], $answer);
         }
+    }
+
+    /**
+     * The answer is a fact the person gave: what a term or a meeting is, or
+     * whether what the system kept seeing should replace what they said.
+     */
+    public function remember(KnowledgeGap $gap, string $answer): void
+    {
+        $writer = app(ContextWriter::class);
+
+        if ($gap->kind === GapKind::Fact) {
+            $factId = (int) ($gap->context['fact_id'] ?? 0);
+            preg_match('/^\s*(s[ií]|vale|claro|correcto|ok|exacto)\b/iu', $answer) === 1
+                ? $writer->accept($gap->user, $factId)
+                : $writer->reject($gap->user, $factId);
+
+            return;
+        }
+
+        if ($gap->kind === GapKind::Resolution) {
+            return;
+        }
+
+        $writer->record($gap->user, FactOrigin::User, [[
+            'op' => 'set',
+            'kind' => 'term',
+            'subject' => $gap->kind->value.':'.$gap->subject_key,
+            'attribute' => 'meaning',
+            'value' => ['text' => $answer, 'name' => $gap->subject, 'question' => $gap->question],
+            'audiences' => [],
+            'refs' => ["gap:{$gap->id}"],
+        ]]);
     }
 
     /**
@@ -105,12 +130,14 @@ class GapQuestions
             'title' => match ($gap->kind) {
                 GapKind::Meeting => "¿Para qué es «{$gap->subject}»?",
                 GapKind::Resolution => "¿Cómo se resolvió «{$gap->subject}»?",
+                GapKind::Fact => $gap->question,
                 default => "¿Qué es «{$gap->subject}»?",
             },
             'body' => $gap->question,
             'why' => match ($gap->kind) {
                 GapKind::Meeting => 'No sé de qué va esta reunión: ni descripción, ni documentos, ni notas.',
                 GapKind::Resolution => 'Lo diste por resuelto y no veo cómo: saberlo me ayuda a proponer mejor la próxima vez.',
+                GapKind::Fact => 'Lo he visto varias veces esta semana y no cuadra con lo que me dijiste.',
                 default => 'Sale en '.($gap->context['documents'] ?? 'varios').' documentos recientes y no está en tu archivo.',
             },
             'relevance' => 40,

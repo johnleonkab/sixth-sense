@@ -5,6 +5,9 @@ namespace App\Alerts\Intents;
 use App\Actions\Actions;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\SlackTriageEvent;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Models\SlackPreferenceRule;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
@@ -15,7 +18,7 @@ use App\Models\User;
  */
 class SlackPreference
 {
-    public function __construct(private Actions $actions, private ProductAnalytics $analytics) {}
+    public function __construct(private Actions $actions, private ProductAnalytics $analytics, private ContextWriter $context) {}
 
     public function propose(User $user, SlackTriageDecision $decision, string $correction): SlackPreferenceRule
     {
@@ -26,10 +29,9 @@ class SlackPreference
             'place' => $decision->place,
             'channel' => $decision->channel,
             'target' => $decision->target,
-            'body' => $this->phrase($correction, $decision->channel, null, []),
         ]);
 
-        $pending = $this->actions->propose($user, 'slack.preference', 'Guardar la regla: '.$rule->body, [
+        $pending = $this->actions->propose($user, 'slack.preference', 'Guardar la regla: '.$rule->sentence(), [
             'rule_id' => $rule->id,
         ]);
         $rule->update(['pending_action_id' => $pending->id]);
@@ -50,7 +52,7 @@ class SlackPreference
     /**
      * @param  list<string>  $words
      */
-    public function acceptNow(User $user, string $correction, string $body, ?string $channel, ?string $actor, array $words): SlackPreferenceRule
+    public function acceptNow(User $user, string $correction, ?string $channel, ?string $actor, array $words): SlackPreferenceRule
     {
         $rule = $user->slackPreferenceRules()->create([
             'correction' => $correction,
@@ -58,11 +60,10 @@ class SlackPreference
             'channel' => $channel,
             'actor' => $actor,
             'words' => $words === [] ? null : $words,
-            'body' => $body,
             'accepted_at' => now(),
         ]);
 
-        $this->rewrite($user);
+        $this->remember($rule);
         $this->analytics->capture($user, SlackTriageEvent::PreferenceRuleAccepted, [
             'correction' => $correction,
         ]);
@@ -77,42 +78,13 @@ class SlackPreference
         }
 
         $rule->update(['status' => 'accepted', 'accepted_at' => now()]);
-        $this->rewrite($rule->user);
+        $this->remember($rule);
         $this->analytics->capture($rule->user, SlackTriageEvent::PreferenceRuleAccepted, [
             'action' => $rule->decision?->action,
             'correction' => $rule->correction,
         ]);
 
         return $rule;
-    }
-
-    public function rewrite(User $user): void
-    {
-        $accepted = $user->slackPreferenceRules()->where('status', 'accepted')->latest('id')->get();
-        $profile = $user->slackAttentionProfile()->firstOrCreate([], [
-            'body' => '',
-            'signals' => [],
-            'built_at' => now(),
-        ]);
-        $signals = $profile->signals ?? [];
-        $signals['rules'] = $accepted->map(fn (SlackPreferenceRule $rule): array => [
-            'correction' => $rule->correction,
-            'channel' => $rule->channel,
-            'place' => $rule->place,
-            'actor' => $rule->actor,
-            'target' => $rule->target,
-            'words' => $rule->words ?? [],
-        ])->all();
-
-        $preface = $accepted->isEmpty()
-            ? ''
-            : "Reglas que ha dicho ella, por encima del histórico:\n".$accepted->pluck('body')->implode("\n")."\n\n";
-
-        $profile->update([
-            'signals' => $signals,
-            'body' => $preface.$this->history((string) $profile->body),
-        ]);
-        $user->unsetRelation('slackAttentionProfile');
     }
 
     /**
@@ -138,17 +110,19 @@ class SlackPreference
         };
     }
 
-    private function history(string $body): string
+    /**
+     * She said it: it sits above what was learned from how she answers.
+     */
+    private function remember(SlackPreferenceRule $rule): void
     {
-        $header = "Reglas que ha dicho ella, por encima del histórico:\n";
-
-        if (! str_starts_with($body, $header)) {
-            return $body;
-        }
-
-        $rest = substr($body, strlen($header));
-        $parts = preg_split("/\n\n/", $rest, 2);
-
-        return $parts[1] ?? '';
+        $this->context->record($rule->user, FactOrigin::Correction, [[
+            'op' => 'add',
+            'kind' => 'channel',
+            'subject' => 'slack',
+            'attribute' => 'rule',
+            'value' => ['text' => $rule->sentence()],
+            'audiences' => [Audience::Triage->value],
+            'refs' => ["slack-rule:{$rule->id}"],
+        ]], revision: "slack-rule:{$rule->id}");
     }
 }

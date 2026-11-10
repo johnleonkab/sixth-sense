@@ -3,8 +3,8 @@
 namespace App\Alerts\Actions;
 
 use App\Alerts\AlertFollowUp;
-use App\Alerts\Lessons\Lessons;
 use App\Alerts\Outcomes\ProposalOutcomes;
+use App\Comms\Context\ContextWriter;
 use App\Events\InboxItemUpdated;
 use App\Models\AgendaTask;
 use App\Models\InboxItem;
@@ -33,7 +33,7 @@ class AlertActions
     public function __construct(
         private AlertFollowUp $followUp,
         private Scheduler $scheduler,
-        private Lessons $lessons,
+        private ContextWriter $context,
         private ProposalOutcomes $outcomes,
     ) {}
 
@@ -67,7 +67,7 @@ class AlertActions
 
         if ($yes === false) {
             array_splice($actions, $index, 1);
-            $this->lessons->learn($item->user, "Un mensaje de {$item->actor_name} como «{$item->title}» no pedía ".self::CLASS_NAMES[$action->class]." ({$action->summary}).", 'classifier', $item->actor_name, "not-{$action->class}", $item->id);
+            $this->context->rule($item->user, "Un mensaje de {$item->actor_name} como «{$item->title}» no pedía ".self::CLASS_NAMES[$action->class]." ({$action->summary}).", 'classifier', $item->actor_name, "not-{$action->class}", ["alert:{$item->id}"]);
             $this->evalCase($item, array_column($actions, 'class'));
             $item->update(['proposal' => [...$proposal, 'actions' => array_values($actions)]]);
             InboxItemUpdated::dispatch($item);

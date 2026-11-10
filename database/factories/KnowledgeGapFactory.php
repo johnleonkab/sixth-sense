@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Knowledge\Gaps\GapKind;
+use App\Knowledge\Gaps\GapQuestions;
 use App\Knowledge\Gaps\GapStatus;
 use App\Models\KnowledgeGap;
 use App\Models\User;
@@ -38,6 +39,6 @@ class KnowledgeGapFactory extends Factory
             'answer' => $answer,
             'asked_at' => now()->subDay(),
             'answered_at' => now(),
-        ]);
+        ])->afterCreating(fn (KnowledgeGap $gap) => app(GapQuestions::class)->remember($gap, $answer));
     }
 }

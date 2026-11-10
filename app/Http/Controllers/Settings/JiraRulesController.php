@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Connections\Provider;
 use App\Connectors\Jira\JiraRules;
 use App\Http\Controllers\Controller;
@@ -45,12 +47,20 @@ class JiraRulesController extends Controller
     /**
      * Save the rules as written.
      */
-    public function update(Request $request, int $account): RedirectResponse
+    public function update(Request $request, ContextWriter $context, int $account): RedirectResponse
     {
         $account = $this->jiraAccount($request, $account);
         $validated = $request->validate(['rules' => ['nullable', 'string', 'max:'.JiraRules::MAX_LENGTH]]);
 
         $account->update(['rules' => filled($validated['rules'] ?? null) ? $validated['rules'] : null]);
+        $context->record($request->user(), FactOrigin::User, [[
+            'op' => filled($validated['rules'] ?? null) ? 'set' : 'retract',
+            'kind' => 'rule',
+            'subject' => "jira:{$account->id}",
+            'attribute' => 'rules',
+            'value' => ['text' => (string) ($validated['rules'] ?? ''), 'name' => 'Jira'],
+            'audiences' => ['voice', 'export'],
+        ]]);
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Reglas de Jira guardadas. El asistente las usará desde la próxima conversación.']);
 
         return back();

@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Alerts\Lessons;
+namespace App\Comms\Context;
 
 use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
-use App\Models\IntentLesson;
 use App\Models\ProposalOutcome;
 use Illuminate\Support\Str;
 
@@ -12,7 +11,7 @@ use Illuminate\Support\Str;
  * The lesson writer, with a light model: what the correction says about the
  * person, the one who wrote, or the kind of message, in one short sentence.
  */
-class LlmLessonWriter implements LessonWriter
+class LlmRuleWriter implements RuleWriter
 {
     public function __construct(private TextModel $model) {}
 
@@ -38,7 +37,7 @@ class LlmLessonWriter implements LessonWriter
                     'items' => [
                         'type' => 'OBJECT',
                         'properties' => [
-                            'layer' => ['type' => 'STRING', 'enum' => array_keys(IntentLesson::LAYERS)],
+                            'layer' => ['type' => 'STRING', 'enum' => Audience::LAYERS],
                             'about' => ['type' => 'STRING'],
                             'topic' => ['type' => 'STRING'],
                             'body' => ['type' => 'STRING'],
@@ -50,7 +49,7 @@ class LlmLessonWriter implements LessonWriter
             'required' => ['lessons'],
         ], 0.2, AiGenerationContext::forUser($user));
 
-        return array_values(array_filter(array_map(fn (mixed $lesson): ?array => is_array($lesson) && filled($lesson['body'] ?? null) && isset(IntentLesson::LAYERS[$lesson['layer'] ?? '']) ? [
+        return array_values(array_filter(array_map(fn (mixed $lesson): ?array => is_array($lesson) && filled($lesson['body'] ?? null) && in_array($lesson['layer'] ?? '', Audience::LAYERS, true) ? [
             'layer' => $lesson['layer'],
             'about' => filled($lesson['about'] ?? null) ? Str::limit(trim($lesson['about']), 120, '') : null,
             'topic' => Str::limit(Str::slug((string) ($lesson['topic'] ?? 'general')), 40, ''),

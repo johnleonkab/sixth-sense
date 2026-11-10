@@ -127,13 +127,13 @@ test('an uncertain message can be moved or split, and two intents can merge', fu
 test('people settings are stored as configuration events', function () {
     [$user, $self, $marta] = boardPeople();
 
-    $this->actingAs($user)->get(route('settings.people.index'))
+    $this->actingAs($user)->get(route('settings.context.index', ['tab' => 'people']))
         ->assertInertia(fn ($page) => $page
-            ->component('settings/people')
+            ->component('settings/context')
             ->where('people.0.name', 'Marta')
             ->where('preference.timezone', 'Europe/Madrid'));
 
-    $this->actingAs($user)->put(route('settings.people.update', $marta), [
+    $this->actingAs($user)->put(route('settings.context.people.update', $marta), [
         'relation' => 'client',
         'importance_weight' => 35,
     ])->assertRedirect();
@@ -142,7 +142,10 @@ test('people settings are stored as configuration events', function () {
         ->and($marta->importance_weight)->toBe(35)
         ->and(CommsEvent::query()->where('type', EventType::UserConfigured)->exists())->toBeTrue();
 
-    $this->actingAs($user)->put(route('settings.people.preference'), [
+    $this->actingAs($user)->get(route('settings.context.index', ['tab' => 'people']))
+        ->assertInertia(fn ($page) => $page->where('people.0.origins.relation', 'user'));
+
+    $this->actingAs($user)->put(route('settings.context.preference'), [
         'timezone' => 'Atlantic/Canary',
         'locale' => 'es',
         'work_start' => '08:30',
@@ -153,7 +156,7 @@ test('people settings are stored as configuration events', function () {
     expect(CommsPreference::query()->firstOrFail()->timezone)->toBe('Atlantic/Canary')
         ->and(CommsPreference::query()->firstOrFail()->work_days)->toBe([1, 2, 3, 4]);
 
-    $this->actingAs($user)->post(route('settings.people.areas.store'), [
+    $this->actingAs($user)->post(route('settings.context.areas.store'), [
         'kind' => 'product',
         'ref' => 'prepago',
         'name' => 'Prepago',
@@ -164,7 +167,7 @@ test('people settings are stored as configuration events', function () {
 
     expect($area->keywords)->toBe(['prepago', 'cobro']);
 
-    $this->actingAs($user)->delete(route('settings.people.areas.destroy', $area))->assertRedirect();
+    $this->actingAs($user)->delete(route('settings.context.areas.destroy', $area))->assertRedirect();
 
     expect(CommsOwnedArea::query()->count())->toBe(0)
         ->and($self->relation)->toBe(Relation::Self);

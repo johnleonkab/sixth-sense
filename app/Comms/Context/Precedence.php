@@ -2,8 +2,6 @@
 
 namespace App\Comms\Context;
 
-use App\Models\Comms\CommsDocument;
-
 /**
  * Code is what was built. Jira and Notion are what was decided.
  * A disagreement is returned. Nothing here picks a winner.
@@ -11,7 +9,7 @@ use App\Models\Comms\CommsDocument;
 class Precedence
 {
     /**
-     * @param  list<CommsDocument>  $documents
+     * @param  list<CorpusDocument>  $documents
      * @return list<array{refs: list<string>, summary: string}>
      */
     public function findings(array $documents): array
@@ -46,21 +44,21 @@ class Precedence
     }
 
     /**
-     * @param  list<CommsDocument>  $documents
+     * @param  list<CorpusDocument>  $documents
      * @param  list<string>  $kinds
      */
-    private function latest(array $documents, array $kinds): ?CommsDocument
+    private function latest(array $documents, array $kinds): ?CorpusDocument
     {
         $found = array_values(array_filter(
             $documents,
-            fn (CommsDocument $document): bool => in_array($document->kind, $kinds, true),
+            fn (CorpusDocument $document): bool => in_array($document->kind, $kinds, true),
         ));
 
         if ($found === []) {
             return null;
         }
 
-        usort($found, fn (CommsDocument $left, CommsDocument $right): int => $right->updated_at <=> $left->updated_at);
+        usort($found, fn (CorpusDocument $left, CorpusDocument $right): int => $right->updatedAt <=> $left->updatedAt);
 
         return $found[0];
     }

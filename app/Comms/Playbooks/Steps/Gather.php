@@ -3,8 +3,8 @@
 namespace App\Comms\Playbooks\Steps;
 
 use App\Comms\Context\ContextEngine;
+use App\Comms\Context\CorpusDocument;
 use App\Comms\Context\Precedence;
-use App\Models\Comms\CommsDocument;
 use App\Models\Comms\CommsIntent;
 use App\Models\User;
 
@@ -16,7 +16,7 @@ class Gather
     public function __construct(private ContextEngine $context, private Precedence $precedence) {}
 
     /**
-     * @return array{conversation: list<array<string, mixed>>, hits: list<array{document: CommsDocument, similarity: float}>, findings: list<array{refs: list<string>, summary: string}>, archive: array<string, mixed>}
+     * @return array{conversation: list<array<string, mixed>>, hits: list<array{document: CorpusDocument, similarity: float}>, findings: list<array{refs: list<string>, summary: string}>, archive: array<string, mixed>}
      */
     public function forIntent(User $user, CommsIntent $intent): array
     {
@@ -26,7 +26,7 @@ class Gather
             'conversation' => $this->context->conversation($intent),
             'hits' => $hits,
             'findings' => $this->precedence->findings(array_map(
-                fn (array $hit): CommsDocument => $hit['document'],
+                fn (array $hit): CorpusDocument => $hit['document'],
                 $hits,
             )),
             'archive' => $this->context->archive($user),

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Alerts\AlertSource;
+use App\Comms\Context\ContextQuestions;
 use App\Knowledge\Gaps\GapQuestions;
 use App\Knowledge\Gaps\MeetingGaps;
 use App\Knowledge\Gaps\TermGaps;
@@ -58,6 +59,12 @@ class FindKnowledgeGaps implements ShouldBeUnique, ShouldQueue
             } catch (Throwable $exception) {
                 report($exception);
             }
+        }
+
+        try {
+            app(ContextQuestions::class)->find($this->user);
+        } catch (Throwable $exception) {
+            report($exception);
         }
 
         $questions->ask($this->user);

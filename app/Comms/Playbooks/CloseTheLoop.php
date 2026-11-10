@@ -2,10 +2,11 @@
 
 namespace App\Comms\Playbooks;
 
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\CorpusDocument;
 use App\Comms\Gate\ActionClass;
 use App\Comms\Gate\Gate;
 use App\Comms\Playbooks\Steps\Propose;
-use App\Models\Comms\CommsDocument;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
@@ -21,7 +22,7 @@ use Carbon\CarbonImmutable;
  */
 class CloseTheLoop
 {
-    public function __construct(private Propose $propose, private Gate $gate) {}
+    public function __construct(private Propose $propose, private Gate $gate, private ContextEngine $context) {}
 
     public function source(CommsEvent $event): void
     {
@@ -175,31 +176,27 @@ class CloseTheLoop
             ->first();
     }
 
-    private function outdated(User $user, CommsIntent $intent, string $quote): ?CommsDocument
+    private function outdated(User $user, CommsIntent $intent, string $quote): ?CorpusDocument
     {
         $words = array_values(array_filter(
             preg_split('/\s+/u', mb_strtolower($intent->what.' '.$quote)) ?: [],
             fn (string $word): bool => mb_strlen($word) >= 4,
         ));
 
-        return CommsDocument::query()
-            ->whereBelongsTo($user)
-            ->where('kind', 'notion')
-            ->get()
-            ->first(function (CommsDocument $document) use ($quote, $words): bool {
-                if (str_contains($document->body, $quote)) {
-                    return false;
+        foreach ($this->context->corpus($user, ['notion']) as $document) {
+            if (str_contains($document->body, $quote)) {
+                continue;
+            }
+
+            $haystack = mb_strtolower($document->title.' '.$document->body);
+
+            foreach ($words as $word) {
+                if (str_contains($haystack, $word)) {
+                    return $document;
                 }
+            }
+        }
 
-                $haystack = mb_strtolower($document->title.' '.$document->body);
-
-                foreach ($words as $word) {
-                    if (str_contains($haystack, $word)) {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
+        return null;
     }
 }

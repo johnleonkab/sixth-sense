@@ -11,11 +11,13 @@ use App\Alerts\Actions\LlmActionClassifier;
 use App\Alerts\AlertFollowUp;
 use App\Alerts\AlertSource;
 use App\Alerts\Replies\AlertBrief;
+use App\Comms\Context\ContextWriter;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
 use App\Jobs\ExecutePendingAction;
 use App\Jobs\ScheduleTask;
 use App\Models\AlertSetting;
+use App\Models\Comms\CommsContextFact;
 use App\Models\InboxItem;
 use App\Models\User;
 use App\Scheduling\AgendaTaskStatus;
@@ -37,7 +39,7 @@ test('a task missing a deliverable, someone expecting it or a deadline is only a
         ['class' => 'call', 'confidence' => 'sure', 'summary' => 'Reunión del equipo el jueves', 'doubt' => '', 'includes_me' => false, 'people' => ['Equipo']],
         ['class' => 'meeting', 'confidence' => 'sure', 'summary' => 'Lo que no existe', 'doubt' => ''],
     ]]);
-    $this->user->intentLessons()->create(['body' => 'Andrés pide informes los jueves.']);
+    app(ContextWriter::class)->rule($this->user, 'Andrés pide informes los jueves.', null);
 
     $actions = (new LlmActionClassifier($model))->classify($this->user, $this->brief);
 
@@ -106,7 +108,7 @@ test('a doubt is settled with one word: yes prepares it, no takes it off and tea
     $settle('a0', 'no')->assertOk()->assertJsonPath('output.say', 'Vale, lo quito.')->assertJsonPath('canvas.view', 'alerts.review');
 
     expect(array_column($item->refresh()->proposal['actions'], 'key'))->toBe(['a1'])
-        ->and($this->user->intentLessons()->sole()->body)->toContain('no pedía una tarea (Documentar los reembolsos)')
+        ->and(CommsContextFact::query()->whereBelongsTo($this->user)->where('attribute', 'rule')->where('status', 'active')->sole()->text())->toContain('no pedía una tarea (Documentar los reembolsos)')
         ->and($item->agendaTask)->toBeNull();
 
     $settle('a1', 'yes')->assertOk()->assertJsonPath('output.say', 'Vale, lo preparo.');

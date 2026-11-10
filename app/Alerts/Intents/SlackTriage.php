@@ -6,7 +6,6 @@ use App\Alerts\InboxCandidate;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\SlackTriageEvent;
 use App\Connectors\Slack\SlackAttention;
-use App\Models\SlackAttentionProfile;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
 
@@ -64,7 +63,7 @@ class SlackTriage
         return $this->preference($adjusted, $state, $signals);
     }
 
-    public function record(User $user, InboxCandidate $candidate, IntentDecision $decision, SlackThreadState $state, ?SlackAttentionProfile $profile): SlackTriageDecision
+    public function record(User $user, InboxCandidate $candidate, IntentDecision $decision, SlackThreadState $state, bool $policyPresent): SlackTriageDecision
     {
         $row = $user->slackTriageDecisions()->firstOrNew([
             'external_id' => $candidate->externalId,
@@ -80,7 +79,7 @@ class SlackTriage
             'has_target' => $decision->hasTarget,
             'target' => $decision->target,
             'already_answered' => $decision->alreadyAnswered,
-            'policy_present' => $profile !== null && filled($profile->body),
+            'policy_present' => $policyPresent,
             'thread_key' => $candidate->threadKey,
             'channel' => $state->channel,
             'candidate' => $candidate->toArray(),

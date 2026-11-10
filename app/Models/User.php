@@ -224,26 +224,6 @@ class User extends Authenticatable
     }
 
     /**
-     * What the reply agent has learned while resolving intents.
-     *
-     * @return HasMany<IntentLesson, $this>
-     */
-    public function intentLessons(): HasMany
-    {
-        return $this->hasMany(IntentLesson::class);
-    }
-
-    /**
-     * How this person has been answering Slack, learned from the last month.
-     *
-     * @return HasOne<SlackAttentionProfile, $this>
-     */
-    public function slackAttentionProfile(): HasOne
-    {
-        return $this->hasOne(SlackAttentionProfile::class);
-    }
-
-    /**
      * Slack messages already triaged, including the ones that did not ring.
      *
      * @return HasMany<SlackTriageDecision, $this>

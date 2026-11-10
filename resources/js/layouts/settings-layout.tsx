@@ -14,7 +14,6 @@ type SettingsSection = {
 
 const sections: SettingsSection[] = [
     { href: '/settings/connections', label: 'Conexiones' },
-    { href: '/settings/people', label: 'Personas' },
     { href: '/shadow', label: 'Sombra' },
     { href: '/settings/archive/agents', match: '/settings/archive', label: 'Archivo' },
     { href: '/settings/alerts', label: 'Avisos' },
@@ -23,7 +22,6 @@ const sections: SettingsSection[] = [
     { href: '/settings/wingman', label: 'Wingman' },
     { href: '/settings/system', label: 'Sistema' },
     { href: '/settings/impact', label: 'Impacto' },
-    { href: '/settings/lessons', label: 'Lecciones' },
 ];
 
 type SettingsLayoutProps = {

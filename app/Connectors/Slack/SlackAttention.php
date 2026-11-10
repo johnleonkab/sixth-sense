@@ -2,13 +2,12 @@
 
 namespace App\Connectors\Slack;
 
-use App\Alerts\Intents\SlackPreference;
 use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
 use App\Comms\Context\ContextWriter;
 use App\Comms\Context\FactOrigin;
 use App\Connections\Capability;
 use App\Connectors\Chat\ChatMessage;
-use App\Models\SlackAttentionProfile;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use RuntimeException;
@@ -28,16 +27,19 @@ class SlackAttention
     public function __construct(
         private SlackApi $slack,
         private SlackChats $chats,
-        private SlackPreference $preferences,
+        private ContextEngine $context,
     ) {}
 
-    public function learn(User $user): ?SlackAttentionProfile
+    /**
+     * @return array{text: string, signals: array<string, mixed>}|null
+     */
+    public function learn(User $user): ?array
     {
         if ($user->accountsWith(Capability::SlackSearch)->isEmpty()) {
             return null;
         }
 
-        $previous = $user->slackAttentionProfile;
+        $previous = $this->context->slackProfile($user);
         $signals = $this->aged($this->signals($this->threads($user)), $previous);
         $body = $this->body($signals);
 
@@ -51,36 +53,30 @@ class SlackAttention
             $body .= "\n\n¿A quién respondes siempre? ¿Qué proyectos son de este trimestre? ¿Qué canales son ruido?";
         }
 
-        $user->slackAttentionProfile()->updateOrCreate([], [
-            'body' => $body,
-            'signals' => $signals,
-            'built_at' => now(),
-        ]);
-        $this->preferences->rewrite($user);
         app(ContextWriter::class)->record($user, FactOrigin::Observed, [[
             'op' => 'set',
             'kind' => 'channel',
             'subject' => 'slack',
             'attribute' => 'profile',
-            'value' => ['text' => $body],
+            'value' => ['text' => $body, 'signals' => $signals],
             'audiences' => [Audience::Triage->value],
-            'origin' => 'observed',
         ]]);
 
-        return $user->slackAttentionProfile()->first();
+        return ['text' => $body, 'signals' => $signals];
     }
 
     /**
      * Signals older than a quarter keep half their weight.
      *
      * @param  array{threads: int, replied: int, missed: int, other: int, noise: int, people: list<array{name: string, replied: int}>, channels: list<array{label: string, threads: int, replied: int, missed: int}>, owned_channels: list<string>}  $signals
+     * @param  array{signals: array<string, mixed>, at: ?CarbonImmutable}|null  $previous
      * @return array<string, mixed>
      */
-    private function aged(array $signals, ?SlackAttentionProfile $previous): array
+    private function aged(array $signals, ?array $previous): array
     {
         $carried = ['replied' => 0, 'missed' => 0, 'other' => 0, 'noise' => 0];
-        $earlier = $previous?->signals ?? [];
-        $stale = $previous?->built_at !== null && $previous->built_at->lt(now()->subMonths(3));
+        $earlier = $previous['signals'] ?? [];
+        $stale = $previous !== null && $previous['at'] !== null && $previous['at']->lt(now()->subMonths(3));
 
         if ($stale) {
             foreach ($carried as $key => $value) {

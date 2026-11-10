@@ -3,6 +3,9 @@
 namespace App\Alerts\Intents;
 
 use App\Alerts\Replies\AlertBrief;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextRequest;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\ChatSearch;
@@ -121,13 +124,13 @@ class SlackDraft
             return ['kind' => 'archive', 'who' => "{$hit['source']}, {$hit['title']}", 'text' => Str::limit($hit['summary'] ?? $hit['title'], 160)];
         }
 
-        $work = $user->workContext;
+        $summary = app(ContextEngine::class)->pack($user, new ContextRequest(Audience::Reply))->summary();
 
-        if ($work === null || ! $work->usable() || ! $this->overlaps((string) $work->summary, $words)) {
+        if ($summary === '' || ! $this->overlaps($summary, $words)) {
             return null;
         }
 
-        return ['kind' => 'archive', 'who' => '', 'text' => Str::limit((string) $work->summary, 160)];
+        return ['kind' => 'archive', 'who' => '', 'text' => Str::limit($summary, 160)];
     }
 
     /**

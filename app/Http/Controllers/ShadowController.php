@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Actions\ActionStatus;
-use App\Comms\Context\Audience;
 use App\Comms\Context\ContextWriter;
-use App\Comms\Context\FactOrigin;
 use App\Comms\Cutover\HomeFeed;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Gate\QuestionDraft;
+use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
@@ -148,15 +147,19 @@ class ShadowController extends Controller
             revision: (string) Str::uuid(),
         );
 
-        $context->record($request->user(), FactOrigin::Correction, [[
-            'op' => 'add',
-            'kind' => 'rule',
-            'subject' => 'notification:'.$notification->id,
-            'attribute' => 'rule',
-            'value' => ['text' => $feedback],
-            'audiences' => [Audience::Importance->value],
-            'origin' => FactOrigin::Correction->value,
-        ]]);
+        $requester = $notification->subject_type === 'intent'
+            ? CommsIntent::query()->whereBelongsTo($request->user())->with('participants.person')->find($notification->subject_id)?->participants->firstWhere('role', 'requester')?->person?->display_name
+            : null;
+        $sentence = $requester === null ? null : match ($feedback) {
+            'useful' => "Lo que pide {$requester} sí merece aviso.",
+            'not_urgent' => "Lo que pide {$requester} no suele ser urgente: avisar sin interrumpir.",
+            'not_relevant' => "Lo que escribe {$requester} no le importa: no avisar.",
+            'wrong' => "Un aviso sobre lo que pidió {$requester} estaba mal entendido: leer el hilo antes de avisar.",
+        };
+
+        if ($sentence !== null) {
+            $context->rule($request->user(), $sentence, 'judge', $requester, topic: 'shadow:'.Str::lower($requester), refs: ["notification:{$notification->key}"]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Anotado.']);
 

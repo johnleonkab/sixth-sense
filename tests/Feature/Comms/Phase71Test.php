@@ -14,12 +14,13 @@ use App\Comms\Models\CompletesTasks;
 use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
 use App\Connections\Provider;
-use App\Models\Comms\CommsDocument;
+use App\Knowledge\KnowledgeSource;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsWatcher;
 use App\Models\ConnectedAccount;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -66,12 +67,12 @@ test('a decision is recorded and a contradicted spec is an edit', function () {
     $user = phase71User();
     $text = 'Quedamos en que el tope es 50.';
 
-    CommsDocument::query()->create([
-        'user_id' => $user->id,
-        'ref' => 'notion:spec',
-        'kind' => 'notion',
+    KnowledgeDocument::factory()->for($user)->create([
+        'source' => KnowledgeSource::Notion,
+        'ref' => 'spec',
         'title' => 'Spec del tope',
-        'body' => 'El tope es 10.',
+        'summary' => 'El tope es 10.',
+        'terms' => 'spec del tope el tope es 10',
         'topic' => 'prepago',
     ]);
     phase71Script([

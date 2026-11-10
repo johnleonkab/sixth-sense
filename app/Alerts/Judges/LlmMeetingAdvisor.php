@@ -6,9 +6,9 @@ use App\Ai\AiGenerationContext;
 use App\Ai\TextModel;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\MeetingBriefing;
+use App\Comms\Context\ContextEngine;
 use App\Connectors\Calendar\CalendarEvent;
 use App\Knowledge\Gaps\GapKind;
-use App\Knowledge\Gaps\GapStatus;
 use App\Knowledge\Gaps\MeetingGaps;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -66,11 +66,7 @@ class LlmMeetingAdvisor implements MeetingAdvisor
 
     private function describe(User $user, CalendarEvent $event): string
     {
-        $known = $user->knowledgeGaps()
-            ->where('kind', GapKind::Meeting)
-            ->where('subject_key', MeetingGaps::seriesKey($event))
-            ->where('status', GapStatus::Answered)
-            ->value('answer');
+        $known = app(ContextEngine::class)->answer($user, GapKind::Meeting->value.':'.MeetingGaps::seriesKey($event));
         $people = array_map(fn (array $attendee): string => $attendee['name'] ?: (string) $attendee['email'], $event->attendees);
 
         return implode("\n", [

@@ -20,6 +20,7 @@ class ContextProjector
     /** @var list<string> */
     private const SINGLE = [
         'relation',
+        'rules',
         'importance',
         'language',
         'role',
@@ -31,6 +32,10 @@ class ContextProjector
         'timezone',
         'locale',
         'profile',
+        'note',
+        'state',
+        'hot',
+        'moved',
     ];
 
     public function __construct(private PersonRef $people) {}
@@ -49,6 +54,25 @@ class ContextProjector
             ),
             default => null,
         };
+    }
+
+    /**
+     * The same value gives the same hash whatever order the database keeps
+     * its keys in (MySQL sorts them).
+     *
+     * @param  array<mixed>  $value
+     */
+    public static function hash(array $value): string
+    {
+        $sort = function (array $items) use (&$sort): array {
+            if (! array_is_list($items)) {
+                ksort($items);
+            }
+
+            return array_map(fn (mixed $item): mixed => is_array($item) ? $sort($item) : $item, $items);
+        };
+
+        return hash('sha1', (string) json_encode($sort($value), JSON_UNESCAPED_UNICODE));
     }
 
     public function expire(User $user, CarbonImmutable $at): void
@@ -177,7 +201,7 @@ class ContextProjector
             return;
         }
 
-        $hash = hash('sha1', (string) json_encode($value));
+        $hash = self::hash($value);
         $already = CommsContextFact::query()
             ->where('event_id', $event->id)
             ->where('subject', $subject)
@@ -191,6 +215,17 @@ class ContextProjector
 
         if ($operation === 'reject') {
             $this->reject($user, $subject, $attribute, $hash, $event);
+
+            return;
+        }
+
+        if ($operation === 'retract') {
+            CommsContextFact::query()
+                ->whereBelongsTo($user)
+                ->where('subject', $subject)
+                ->where('attribute', $attribute)
+                ->where('status', 'active')
+                ->update(['status' => 'superseded']);
 
             return;
         }
@@ -224,6 +259,17 @@ class ContextProjector
             return;
         }
 
+        if ($status === 'active') {
+            $this->replaceTopic($user, $subject, $attribute, $value, $audiences, $origin);
+            CommsContextFact::query()
+                ->whereBelongsTo($user)
+                ->where('subject', $subject)
+                ->where('attribute', $attribute)
+                ->where('value_hash', $hash)
+                ->where('status', 'proposed')
+                ->update(['status' => 'superseded']);
+        }
+
         $fact = CommsContextFact::query()->create([
             'user_id' => $user->id,
             'kind' => Str::limit($kind, 24, ''),
@@ -253,7 +299,7 @@ class ContextProjector
             ->where('subject', $subject)
             ->where('attribute', $attribute)
             ->where('value_hash', $hash)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'proposed'])
             ->update(['status' => 'rejected']);
 
         if (CommsContextFact::query()->where('event_id', $event->id)->where('value_hash', $hash)->exists()) {
@@ -276,6 +322,33 @@ class ContextProjector
             'value_hash' => $hash,
             'confirmed_at' => $event->occurred_at,
         ]);
+    }
+
+    /**
+     * A newer rule on the same topic, for the same readers, replaces the
+     * older one: it contradicts it. A user rule is only replaced by another.
+     *
+     * @param  array<string, mixed>  $value
+     * @param  list<string>  $audiences
+     */
+    private function replaceTopic(User $user, string $subject, string $attribute, array $value, array $audiences, FactOrigin $origin): void
+    {
+        $topic = $value['topic'] ?? null;
+
+        if ($attribute !== 'rule' || ! is_string($topic) || $topic === '') {
+            return;
+        }
+
+        CommsContextFact::query()
+            ->whereBelongsTo($user)
+            ->where('subject', $subject)
+            ->where('attribute', 'rule')
+            ->where('status', 'active')
+            ->get()
+            ->filter(fn (CommsContextFact $fact): bool => ($fact->value['topic'] ?? null) === $topic
+                && ($fact->audiences ?? []) == $audiences
+                && $fact->origin->rank() <= $origin->rank())
+            ->each(fn (CommsContextFact $fact) => $fact->update(['status' => 'superseded']));
     }
 
     private function active(User $user, string $subject, string $attribute, string $hash): ?CommsContextFact

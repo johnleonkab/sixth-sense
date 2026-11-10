@@ -8,6 +8,7 @@ use App\Alerts\Intents\SlackAction;
 use App\Alerts\Intents\SlackThreadReader;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\SlackTriageEvent;
+use App\Comms\Context\ContextEngine;
 use App\Models\SlackTriageDecision;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,7 +30,6 @@ class PromoteUnansweredSlack implements ShouldQueue
     public function handle(SlackThreadReader $threads, IntentAssigner $assigner, ProductAnalytics $analytics): void
     {
         SlackTriageDecision::query()
-            ->with(['user.slackAttentionProfile'])
             ->whereNull('settled_at')
             ->where('place', 'channel')
             ->whereIn('action', [SlackAction::Notice->value, SlackAction::Ignore->value])
@@ -43,7 +43,7 @@ class PromoteUnansweredSlack implements ShouldQueue
     private function consider(SlackTriageDecision $decision, SlackThreadReader $threads, IntentAssigner $assigner, ProductAnalytics $analytics): void
     {
         $user = $decision->user;
-        $owned = is_array($user?->slackAttentionProfile?->signals) ? ($user->slackAttentionProfile->signals['owned_channels'] ?? []) : [];
+        $owned = $user !== null ? (app(ContextEngine::class)->slackSignals($user)['owned_channels'] ?? []) : [];
 
         if ($user === null || ! in_array($decision->channel, $owned, true)) {
             $decision->update(['settled_at' => now()]);
@@ -93,7 +93,7 @@ class PromoteUnansweredSlack implements ShouldQueue
             'uncertain' => false,
             'already_answered' => false,
             'has_target' => false,
-            'policy_present' => filled($user->slackAttentionProfile?->body),
+            'policy_present' => app(ContextEngine::class)->slackProfile($user) !== null,
         ]);
     }
 }

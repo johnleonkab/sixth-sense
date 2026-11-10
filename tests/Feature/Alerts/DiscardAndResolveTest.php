@@ -7,12 +7,14 @@ use App\Alerts\Outcomes\ProposalOutcomes;
 use App\Alerts\Outcomes\ResolutionInference;
 use App\Alerts\Replies\AlertBrief;
 use App\Alerts\Replies\LlmReplyPlanner;
+use App\Comms\Context\ContextWriter;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\FakeCalendarReader;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
 use App\Knowledge\Gaps\GapKind;
 use App\Knowledge\Gaps\GapQuestions;
+use App\Models\Comms\CommsContextFact;
 use App\Models\InboxItem;
 use App\Models\ProposalOutcome;
 use App\Models\User;
@@ -43,7 +45,7 @@ function resolveAlert(array $arguments): void
 test('each discard reason becomes a lesson, and without a reason nothing is learned', function (string $reason, string $lesson) {
     resolveAlert(['outcome' => 'dismissed', 'reason' => $reason]);
 
-    expect($this->user->intentLessons()->sole()->body)->toBe($lesson);
+    expect(CommsContextFact::query()->whereBelongsTo($this->user)->where('attribute', 'rule')->where('status', 'active')->sole()->text())->toBe($lesson);
 })->with([
     'not important' => ['not_important', 'No le importó: Slack de Andrés Vela sobre «Contrato». No avisar de mensajes así.'],
     'not for me' => ['not_for_me', 'No era para él: Slack de Andrés Vela sobre «Contrato». Le tocaba a otra persona.'],
@@ -53,12 +55,12 @@ test('each discard reason becomes a lesson, and without a reason nothing is lear
 test('a discard without a reason teaches nothing', function () {
     resolveAlert(['outcome' => 'dismissed']);
 
-    expect($this->user->intentLessons()->count())->toBe(0)
+    expect(CommsContextFact::query()->whereBelongsTo($this->user)->where('attribute', 'rule')->where('status', 'active')->count())->toBe(0)
         ->and($this->alert->outcomes()->sole()->reason)->toBeNull();
 });
 
 test('the relevance judge and the reply engine read what was learned', function () {
-    $this->user->intentLessons()->create(['body' => 'No le importó: Slack de Andrés Vela sobre «Contrato».']);
+    app(ContextWriter::class)->rule($this->user, 'No le importó: Slack de Andrés Vela sobre «Contrato».', null);
 
     $judge = new RecordingTextModel(['important' => false, 'reason' => 'x', 'relevance' => 0]);
     (new LlmRelevanceJudge($judge))->judge($this->user, InboxCandidate::fromArray(['source' => 'slack', 'external_id' => 'x', 'account' => '1', 'from' => ['name' => 'Andrés'], 'subject' => 'Hola', 'excerpt' => 'Hola', 'received_at' => now()->toIso8601String()]));

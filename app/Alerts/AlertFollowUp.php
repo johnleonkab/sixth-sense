@@ -20,6 +20,8 @@ use App\Alerts\Replies\ReplyPlan;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\SlackTriageEvent;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Issues\IssueComment;
@@ -127,10 +129,15 @@ class AlertFollowUp
         $plan = $this->planner->plan($item->user, $brief);
 
         if (filled($plan->learned)) {
-            $item->user->intentLessons()->create([
-                'inbox_item_id' => $item->id,
-                'body' => $plan->learned,
-            ]);
+            app(ContextWriter::class)->record($item->user, FactOrigin::Inferred, [[
+                'op' => 'add',
+                'kind' => 'rule',
+                'subject' => 'user',
+                'attribute' => 'rule',
+                'value' => ['text' => Str::limit(trim($plan->learned), 240)],
+                'audiences' => [],
+                'refs' => ["alert:{$item->id}"],
+            ]]);
         }
 
         $proposal = $plan->toArray();

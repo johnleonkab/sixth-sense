@@ -53,14 +53,28 @@ class RememberFact implements VoiceTool
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult
     {
         $attribute = (string) $arguments['attribute'];
+        $about = trim((string) $arguments['subject']);
+        $self = in_array(Str::lower($about), ['user', 'yo', 'me', ''], true);
+        $subject = match (true) {
+            $self => 'user',
+            str_contains($about, ':') => $about,
+            default => $this->context->subject($about),
+        };
+
         $this->context->record($user, FactOrigin::User, [[
             'op' => $attribute === 'rule' ? 'add' : 'set',
-            'kind' => $attribute === 'rule' ? 'rule' : 'person',
-            'subject' => Str::startsWith((string) $arguments['subject'], 'person:') ? $arguments['subject'] : 'person:'.Str::lower((string) $arguments['subject']),
+            'kind' => match (true) {
+                $attribute === 'rule' => 'rule',
+                $attribute === 'hours' && $self => 'preference',
+                default => 'person',
+            },
+            'subject' => $subject,
             'attribute' => $attribute,
-            'value' => $attribute === 'rule' ? ['text' => $arguments['value']] : ['value' => $arguments['value']],
+            'value' => array_filter([
+                ($attribute === 'rule' ? 'text' : 'value') => trim((string) $arguments['value']),
+                'name' => $self || str_contains($about, ':') ? null : $about,
+            ]),
             'audiences' => [],
-            'origin' => FactOrigin::User->value,
         ]]);
 
         return new ToolResult(['remembered' => true]);

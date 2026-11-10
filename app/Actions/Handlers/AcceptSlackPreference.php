@@ -27,6 +27,6 @@ class AcceptSlackPreference implements ActionHandler
 
         $this->preferences->accept($rule);
 
-        return ['rule' => $rule->body];
+        return ['rule' => $rule->sentence()];
     }
 }

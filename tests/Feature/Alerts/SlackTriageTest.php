@@ -14,6 +14,9 @@ use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\RecordingProductAnalytics;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Connections\Provider;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
@@ -23,7 +26,6 @@ use App\Connectors\Mail\MailAddress;
 use App\Jobs\PromoteUnansweredSlack;
 use App\Jobs\ScheduleTask;
 use App\Models\ConnectedAccount;
-use App\Models\SlackAttentionProfile;
 use App\Models\SlackTriageDecision;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -234,21 +236,26 @@ function slackPerson(): array
         'scopes' => Provider::Slack->scopes(),
         'metadata' => ['team_id' => 'T1', 'team_name' => 'CoverManager', 'user_id' => 'U1'],
     ]);
-    SlackAttentionProfile::query()->create([
-        'user_id' => $user->id,
-        'body' => 'Canales que parecen suyos: #producto.',
-        'signals' => [
-            'threads' => 3,
-            'replied' => 2,
-            'missed' => 0,
-            'other' => 1,
-            'noise' => 0,
-            'people' => [],
-            'channels' => [],
-            'owned_channels' => ['#producto'],
+    app(ContextWriter::class)->record($user, FactOrigin::Observed, [[
+        'op' => 'set',
+        'kind' => 'channel',
+        'subject' => 'slack',
+        'attribute' => 'profile',
+        'value' => [
+            'text' => 'Canales que parecen suyos: #producto.',
+            'signals' => [
+                'threads' => 3,
+                'replied' => 2,
+                'missed' => 0,
+                'other' => 1,
+                'noise' => 0,
+                'people' => [],
+                'channels' => [],
+                'owned_channels' => ['#producto'],
+            ],
         ],
-        'built_at' => now(),
-    ]);
+        'audiences' => [Audience::Triage->value],
+    ]]);
     $recording = new RecordingProductAnalytics;
     app()->instance(ProductAnalytics::class, $recording);
 

@@ -10,17 +10,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * What the person is working on lately, built every night from their
- * services (read only), for the voice assistant to start each conversation
- * knowing it.
+ * The nightly read of the person's services: whether it is on and how the
+ * last one went. What it found is in the context store, as inferred facts.
  */
-#[Fillable(['enabled', 'status', 'summary', 'digest', 'sources', 'error', 'started_at', 'generated_at'])]
+#[Fillable(['enabled', 'status', 'sources', 'error', 'started_at', 'generated_at'])]
 class WorkContext extends Model
 {
     /** @use HasFactory<WorkContextFactory> */
     use HasFactory;
 
-    /** Older than this, it no longer describes the present: the assistant does not get it. */
+    /** Older than this, the last read no longer describes the present. */
     public const FRESH_FOR_HOURS = 72;
 
     /** A build running longer than this died with its worker: it may be started again. */
@@ -44,7 +43,6 @@ class WorkContext extends Model
         return [
             'enabled' => 'boolean',
             'status' => WorkContextStatus::class,
-            'digest' => 'array',
             'sources' => 'array',
             'started_at' => 'immutable_datetime',
             'generated_at' => 'immutable_datetime',
@@ -60,12 +58,11 @@ class WorkContext extends Model
     }
 
     /**
-     * Whether the assistant should get it: on, built, and recent.
+     * Whether the last read is on and recent.
      */
-    public function usable(): bool
+    public function recent(): bool
     {
         return $this->enabled
-            && filled($this->summary)
             && $this->generated_at?->greaterThan(now()->subHours(self::FRESH_FOR_HOURS)) === true;
     }
 

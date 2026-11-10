@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Alerts\Lessons;
+namespace App\Comms\Context;
 
 use App\Models\ProposalOutcome;
 
 /**
  * For tests and demo mode: a lesson from each correction, without a model.
  */
-class FakeLessonWriter implements LessonWriter
+class FakeRuleWriter implements RuleWriter
 {
     public function write(ProposalOutcome $outcome): array
     {

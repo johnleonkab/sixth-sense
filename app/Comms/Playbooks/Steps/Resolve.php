@@ -2,6 +2,9 @@
 
 namespace App\Comms\Playbooks\Steps;
 
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
 use App\Comms\Models\ModelAnswer;
 use App\Comms\Models\ModelRouter;
 use App\Models\Comms\CommsIntent;
@@ -14,14 +17,14 @@ use App\Models\User;
  */
 class Resolve
 {
-    public function __construct(private ModelRouter $router) {}
+    public function __construct(private ModelRouter $router, private ContextRenderer $context) {}
 
     public function answer(User $user, CommsIntent $intent, CommsMessage $message): ModelAnswer
     {
         return $this->router->ask(
             user: $user,
             task: 'answer',
-            input: $this->wrapped($message, $intent->what),
+            input: ltrim($this->context->block($user, new ContextRequest(Audience::Reply, intent: $intent, query: $intent->what))."\n".$this->wrapped($message, $intent->what)),
             schema: [
                 'type' => 'object',
                 'required' => ['points'],

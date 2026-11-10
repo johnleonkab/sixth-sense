@@ -7,6 +7,7 @@ use App\Alerts\Intents\IntentClassifier;
 use App\Alerts\Intents\IntentDecision;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\RecordingProductAnalytics;
+use App\Comms\Context\ContextEngine;
 use App\Connections\Provider;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Slack\SlackAttention;
@@ -36,23 +37,23 @@ test('a month of slack becomes a profile the next triage can read', function () 
 
     (new LearnSlackAttention($user))->handle(app(SlackAttention::class), $recording);
 
-    $profile = $user->slackAttentionProfile()->first();
+    $profile = app(ContextEngine::class)->slackProfile($user);
     $secret = 'presupuesto-secreto-q4';
 
     expect($profile)->not->toBeNull()
-        ->and($profile->signals['threads'])->toBe(5)
-        ->and($profile->signals['replied'])->toBe(2)
-        ->and($profile->signals['missed'])->toBe(1)
-        ->and($profile->signals['other'])->toBe(1)
-        ->and($profile->signals['noise'])->toBe(1)
-        ->and($profile->signals['people'][0]['name'])->toBe('Julián Soto')
-        ->and($profile->signals['owned_channels'])->toBe(['#producto'])
-        ->and($profile->body)->toContain('Contestó 2')
-        ->and($profile->body)->toContain('Julián Soto')
-        ->and($profile->body)->toContain('#producto')
-        ->and($profile->body)->toContain('#general')
-        ->and($profile->body)->not->toContain($secret)
-        ->and(json_encode($profile->signals))->not->toContain($secret);
+        ->and($profile['signals']['threads'])->toBe(5)
+        ->and($profile['signals']['replied'])->toBe(2)
+        ->and($profile['signals']['missed'])->toBe(1)
+        ->and($profile['signals']['other'])->toBe(1)
+        ->and($profile['signals']['noise'])->toBe(1)
+        ->and($profile['signals']['people'][0]['name'])->toBe('Julián Soto')
+        ->and($profile['signals']['owned_channels'])->toBe(['#producto'])
+        ->and($profile['text'])->toContain('Contestó 2')
+        ->and($profile['text'])->toContain('Julián Soto')
+        ->and($profile['text'])->toContain('#producto')
+        ->and($profile['text'])->toContain('#general')
+        ->and($profile['text'])->not->toContain($secret)
+        ->and(json_encode($profile['signals']))->not->toContain($secret);
 
     expect($recording->events)->toBe([[
         'event' => 'slack_attention_profile_built',
@@ -95,7 +96,7 @@ test('someone without slack search is not profiled', function () {
     $user = User::factory()->create();
 
     expect(app(SlackAttention::class)->learn($user))->toBeNull()
-        ->and($user->slackAttentionProfile()->exists())->toBeFalse();
+        ->and(app(ContextEngine::class)->slackProfile($user))->toBeNull();
 });
 
 test('the weekly command queues one profile per slack workspace', function () {

@@ -5,7 +5,6 @@ namespace App\Alerts\Intents;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
-use App\Alerts\Lessons\Lessons;
 use App\Alerts\Triage;
 use App\Comms\Context\Audience;
 use App\Comms\Context\ContextEngine;
@@ -53,7 +52,11 @@ class IntentAssigner
         }
 
         $intents = $this->intents($user);
-        $context = $this->context($user);
+        $context = app(ContextRenderer::class)->block($user, new ContextRequest(
+            audience: Audience::Triage,
+            subjects: ['slack'],
+            about: $candidate->from?->name ?? $candidate->from?->email,
+        ));
         $state = null;
 
         if ($candidate->source === AlertSource::Slack) {
@@ -71,10 +74,10 @@ class IntentAssigner
         $row = null;
 
         if ($state !== null) {
-            $profile = $user->slackAttentionProfile;
-            $decision = $this->triage->adjust($decision, $state, $profile?->signals);
+            $signals = app(ContextEngine::class)->slackSignals($user);
+            $decision = $this->triage->adjust($decision, $state, $signals);
             $decision = $this->triage->recover($user, $candidate, $decision, $state);
-            $row = $this->triage->record($user, $candidate, $decision, $state, $profile);
+            $row = $this->triage->record($user, $candidate, $decision, $state, app(ContextEngine::class)->slackProfile($user) !== null);
         }
 
         $intent = $decision->intentId !== null ? $intents->firstWhere('id', $decision->intentId) : null;
@@ -126,18 +129,6 @@ class IntentAssigner
         return $user->inboxItems()
             ->where(fn ($items) => $items->where('external_id', $externalId)->orWhereJsonContains('payload->message_ids', $externalId))
             ->first();
-    }
-
-    private function context(User $user): string
-    {
-        app(Lessons::class)->for($user, 'triage');
-
-        return app(ContextRenderer::class)->triage(
-            $user,
-            app(ContextEngine::class)->pack($user, new ContextRequest(
-                audience: Audience::Triage,
-            )),
-        );
     }
 
     /**

@@ -9,11 +9,16 @@ use App\Alerts\Intents\IntentDecision;
 use App\Alerts\Intents\SlackAction;
 use App\Analytics\ProductAnalytics;
 use App\Analytics\RecordingProductAnalytics;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\FactOrigin;
 use App\Connections\Provider;
 use App\Connectors\Mail\MailAddress;
 use App\Connectors\Slack\SlackAttention;
 use App\Models\ConnectedAccount;
-use App\Models\SlackAttentionProfile;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -32,7 +37,7 @@ test('a tap proposes a rule and the next similar message follows it only after y
     $tap->assertOk();
     $rule = 'En #producto, mensajes de este tipo: no hace falta avisar.';
 
-    expect($user->slackAttentionProfile()->first()->body)->not->toContain($rule)
+    expect(slackPolicy($user))->not->toContain($rule)
         ->and($user->slackPreferenceRules()->first()->status)->toBe('proposed')
         ->and($tap->json('output.rule'))->toBe($rule);
 
@@ -59,10 +64,9 @@ test('a tap proposes a rule and the next similar message follows it only after y
     $this->actingAs($user)->postJson(route('actions.confirm', $tap->json('output.pending_action_id')))->assertOk();
 
     expect($user->slackPreferenceRules()->first()->status)->toBe('accepted')
-        ->and($user->slackAttentionProfile()->first()->body)->toContain($rule)
+        ->and(slackPolicy($user))->toContain($rule)
         ->and(collect($recording->events)->pluck('event'))->toContain('slack_preference_rule_accepted');
 
-    $user->unsetRelation('slackAttentionProfile');
     preferenceDecide($user, SlackAction::Reply, 'Hay que contestar en el canal.');
     $after = app(IntentAssigner::class)->assign($user, preferenceMessage('msg-3', 'hilo-3'));
 
@@ -72,12 +76,9 @@ test('a tap proposes a rule and the next similar message follows it only after y
 
 test('a profile older than a quarter keeps half its weight and a second week does not halve it again', function () {
     [$user] = preferencePerson(false);
-    SlackAttentionProfile::query()->create([
-        'user_id' => $user->id,
-        'body' => 'Contestó mucho.',
-        'signals' => ['threads' => 10, 'replied' => 10, 'missed' => 0, 'other' => 0, 'noise' => 0],
-        'built_at' => now()->subMonths(4),
-    ]);
+    $this->travelTo(now()->subMonths(4));
+    preferenceProfile($user, 'Contestó mucho.', ['threads' => 10, 'replied' => 10, 'missed' => 0, 'other' => 0, 'noise' => 0]);
+    $this->travelBack();
     Http::preventStrayRequests();
     Http::fake([
         'slack.com/*' => Http::response(['ok' => true, 'messages' => ['matches' => []]]),
@@ -85,20 +86,19 @@ test('a profile older than a quarter keeps half its weight and a second week doe
 
     app(SlackAttention::class)->learn($user);
 
-    $profile = $user->slackAttentionProfile()->first();
+    $profile = app(ContextEngine::class)->slackProfile($user);
 
-    expect($profile->body)->toContain('Esto venía del trimestre pasado.')
-        ->and($profile->signals['aged']['replied'])->toBe(5)
-        ->and($profile->body)->toContain('¿A quién respondes siempre?');
+    expect($profile['text'])->toContain('Esto venía del trimestre pasado.')
+        ->and($profile['signals']['aged']['replied'])->toBe(5)
+        ->and($profile['text'])->toContain('¿A quién respondes siempre?');
 
     app(SlackAttention::class)->learn($user);
 
-    expect($user->slackAttentionProfile()->first()->signals['aged']['replied'])->toBe(5);
+    expect(app(ContextEngine::class)->slackProfile($user)['signals']['aged']['replied'])->toBe(5);
 });
 
 test('a cold start asks three questions and an answer is already a rule', function () {
     [$user, $recording] = preferencePerson(false);
-    $user->slackAttentionProfile()->delete();
     Http::preventStrayRequests();
     Http::fake([
         'slack.com/*' => Http::response(['ok' => true, 'messages' => ['matches' => []]]),
@@ -106,7 +106,7 @@ test('a cold start asks three questions and an answer is already a rule', functi
 
     app(SlackAttention::class)->learn($user);
 
-    $body = $user->slackAttentionProfile()->first()->body;
+    $body = app(ContextEngine::class)->slackProfile($user)['text'];
 
     expect($body)->toContain('¿A quién respondes siempre?')
         ->and($body)->toContain('¿Qué proyectos son de este trimestre?')
@@ -118,11 +118,10 @@ test('a cold start asks three questions and an answer is already a rule', functi
     ])->assertOk();
 
     expect($user->slackPreferenceRules()->first()->status)->toBe('accepted')
-        ->and($user->slackAttentionProfile()->first()->body)->toContain('Responde siempre a Julián Soto.')
+        ->and(slackPolicy($user))->toContain('Responde siempre a Julián Soto.')
         ->and(collect($recording->events)->pluck('event'))->toContain('slack_preference_rule_accepted')
         ->and(collect($recording->events)->pluck('event'))->not->toContain('slack_preference_rule_proposed');
 
-    $user->unsetRelation('slackAttentionProfile');
     preferenceDecide($user, SlackAction::Ignore, 'Informativo, sin nada que hacer.');
     $item = app(IntentAssigner::class)->assign($user, preferenceMessage('msg-dm', 'hilo-dm', 'dm', 'Mensaje directo', '¿lo miramos?'));
 
@@ -168,20 +167,15 @@ function preferencePerson(bool $withProfile = true): array
     ]);
 
     if ($withProfile) {
-        SlackAttentionProfile::query()->create([
-            'user_id' => $user->id,
-            'body' => 'Canales que parecen suyos: #producto.',
-            'signals' => [
-                'threads' => 3,
-                'replied' => 2,
-                'missed' => 0,
-                'other' => 1,
-                'noise' => 0,
-                'people' => [],
-                'channels' => [],
-                'owned_channels' => ['#producto'],
-            ],
-            'built_at' => now(),
+        preferenceProfile($user, 'Canales que parecen suyos: #producto.', [
+            'threads' => 3,
+            'replied' => 2,
+            'missed' => 0,
+            'other' => 1,
+            'noise' => 0,
+            'people' => [],
+            'channels' => [],
+            'owned_channels' => ['#producto'],
         ]);
     }
 
@@ -221,4 +215,27 @@ function preferenceMessage(string $ref, string $thread, string $place = 'channel
         labels: [$place],
         threadKey: $thread,
     );
+}
+
+/**
+ * @param  array<string, mixed>  $signals
+ */
+function preferenceProfile(User $user, string $text, array $signals): void
+{
+    app(ContextWriter::class)->record($user, FactOrigin::Observed, [[
+        'op' => 'set',
+        'kind' => 'channel',
+        'subject' => 'slack',
+        'attribute' => 'profile',
+        'value' => ['text' => $text, 'signals' => $signals],
+        'audiences' => [Audience::Triage->value],
+    ]]);
+}
+
+/**
+ * What the Slack triage reads about how the person answers.
+ */
+function slackPolicy(User $user): string
+{
+    return app(ContextRenderer::class)->block($user, new ContextRequest(Audience::Triage, ['slack']));
 }

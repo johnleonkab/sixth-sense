@@ -20,6 +20,7 @@ use App\Models\AgendaTask;
 use App\Models\AlertSetting;
 use App\Models\InboxItem;
 use App\Models\User;
+use App\Models\WorkContext;
 use App\Scheduling\AgendaTaskStatus;
 use App\Scheduling\Assessors\FakeTaskAssessor;
 use App\Scheduling\Scheduler;
@@ -223,11 +224,11 @@ test('when the assessor can not answer, it is looked for this week with what was
 });
 
 test('the assessor gets the person work context and how busy the coming days are', function () {
-    $this->user->workContext()->create(['enabled' => true, 'status' => 'ready', 'summary' => 'Cerrando el lanzamiento del prepago.', 'generated_at' => now()]);
+    WorkContext::factory()->for($this->user)->ready(['summary' => 'Cerrando el lanzamiento del prepago.'])->create();
 
     scheduleFor('Revisar el PRD');
 
-    expect($this->assessor->assessed[0]['work_context'])->toBe('Cerrando el lanzamiento del prepago.')
+    expect($this->assessor->assessed[0]['work_context'])->toContain('Cerrando el lanzamiento del prepago.')
         ->and($this->assessor->assessed[0]['load'][0])->toBe('mié. 14 oct.: 5 reuniones, 3.3 h ocupadas');
 });
 

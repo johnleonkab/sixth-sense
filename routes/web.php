@@ -25,7 +25,6 @@ use App\Http\Controllers\Settings\ConnectionController;
 use App\Http\Controllers\Settings\GithubRepositoryController;
 use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
-use App\Http\Controllers\Settings\LessonController;
 use App\Http\Controllers\Settings\McpServerController;
 use App\Http\Controllers\Settings\SenseWorkspaceController;
 use App\Http\Controllers\Settings\SystemController;
@@ -114,18 +113,16 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/proposals/{proposal}/undo', [ProposalController::class, 'undo'])->whereNumber('proposal')->name('comms.proposals.undo');
 
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('people', [CommsPeopleController::class, 'index'])->name('people.index');
-        Route::put('people/preference', [CommsPeopleController::class, 'updatePreference'])->name('people.preference');
-        Route::post('people/areas', [CommsPeopleController::class, 'storeArea'])->name('people.areas.store');
-        Route::delete('people/areas/{area}', [CommsPeopleController::class, 'destroyArea'])->whereNumber('area')->name('people.areas.destroy');
-        Route::put('people/{person}', [CommsPeopleController::class, 'update'])->whereNumber('person')->name('people.update');
+        Route::redirect('people', '/settings/context?tab=people');
+        Route::put('context/preference', [CommsPeopleController::class, 'updatePreference'])->name('context.preference');
+        Route::post('context/areas', [CommsPeopleController::class, 'storeArea'])->name('context.areas.store');
+        Route::delete('context/areas/{area}', [CommsPeopleController::class, 'destroyArea'])->whereNumber('area')->name('context.areas.destroy');
+        Route::put('context/people/{person}', [CommsPeopleController::class, 'update'])->whereNumber('person')->name('context.people.update');
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
         Route::get('impact', [ImpactController::class, 'index'])->name('impact.index');
-        Route::get('lessons', [LessonController::class, 'index'])->name('lessons.index');
-        Route::put('lessons/{lesson}', [LessonController::class, 'update'])->whereNumber('lesson')->name('lessons.update');
-        Route::delete('lessons/{lesson}', [LessonController::class, 'destroy'])->whereNumber('lesson')->name('lessons.destroy');
+        Route::redirect('lessons', '/settings/context?tab=rules');
         Route::get('mcp', [McpServerController::class, 'index'])->name('mcp.index');
         Route::post('mcp', [McpServerController::class, 'store'])->middleware('throttle:10,1')->name('mcp.store');
         Route::get('mcp/oauth/callback', [McpServerController::class, 'callback'])->name('mcp.callback');
@@ -153,9 +150,10 @@ Route::middleware('auth')->group(function () {
         Route::post('context/build', [WorkContextController::class, 'build'])
             ->middleware('throttle:5,10')
             ->name('context.build');
-        Route::post('context/facts/{fact}/reject', [WorkContextController::class, 'reject'])
-            ->whereNumber('fact')
-            ->name('context.facts.reject');
+        Route::post('context/facts/{fact}/reject', [WorkContextController::class, 'reject'])->whereNumber('fact')->name('context.facts.reject');
+        Route::post('context/facts/{fact}/accept', [WorkContextController::class, 'accept'])->whereNumber('fact')->name('context.facts.accept');
+        Route::put('context/facts/{fact}', [WorkContextController::class, 'edit'])->whereNumber('fact')->name('context.facts.edit');
+        Route::put('context/tone', [WorkContextController::class, 'tone'])->name('context.tone');
         Route::redirect('archive', '/settings/archive/agents')->name('archive.index');
         Route::get('archive/agents', [ArchiveAgentController::class, 'index'])->name('archive.agents.index');
         Route::post('archive/agents/sync', [ArchiveAgentController::class, 'sync'])->name('archive.agents.sync');

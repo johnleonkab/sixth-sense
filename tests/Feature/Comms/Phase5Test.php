@@ -17,9 +17,9 @@ use App\Comms\Models\ModelCompletion;
 use App\Comms\People\Relation;
 use App\Comms\Playbooks\AnswerFromSources;
 use App\Connections\Provider;
+use App\Knowledge\KnowledgeSource;
 use App\Models\AiUsage;
 use App\Models\Comms\CommsConversationLink;
-use App\Models\Comms\CommsDocument;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIdentity;
 use App\Models\Comms\CommsIntent;
@@ -31,9 +31,11 @@ use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
 use App\Models\ConnectedAccount;
+use App\Models\KnowledgeDocument;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     Http::preventStrayRequests();
@@ -509,12 +511,14 @@ function phase5Say(
 
 function phase5Doc(User $user, string $ref, string $kind, string $title, string $body, ?string $topic): void
 {
-    CommsDocument::query()->create([
-        'user_id' => $user->id,
-        'ref' => $ref,
-        'kind' => $kind,
+    $source = $kind === 'code' ? KnowledgeSource::Archive : KnowledgeSource::from($kind);
+
+    KnowledgeDocument::factory()->for($user)->create([
+        'source' => $source,
+        'ref' => Str::after($ref, $source->value.':'),
         'title' => $title,
-        'body' => $body,
+        'summary' => $body,
+        'terms' => mb_strtolower($title.' '.$body),
         'topic' => $topic,
     ]);
 }

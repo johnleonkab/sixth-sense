@@ -5,6 +5,7 @@ namespace App\Connectors\Slack;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
 use App\Alerts\InboxWatcher;
+use App\Comms\Context\ContextEngine;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Mail\MailAddress;
 use App\Models\ConnectedAccount;
@@ -57,7 +58,7 @@ class SlackWatcher implements InboxWatcher
         $after = CarbonImmutable::createFromTimestamp($since)->subDay()->toDateString();
         $queries = ["to:<@{$me}> after:{$after}", "<@{$me}> after:{$after}"];
         $ownedChannel = [];
-        $signals = $account->user->slackAttentionProfile?->signals;
+        $signals = app(ContextEngine::class)->slackSignals($account->user);
 
         foreach (array_slice(is_array($signals) ? ($signals['owned_channels'] ?? []) : [], 0, 5) as $channel) {
             if (is_string($channel) && str_starts_with($channel, '#')) {

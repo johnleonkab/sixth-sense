@@ -11,8 +11,6 @@ use App\Connectors\Chat\ChatPerson;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Jira\JiraRules;
-use App\Knowledge\Gaps\GapStatus;
-use App\Models\KnowledgeGap;
 use App\Models\User;
 use App\Voice\Tools\Toolbox;
 use Carbon\CarbonImmutable;
@@ -84,12 +82,6 @@ final readonly class AssistantProfile
             $lines[] = 'Antes de responder sobre un proyecto, una decisión, un proceso, una reunión, una persona o cualquier contexto del trabajo, llama a search_knowledge: busca a la vez en el archivo de trabajo, Jira, Notion, las notas y transcripciones de reuniones y lo que el usuario te ha explicado. Responde con lo que encuentres y di de dónde sale. Si no hay nada, dilo; no lo inventes.';
         }
 
-        $answers = $user->knowledgeGaps()->where('status', GapStatus::Answered)->latest('answered_at')->limit(30)->get();
-
-        if ($answers->isNotEmpty()) {
-            $lines[] = "Lo que el usuario te ha explicado cuando preguntaste:\n".$answers->map(fn (KnowledgeGap $gap): string => '- '.$gap->memory())->implode("\n");
-        }
-
         $open = $user->inboxItems()->where('source', AlertSource::Questions)->where('status', AlertStatus::Pending)->count();
 
         if ($open > 0) {
@@ -147,12 +139,11 @@ final readonly class AssistantProfile
     }
 
     /**
-     * What the user is working on lately, built overnight, when they switched it
-     * on and it is recent. Already written: starting a conversation costs nothing more.
+     * What sixth-sense knows of the person's work: the voice pack, as prose.
      */
     private static function workContext(User $user): string
     {
-        return app(ContextRenderer::class)->forVoice($user);
+        return app(ContextRenderer::class)->voice($user);
     }
 
     /**

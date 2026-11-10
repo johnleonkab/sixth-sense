@@ -2,7 +2,6 @@
 
 namespace App\WorkContext;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
 /**
@@ -116,46 +115,5 @@ final readonly class WorkDigest
             'hot_pages' => $this->hotPages,
             'jira' => $this->jira,
         ];
-    }
-
-    /**
-     * The context as the voice assistant reads it at the start of each conversation.
-     */
-    public function forAssistant(CarbonImmutable $generatedAt): string
-    {
-        $workstreams = array_map(fn (array $stream): string => '- '.implode(' ', array_filter([
-            "{$stream['name']}: {$stream['what']}.",
-            $stream['why'] ? "Por qué: {$stream['why']}." : null,
-            $stream['with'] !== [] ? 'Con: '.implode(', ', $stream['with']).'.' : null,
-            $stream['where'] !== [] ? 'Dónde: '.implode(', ', $stream['where']).'.' : null,
-            $stream['next'] ? "Siguiente paso: {$stream['next']}." : null,
-        ])), $this->workstreams);
-
-        $people = implode('; ', array_map(
-            fn (array $person): string => $person['name'].($person['relation'] !== '' ? " ({$person['relation']})" : ''),
-            $this->people,
-        ));
-
-        return implode("\n", array_filter([
-            'Contexto de su trabajo estos días, preparado el '.$generatedAt->locale('es')->isoFormat('dddd D [de] MMMM').' leyendo (sin cambiar nada) su Slack, su correo, su Drive, su Notion y su Jira. '
-                .'Úsalo para entender de qué y de quién habla, en qué idioma, y cómo escribe, sin que te lo explique. No lo recites ni digas que lo tienes si no viene a cuento. '
-                .'Puede estar desactualizado: lo que veas con tus herramientas manda.',
-            "Resumen: {$this->summary}",
-            $workstreams !== [] ? "En qué está:\n".implode("\n", $workstreams) : null,
-            $people !== '' ? "Personas: {$people}." : null,
-            $this->contacts !== [] ? "Contactos frecuentes (idioma en el que hay que hablarles):\n".implode("\n", array_map(
-                fn (array $contact): string => '- '.$contact['name']
-                    .($contact['language'] !== '' ? " · {$contact['language']}" : '')
-                    .($contact['where'] !== '' ? " · {$contact['where']}" : '')
-                    .($contact['note'] !== '' ? " · {$contact['note']}" : ''),
-                $this->contacts,
-            )) : null,
-            $this->writingSlack !== '' ? "Cómo escribe en Slack: {$this->writingSlack}" : null,
-            $this->writingGmail !== '' ? "Cómo escribe en Gmail: {$this->writingGmail}" : null,
-            $this->hotFiles !== [] ? "Archivos calientes:\n".implode("\n", array_map(fn (array $file): string => "- {$file['title']}".($file['why'] !== '' ? ": {$file['why']}" : ''), $this->hotFiles)) : null,
-            $this->hotPages !== [] ? "Páginas calientes de Notion:\n".implode("\n", array_map(fn (array $page): string => "- {$page['title']}".($page['why'] !== '' ? ": {$page['why']}" : ''), $this->hotPages)) : null,
-            $this->jira !== [] ? 'Jira reciente: '.implode('; ', $this->jira).'.' : null,
-            $this->openLoops !== [] ? 'Pendiente: '.implode('; ', $this->openLoops).'.' : null,
-        ]));
     }
 }

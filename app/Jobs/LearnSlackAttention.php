@@ -43,9 +43,9 @@ class LearnSlackAttention implements ShouldBeUnique, ShouldQueue
         }
 
         $analytics->capture($this->user, SlackTriageEvent::AttentionProfileBuilt, [
-            'threads' => (int) $profile->signals['threads'],
-            'replied' => (int) $profile->signals['replied'],
-            'missed' => (int) $profile->signals['missed'],
+            'threads' => (int) $profile['signals']['threads'],
+            'replied' => (int) $profile['signals']['replied'],
+            'missed' => (int) $profile['signals']['missed'],
         ]);
     }
 }

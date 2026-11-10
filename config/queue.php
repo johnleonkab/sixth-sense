@@ -73,7 +73,7 @@ return [
             'after_commit' => false,
         ],
 
-        // BuildWorkContext blocks inside HTTP longer than its own alarm can
+        // ContextHarvest blocks inside HTTP longer than its own alarm can
         // fire. Redis must not hand that job to a second worker meanwhile.
         'redis-long' => [
             'driver' => 'redis',

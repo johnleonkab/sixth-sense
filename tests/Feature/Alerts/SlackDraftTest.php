@@ -57,10 +57,7 @@ test('a reply draft cites the thread and stops looking', function () {
 test('a reply draft cites the work archive when the thread says nothing', function () {
     Http::preventStrayRequests();
     [$user, $item] = draftedAlert('¿cómo va el despliegue?');
-    WorkContext::factory()->for($user)->ready()->create([
-        'summary' => 'El despliegue sale el jueves según el archivo de trabajo.',
-        'generated_at' => now(),
-    ]);
+    WorkContext::factory()->for($user)->ready(['summary' => 'El despliegue sale el jueves según el archivo de trabajo.'])->create();
     $chats = mock(Chats::class);
     app()->instance(Chats::class, $chats);
     $chats->shouldReceive('view')->andReturn(threadView('¿cómo va el despliegue?'));

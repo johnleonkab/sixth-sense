@@ -1,5 +1,7 @@
 <?php
 
+use App\Comms\Context\ContextHarvest;
+use App\Comms\Context\ContextRenderer;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
 use App\Connectors\Docs\Documents;
@@ -8,7 +10,7 @@ use App\Connectors\Mail\FakeMailbox;
 use App\Connectors\Mail\Mailbox;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
-use App\Jobs\BuildWorkContext;
+use App\Models\Comms\CommsContextFact;
 use App\Models\User;
 use App\Models\WorkContext;
 use App\WorkContext\ContextSummarizer;
@@ -33,17 +35,20 @@ test('the nightly build reads every source and keeps what the person is working 
     $this->freezeSecond();
     WorkContext::factory()->for($this->user)->create();
 
-    BuildWorkContext::dispatchSync($this->user);
+    ContextHarvest::dispatchSync($this->user);
 
     $context = $this->user->workContext()->first();
     $activity = $this->summarizer->summarized[0];
 
+    $facts = CommsContextFact::query()->whereBelongsTo($this->user)->where('status', 'active')->get();
+
     expect($context->status)->toBe(WorkContextStatus::Ready)
-        ->and($context->summary)->toStartWith('Estos días John León ha escrito o recibido')
-        ->and($context->digest['workstreams'])->not->toBeEmpty()
+        ->and($facts->firstWhere('attribute', 'summary')->text())->toStartWith('Estos días John León ha escrito o recibido')
+        ->and($facts->where('attribute', 'state'))->not->toBeEmpty()
+        ->and($facts->every(fn (CommsContextFact $fact): bool => $fact->refs === ['harvest:'.now()->toDateString()]))->toBeTrue()
         ->and($context->generated_at->equalTo(now()))->toBeTrue()
         ->and($context->sources)->toMatchArray([...$activity->counts(), 'failed' => []])
-        ->and($context->usable())->toBeTrue()
+        ->and($context->recent())->toBeTrue()
         ->and($activity->messages)->not->toBeEmpty()
         ->and($activity->emails)->not->toBeEmpty()
         ->and($activity->documents)->toHaveCount(2)
@@ -55,7 +60,7 @@ test('email is read from the primary inbox and the sent folder of the last week'
     $this->freezeSecond();
     WorkContext::factory()->for($this->user)->create();
 
-    BuildWorkContext::dispatchSync($this->user);
+    ContextHarvest::dispatchSync($this->user);
 
     expect(array_map(fn ($search) => $search->folder, $this->mailbox->searches))->toBe(['primary', 'sent'])
         ->and($this->mailbox->searches[0]->after->equalTo(now()->subDays(7)))->toBeTrue();
@@ -70,7 +75,7 @@ test('a source that fails is left out and the others are still read', function (
     }));
     WorkContext::factory()->for($this->user)->create();
 
-    BuildWorkContext::dispatchSync($this->user);
+    ContextHarvest::dispatchSync($this->user);
 
     $context = $this->user->workContext()->first();
 
@@ -81,6 +86,7 @@ test('a source that fails is left out and the others are still read', function (
 
 test('when the build fails the previous context is kept and the error shown', function () {
     $previous = WorkContext::factory()->for($this->user)->ready()->create();
+    $summary = CommsContextFact::query()->where('attribute', 'summary')->sole()->text();
     $this->app->instance(ContextSummarizer::class, new class implements ContextSummarizer
     {
         public function summarize(User $user, WorkActivity $activity): WorkDigest
@@ -89,20 +95,20 @@ test('when the build fails the previous context is kept and the error shown', fu
         }
     });
 
-    expect(fn () => BuildWorkContext::dispatchSync($this->user))->toThrow(RuntimeException::class);
+    expect(fn () => ContextHarvest::dispatchSync($this->user))->toThrow(RuntimeException::class);
 
     $context = $previous->refresh();
 
     expect($context->status)->toBe(WorkContextStatus::Failed)
         ->and($context->error)->toBe('Gemini work context failed with HTTP 429: quota')
-        ->and($context->summary)->toBe($previous->summary)
-        ->and($context->usable())->toBeTrue();
+        ->and(CommsContextFact::query()->where('attribute', 'summary')->where('status', 'active')->sole()->text())->toBe($summary)
+        ->and($context->recent())->toBeTrue();
 });
 
 test('nothing is read once the person switched it off', function () {
     WorkContext::factory()->for($this->user)->create(['enabled' => false]);
 
-    BuildWorkContext::dispatchSync($this->user);
+    ContextHarvest::dispatchSync($this->user);
 
     expect($this->summarizer->summarized)->toBeEmpty()
         ->and($this->user->workContext()->first()->status)->toBe(WorkContextStatus::Idle);
@@ -115,12 +121,13 @@ test('the nightly command only queues people who switched it on', function () {
 
     $this->artisan('context:build')->assertSuccessful();
 
-    Queue::assertPushed(BuildWorkContext::class, 1);
-    Queue::assertPushed(BuildWorkContext::class, fn (BuildWorkContext $job) => $job->user->is($on));
+    Queue::assertPushed(ContextHarvest::class, 1);
+    Queue::assertPushed(ContextHarvest::class, fn (ContextHarvest $job) => $job->user->is($on));
 });
 
 test('an old context is not given to the assistant', function () {
     $context = WorkContext::factory()->for($this->user)->ready()->create(['generated_at' => now()->subHours(WorkContext::FRESH_FOR_HOURS + 1)]);
 
-    expect($context->usable())->toBeFalse();
+    expect($context->recent())->toBeFalse()
+        ->and(app(ContextRenderer::class)->voice($this->user))->not->toContain('Contexto de su trabajo');
 });

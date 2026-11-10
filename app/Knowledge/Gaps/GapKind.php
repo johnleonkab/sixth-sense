@@ -13,12 +13,16 @@ enum GapKind: string
     /** How an alert the person marked as resolved was resolved. */
     case Resolution = 'resolution';
 
+    /** Whether something it keeps hearing should replace what the person said. */
+    case Fact = 'fact';
+
     public function label(): string
     {
         return match ($this) {
             self::Meeting => 'Reunión',
             self::Term => 'Término',
             self::Resolution => 'Resolución',
+            self::Fact => 'Dato',
         };
     }
 }

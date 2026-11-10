@@ -18,9 +18,6 @@ use App\Alerts\Judges\FakeMeetingAdvisor;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\Judges\LlmMeetingAdvisor;
 use App\Alerts\Judges\LlmRelevanceJudge;
-use App\Alerts\Lessons\FakeLessonWriter;
-use App\Alerts\Lessons\LessonWriter;
-use App\Alerts\Lessons\LlmLessonWriter;
 use App\Alerts\MeetingAdvisor;
 use App\Alerts\Push\PushSender;
 use App\Alerts\Push\WebPushSender;
@@ -30,6 +27,9 @@ use App\Alerts\Replies\LlmReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Analytics\PostHogProductAnalytics;
 use App\Analytics\ProductAnalytics;
+use App\Comms\Context\FakeRuleWriter;
+use App\Comms\Context\LlmRuleWriter;
+use App\Comms\Context\RuleWriter;
 use App\Comms\Ingestion\AccountInboundFeed;
 use App\Comms\Ingestion\FakeInboundFeed;
 use App\Comms\Ingestion\InboundFeed;
@@ -183,9 +183,9 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // What each correction teaches, in a sentence: a light model.
-        $this->app->bind(LessonWriter::class, fn (): LessonWriter => match (true) {
-            $this->usesTextModel(config('alerts.planner')) => new LlmLessonWriter($this->pipeline('lesson_writer')),
-            config('alerts.planner') === 'fake' => new FakeLessonWriter,
+        $this->app->bind(RuleWriter::class, fn (): RuleWriter => match (true) {
+            $this->usesTextModel(config('alerts.planner')) => new LlmRuleWriter($this->pipeline('lesson_writer')),
+            config('alerts.planner') === 'fake' => new FakeRuleWriter,
             default => throw new InvalidArgumentException('Unsupported lesson writer ['.config('alerts.planner').'].'),
         });
 

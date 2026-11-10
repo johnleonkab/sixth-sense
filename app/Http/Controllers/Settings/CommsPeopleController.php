@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Comms\Context\ContextEngine;
 use App\Comms\Intents\Archive;
 use App\Comms\Intents\PersonRef;
 use App\Comms\People\Relation;
@@ -9,37 +10,50 @@ use App\Http\Controllers\Controller;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Inertia\Response;
 
 /**
- * People, owned areas and working hours. Every save is a user.configured event.
+ * People, owned areas and working hours, edited from the Contexto section.
+ * Every save is a user.configured event.
  */
 class CommsPeopleController extends Controller
 {
-    public function index(Request $request): Response
+    /**
+     * What the Personas and Áreas y horario tabs of Contexto show, with where
+     * each value of a person came from.
+     *
+     * @return array<string, mixed>
+     */
+    public static function props(User $user, ContextEngine $engine): array
     {
-        $user = $request->user();
         $preference = CommsPreference::query()->whereBelongsTo($user)->first();
         $people = new PersonRef;
 
-        return Inertia::render('settings/people', [
+        return [
             'people' => CommsPerson::query()
                 ->whereBelongsTo($user)
                 ->where('relation', '!=', Relation::Self)
                 ->with('identities')
                 ->orderBy('display_name')
                 ->get()
-                ->map(fn (CommsPerson $person): array => [
-                    'id' => $person->id,
-                    'name' => $person->display_name,
-                    'relation' => $person->relation->value,
-                    'weight' => $person->importance_weight,
-                    'ref' => $people->key($person),
-                ]),
+                ->map(function (CommsPerson $person) use ($people, $engine, $user): array {
+                    $ref = $people->key($person);
+
+                    return [
+                        'id' => $person->id,
+                        'name' => $person->display_name,
+                        'relation' => $person->relation->value,
+                        'weight' => $person->importance_weight,
+                        'role' => $person->role,
+                        'team' => $person->team,
+                        'ref' => $ref,
+                        'origins' => $engine->origins($user, "person:{$ref}"),
+                    ];
+                }),
             'areas' => CommsOwnedArea::query()->whereBelongsTo($user)->orderBy('name')->get(['id', 'kind', 'ref', 'name', 'keywords']),
             'preference' => [
                 'timezone' => $preference->timezone ?? 'Europe/Madrid',
@@ -52,7 +66,7 @@ class CommsPeopleController extends Controller
                 ->reject(fn (Relation $relation): bool => $relation === Relation::Self)
                 ->map(fn (Relation $relation): array => [
                     'value' => $relation->value,
-                    'label' => $this->relationLabel($relation),
+                    'label' => self::relationLabel($relation),
                     'weight' => $relation->weight(),
                 ])->values(),
             'kinds' => [
@@ -72,7 +86,7 @@ class CommsPeopleController extends Controller
                 'America/Argentina/Buenos_Aires',
                 'UTC',
             ],
-        ]);
+        ];
     }
 
     public function update(Request $request, Archive $archive, PersonRef $people, CommsPerson $person): RedirectResponse
@@ -165,7 +179,7 @@ class CommsPeopleController extends Controller
         return back();
     }
 
-    private function relationLabel(Relation $relation): string
+    private static function relationLabel(Relation $relation): string
     {
         return match ($relation) {
             Relation::Boss => 'Responsable',

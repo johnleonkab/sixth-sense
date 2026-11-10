@@ -4,12 +4,14 @@ namespace App\Voice\Tools\Context;
 
 use App\Comms\Context\Audience;
 use App\Comms\Context\ContextEngine;
+use App\Comms\Context\ContextPack;
 use App\Comms\Context\ContextRenderer;
 use App\Comms\Context\ContextRequest;
 use App\Models\User;
 use App\Voice\Tools\ToolContext;
 use App\Voice\Tools\ToolResult;
 use App\Voice\Tools\VoiceTool;
+use Illuminate\Support\Str;
 
 /**
  * Reads the one context store. It changes nothing.
@@ -45,8 +47,17 @@ class WhatDoYouKnow implements VoiceTool
 
     public function handle(User $user, array $arguments, ToolContext $context): ToolResult
     {
-        $pack = $this->context->pack($user, new ContextRequest(Audience::Voice, about: $arguments['subject'] ?? null));
-        $text = trim($this->renderer->forVoice($user)."\n".$this->renderer->rules($pack));
+        $subject = Str::lower(trim((string) ($arguments['subject'] ?? '')));
+        $pack = $this->context->pack($user, new ContextRequest(Audience::Voice, about: $subject !== '' ? $subject : null));
+
+        if ($subject !== '') {
+            $pack = new ContextPack(Audience::Voice, array_values(array_filter(
+                $pack->facts,
+                fn (array $fact): bool => str_contains(Str::lower($fact['subject'].' '.$this->renderer->name($fact)), $subject),
+            )));
+        }
+
+        $text = $this->renderer->forVoice($pack);
 
         return new ToolResult(['known' => $text !== '' ? $text : 'Todavía no hay nada guardado.']);
     }

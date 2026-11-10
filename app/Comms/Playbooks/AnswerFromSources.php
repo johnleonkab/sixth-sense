@@ -2,6 +2,7 @@
 
 namespace App\Comms\Playbooks;
 
+use App\Comms\Context\CorpusDocument;
 use App\Comms\Models\ModelAnswerKind;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\Steps\Ask;
@@ -9,7 +10,6 @@ use App\Comms\Playbooks\Steps\Gather;
 use App\Comms\Playbooks\Steps\Propose;
 use App\Comms\Playbooks\Steps\Resolve;
 use App\Comms\Playbooks\Steps\Watch;
-use App\Models\Comms\CommsDocument;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsOwnedArea;
@@ -67,7 +67,7 @@ class AnswerFromSources
     }
 
     /**
-     * @param  array{hits?: list<array{document: CommsDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
+     * @param  array{hits?: list<array{document: CorpusDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
      * @param  array<string, mixed>  $output
      */
     private function apply(User $user, CommsIntent $intent, CommsMessage $message, array $gathered, array $output, bool $proposing): void
@@ -119,7 +119,7 @@ class AnswerFromSources
     }
 
     /**
-     * @param  array{hits?: list<array{document: CommsDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
+     * @param  array{hits?: list<array{document: CorpusDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
      * @param  array<string, mixed>  $output
      * @return array{draft: string, unknowns: list<string>, refs: list<string>, options: string}
      */
@@ -215,7 +215,7 @@ class AnswerFromSources
     }
 
     /**
-     * @param  array{hits?: list<array{document: CommsDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
+     * @param  array{hits?: list<array{document: CorpusDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
      * @return array{text: string, ref: string}|null
      */
     private function shortcut(array $gathered): ?array

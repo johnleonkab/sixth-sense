@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Alerts\Lessons;
+namespace App\Comms\Context;
 
 use App\Models\ProposalOutcome;
 use App\Models\User;

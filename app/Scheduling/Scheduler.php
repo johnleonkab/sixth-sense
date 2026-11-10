@@ -7,6 +7,9 @@ use App\Actions\ActionStatus;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Triage;
+use App\Comms\Context\Audience;
+use App\Comms\Context\ContextRenderer;
+use App\Comms\Context\ContextRequest;
 use App\Connectors\Calendar\CalendarAccount;
 use App\Connectors\Calendar\CalendarWriter;
 use App\Connectors\Calendar\NewEvent;
@@ -226,9 +229,9 @@ class Scheduler
     private function assess(AgendaTask $task, SchedulingRequest $request, CarbonImmutable $now): TaskAssessment
     {
         try {
-            $workContext = $task->user->workContext?->usable() ? $task->user->workContext->summary : null;
+            $context = app(ContextRenderer::class)->block($task->user, new ContextRequest(Audience::Scheduler, about: $request->people[0] ?? null));
 
-            return $this->assessor->assess($task->user, $request, $now, $workContext, $this->slots->load($task->user, $now));
+            return $this->assessor->assess($task->user, $request, $now, $context !== '' ? $context : null, $this->slots->load($task->user, $now));
         } catch (Throwable $exception) {
             report($exception);
 

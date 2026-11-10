@@ -69,10 +69,10 @@ class CorrectSlackTriage implements VoiceTool
         return new ToolResult(
             output: [
                 'pending_action_id' => $action?->id,
-                'rule' => $rule->body,
+                'rule' => $rule->sentence(),
                 'needs_confirmation' => true,
             ],
-            canvas: ProposalViews::rule($user, 'Regla de atención', $rule->body, $action),
+            canvas: ProposalViews::rule($user, 'Regla de atención', $rule->sentence(), $action),
         );
     }
 

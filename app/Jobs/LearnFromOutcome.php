@@ -2,14 +2,14 @@
 
 namespace App\Jobs;
 
-use App\Alerts\Lessons\Lessons;
-use App\Alerts\Lessons\LessonWriter;
+use App\Comms\Context\ContextWriter;
+use App\Comms\Context\RuleWriter;
 use App\Models\ProposalOutcome;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Turns one correction of the person into lessons the next proposals read.
+ * Turns one correction of the person into rules the next proposals read.
  */
 class LearnFromOutcome implements ShouldQueue
 {
@@ -21,7 +21,7 @@ class LearnFromOutcome implements ShouldQueue
 
     public function __construct(public ProposalOutcome $outcome) {}
 
-    public function handle(LessonWriter $writer, Lessons $lessons): void
+    public function handle(RuleWriter $writer, ContextWriter $context): void
     {
         $outcome = $this->outcome->fresh();
 
@@ -31,7 +31,7 @@ class LearnFromOutcome implements ShouldQueue
         }
 
         foreach ($writer->write($outcome) as $lesson) {
-            $lessons->learn($outcome->user, $lesson['body'], $lesson['layer'], $lesson['about'], $lesson['topic'], outcome: $outcome);
+            $context->rule($outcome->user, $lesson['body'], $lesson['layer'], $lesson['about'], $lesson['topic'], ["outcome:{$outcome->id}"]);
         }
 
         $outcome->update(['learned_at' => now()]);

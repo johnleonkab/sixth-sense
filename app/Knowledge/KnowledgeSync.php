@@ -2,6 +2,7 @@
 
 namespace App\Knowledge;
 
+use App\Comms\Context\ContextEngine;
 use App\Connectors\Docs\Documents;
 use App\Connectors\Docs\DocumentSearch;
 use App\Connectors\GitHub\GithubApi;
@@ -10,10 +11,9 @@ use App\Connectors\Issues\Issue;
 use App\Connectors\Issues\IssueComment;
 use App\Connectors\Issues\IssueTracker;
 use App\Connectors\Wiki\Wiki;
-use App\Knowledge\Gaps\GapStatus;
+use App\Knowledge\Gaps\GapKind;
 use App\Models\GithubRepository;
 use App\Models\KnowledgeDocument;
-use App\Models\KnowledgeGap;
 use App\Models\User;
 use App\Models\WingmanMeeting;
 use App\Sense\DocumentRules;
@@ -286,15 +286,16 @@ class KnowledgeSync
      */
     public function syncMemory(User $user): void
     {
-        $answered = $user->knowledgeGaps()->where('status', GapStatus::Answered)->get();
+        $answered = app(ContextEngine::class)->answers($user);
         $now = CarbonImmutable::now();
 
-        foreach ($answered as $gap) {
-            $this->remember($user, KnowledgeSource::Memory, "gap:{$gap->id}", "{$gap->kind->label()}: {$gap->subject}", null, $gap->answered_at?->toIso8601String(), $gap->answered_at, $now);
+        foreach ($answered as $answer) {
+            $label = $answer['kind'] === 'meeting' ? GapKind::Meeting->label() : GapKind::Term->label();
+            $this->remember($user, KnowledgeSource::Memory, $answer['ref'], "{$label}: {$answer['name']}", null, $answer['at']->toIso8601String(), $answer['at'], $now);
         }
 
         $stale = $user->knowledgeDocuments()->where('source', KnowledgeSource::Memory);
-        $kept = $answered->map(fn (KnowledgeGap $gap): string => "gap:{$gap->id}")->all();
+        $kept = array_column($answered, 'ref');
 
         if ($kept === []) {
             $stale->delete();
@@ -406,9 +407,9 @@ class KnowledgeSync
      */
     private function answer(KnowledgeDocument $document): ?array
     {
-        $gap = $document->user->knowledgeGaps()->where('status', GapStatus::Answered)->find((int) Str::after($document->ref, 'gap:'));
+        $answer = collect(app(ContextEngine::class)->answers($document->user))->firstWhere('ref', $document->ref);
 
-        return $gap === null ? null : ['content' => "Pregunta: {$gap->question}\nRespuesta: {$gap->answer}"];
+        return $answer === null ? null : ['content' => trim(($answer['question'] !== '' ? "Pregunta: {$answer['question']}\n" : '')."Respuesta: {$answer['text']}")];
     }
 
     private function wingmanText(MeetingNotes $notes): string

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\BuildWorkContext;
+use App\Comms\Context\ContextHarvest;
 use App\Models\User;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -22,7 +22,7 @@ class BuildWorkContexts extends Command
         User::query()
             ->whereHas('workContext', fn ($context) => $context->where('enabled', true))
             ->each(function (User $user) use (&$queued): void {
-                BuildWorkContext::dispatch($user);
+                ContextHarvest::dispatch($user);
                 $queued++;
             });
 

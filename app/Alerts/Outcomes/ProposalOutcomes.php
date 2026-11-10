@@ -2,7 +2,7 @@
 
 namespace App\Alerts\Outcomes;
 
-use App\Alerts\Lessons\Lessons;
+use App\Comms\Context\ContextWriter;
 use App\Jobs\InferResolution;
 use App\Jobs\LearnFromOutcome;
 use App\Models\InboxItem;
@@ -62,11 +62,11 @@ class ProposalOutcomes
 
         // Each reason teaches its layer: the judge, the triage, or the reply engine and the classifier read these.
         if ($lesson !== null) {
-            app(Lessons::class)->learn($alert->user, $lesson, match ($reason) {
+            app(ContextWriter::class)->rule($alert->user, $lesson, match ($reason) {
                 'not_important' => 'judge',
                 'not_for_me' => 'triage',
                 default => 'reply',
-            }, $alert->actor_name, "discard-{$reason}", outcome: $outcome);
+            }, $alert->actor_name, "discard-{$reason}", ["outcome:{$outcome->id}", "alert:{$alert->id}"]);
             $outcome->update(['learned_at' => now()]);
         }
 
