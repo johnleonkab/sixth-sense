@@ -1,5 +1,7 @@
 <?php
 
+use App\Alerts\Push\PushSender;
+use App\Comms\Cutover\HomeFeed;
 use App\Comms\Events\EventType;
 use App\Comms\Ingestion\IdentityResolver;
 use App\Comms\Ingestion\Ingestor;
@@ -16,11 +18,13 @@ use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsNotification;
 use App\Models\ConnectedAccount;
+use App\Models\PushSubscription;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\RecordingPushSender;
 
 beforeEach(function () {
     Http::preventStrayRequests();
@@ -108,7 +112,8 @@ test('an urgent ask reaches the open screen at once, saying who asks and what', 
 
         return $event->broadcastAs() === 'inbox.item.created'
             && $event->broadcastOn()[0]->name === 'private-App.Models.User.'.$user->id
-            && $card['title'] === 'Marta Prueba te pide: Revisar el PR de pagos'
+            && $card['title'] === 'Revisar el PR de pagos'
+            && $card['why'] === 'Urgente. Espera tu respuesta.'
             && $card['actor_name'] === 'Marta Prueba'
             && $card['status'] === 'pending'
             && $card['state'] === 'important'
@@ -185,7 +190,7 @@ test('opening a comms alert shows the ask, its messages and the proposal waiting
         ->assertJsonPath('canvas.props.proposal.text', 'Lo miro esta tarde.')
         ->assertJsonPath('output.proposal.text', 'Lo miro esta tarde.');
 
-    expect($response->json('canvas.props.alert.why'))->toBe('Urgente. Te lo pide Marta Prueba.')
+    expect($response->json('canvas.props.alert.why'))->toBe('Urgente. Espera tu respuesta.')
         ->and($response->json('output.note'))->toContain('propuesta')
         ->and($notification->fresh()->seen_at)->not->toBeNull()
         ->and($models->calls[1]['input'])->toContain('prepare si le piden hacer o preparar un trabajo');
@@ -193,4 +198,33 @@ test('opening a comms alert shows the ask, its messages and the proposal waiting
     $this->actingAs($user)->postJson(route('comms.proposals.edit', $proposal), ['text' => 'Lo miro a las 16h.'])
         ->assertOk()
         ->assertJson(['ok' => true]);
+});
+
+test('an urgent comms alert reaches the device saying what the card says', function () {
+    $sender = new RecordingPushSender;
+    app()->instance(PushSender::class, $sender);
+    $user = probeUser();
+    PushSubscription::factory()->for($user)->create();
+    probeScript([
+        ['label' => 'possible_intent', 'urgent' => true, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [[
+            'op' => 'open',
+            'what' => 'Revisar el PR de pagos',
+            'quote' => '¿Me revisas el PR de pagos?',
+            'confidence' => 0.9,
+            'requesters' => ['slack:probe-marta-prueba'],
+            'responders' => ['self'],
+        ]], 'confidence' => 0.9],
+    ]);
+
+    $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => '¿Me revisas el PR de pagos?', '--from' => 'Marta Prueba', '--wait' => 1])->assertSuccessful();
+
+    $notification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'intent')->where('urgency', 'now')->firstOrFail();
+    $card = app(HomeFeed::class)->card($notification);
+    $pushed = collect($sender->sent)->map(fn (array $sent): array => json_decode($sent['payload'], true)['notification']);
+
+    expect($pushed)->not->toBeEmpty()
+        ->and($pushed->first()['title'])->toBe('Marta Prueba · Slack')
+        ->and($pushed->first()['body'])->toBe("{$card['title']}\n{$card['why']}")
+        ->and($pushed->first()['navigate'])->toBe(url('/?alert='.$card['id']));
 });

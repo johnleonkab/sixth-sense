@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import ActionBar from '@/actions/action-bar';
 import ProposalBar from '@/actions/proposal-bar';
 import type { ActionState } from '@/actions/types';
-import { StateChip } from '@/alerts/alert-center';
+import AlertHeadline from '@/alerts/alert-headline';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
 import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
 import type { Alert } from '@/alerts/types';
@@ -335,7 +335,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     return (
         <CanvasFrame
             index={index}
-            title={props.subject ?? `${props.from} · ${props.where}`}
+            title="Aviso"
             source={props.source_label}
             aside={
                 props.alert.external_url && (
@@ -345,21 +345,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 )
             }
         >
-            {/* Where it stands and why it matters, in one line: the title already says who and where. */}
-            <div key={alert.state} className="alerts-row-in mb-4 flex items-start gap-2.5">
-                <span className="mt-px flex-none">
-                    <StateChip state={alert.state} />
-                </span>
-                <p className="min-w-0 text-[14px] leading-[1.45] text-ink/85">
-                    {alert.why}
-                    {!pending && stateLine(alert) && (
-                        <span className="text-muted">
-                            {alert.why ? ' · ' : ''}
-                            {stateLine(alert)}
-                        </span>
-                    )}
-                    {pending && !alert.why && <span className="text-muted">{stateLine(alert)}</span>}
-                </p>
+            <div key={alert.state} className="alerts-row-in mb-4 rounded-[14px] border border-line bg-surface px-4 py-3">
+                <AlertHeadline alert={alert} />
+                {!pending && stateLine(alert) && <p className="mt-1.5 pl-7 text-[12.5px] text-muted">{stateLine(alert)}</p>}
             </div>
 
             <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">

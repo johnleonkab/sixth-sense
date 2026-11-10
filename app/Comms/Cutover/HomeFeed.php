@@ -73,7 +73,7 @@ class HomeFeed
             ? CommsIntent::query()->with('participants.person')->find($notification->subject_id)
             : null;
         $requester = $intent?->participants->firstWhere('role', 'requester')?->person?->display_name;
-        $text = $this->text($notification, $intent, $requester);
+        $text = $this->text($notification, $intent);
         $waiting = in_array($notification->kind, ['question', 'proposal'], true)
             || ($intent !== null && $intent->state !== 'settled');
         $pending = $notification->dismissed_at === null && $waiting;
@@ -85,7 +85,7 @@ class HomeFeed
             'source_label' => AlertSource::from($source)->label(),
             'actor_name' => $requester ?? 'sixth-sense',
             'title' => Str::limit($text, 120, ''),
-            'why' => $this->why($notification, $intent, $requester),
+            'why' => $this->why($notification, $intent),
             'received_at' => $received,
             'external_id' => 'comms:'.$notification->id,
             'external_url' => null,
@@ -117,9 +117,10 @@ class HomeFeed
     }
 
     /**
-     * Why it is on the list, in a line: who asks, by when, and whether it is urgent.
+     * Why it is on the list, in a line: by when, and whether it is urgent. Who
+     * asks is already the card's actor.
      */
-    private function why(CommsNotification $notification, ?CommsIntent $intent, ?string $requester): string
+    private function why(CommsNotification $notification, ?CommsIntent $intent): string
     {
         if ($intent === null) {
             return match ($notification->kind) {
@@ -130,13 +131,9 @@ class HomeFeed
             };
         }
 
-        $parts = [$requester !== null ? "Te lo pide {$requester}" : 'Espera tu respuesta'];
-
-        if ($intent->deadline !== null) {
-            $parts[] = 'para el '.CarbonImmutable::parse($intent->deadline)->locale('es')->isoFormat('dddd D [de] MMMM');
-        }
-
-        $line = implode(', ', $parts).'.';
+        $line = $intent->deadline !== null
+            ? 'Lo necesita para el '.CarbonImmutable::parse($intent->deadline)->locale('es')->isoFormat('dddd D [de] MMMM').'.'
+            : 'Espera tu respuesta.';
 
         return ($intent->flags['urgent'] ?? false) === true ? 'Urgente. '.$line : $line;
     }
@@ -169,10 +166,10 @@ class HomeFeed
             ->all();
     }
 
-    private function text(CommsNotification $notification, ?CommsIntent $intent, ?string $requester): string
+    private function text(CommsNotification $notification, ?CommsIntent $intent): string
     {
         if ($intent !== null && filled($intent->what)) {
-            return $requester !== null ? "{$requester} te pide: {$intent->what}" : (string) $intent->what;
+            return (string) $intent->what;
         }
 
         if ($notification->subject_type === 'question') {

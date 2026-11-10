@@ -47,7 +47,7 @@ test('an important alert notifies the device once and remembers that message', f
     expect($message['web_push'])->toBe(8030)
         ->and($message['mutable'])->toBeFalse()
         ->and($message['notification']['title'])->toBe('Marta · Gmail')
-        ->and($message['notification']['body'])->toBe('Te pide revisar el flujo antes de las 12.')
+        ->and($message['notification']['body'])->toBe($item->title."\nTe pide revisar el flujo antes de las 12.")
         ->and($message['notification']['navigate'])->toBe(url('/?alert='.$item->id))
         ->and($item->refresh()->last_push_key)->toBe($item->pushKey());
 

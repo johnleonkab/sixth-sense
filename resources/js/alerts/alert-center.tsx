@@ -2,15 +2,13 @@ import { router } from '@inertiajs/react';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import AlertHeadline from '@/alerts/alert-headline';
 import type { Alert } from '@/alerts/types';
 import { useAlertFeed } from '@/alerts/use-alert-feed';
 import { useSwipeToDismiss } from '@/alerts/use-swipe-dismiss';
-import { ServiceIconFor } from '@/components/service-icon';
 import WingmanBubble from '@/wingman/wingman-bubble';
 
-const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
-
-const taskTime = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+export { StateChip } from '@/alerts/alert-headline';
 
 const WAITING = new Set<Alert['state']>(['important', 'planning', 'ready']);
 
@@ -26,47 +24,6 @@ const TOAST_FOR: Partial<Record<Alert['state'], number>> = {
 };
 
 const JUDGING_AT_MOST = 30000;
-
-/** Where an alert stands, as a small label: what it is, and whether work is going on. */
-export function StateChip({ state }: { state: Alert['state'] }) {
-    const base = 'inline-flex flex-none items-center gap-1 rounded-full px-2 py-[2px] text-[10.5px] font-medium whitespace-nowrap';
-
-    switch (state) {
-        case 'judging':
-            return (
-                <span className={`${base} alerts-shimmer text-muted`}>
-                    <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-muted" />
-                    Analizando
-                </span>
-            );
-        case 'important':
-            return <span className={`${base} bg-accent text-accent-ink`}>Importante</span>;
-        case 'planning':
-            return (
-                <span className={`${base} border border-accent/40 bg-accent-soft text-accent`}>
-                    <span aria-hidden className="size-2.5 animate-spin rounded-full border-[1.5px] border-accent border-t-transparent" />
-                    Preparando respuesta
-                </span>
-            );
-        case 'ready':
-            return <span className={`${base} bg-accent-soft text-accent`}>✓ Propuesta lista</span>;
-        case 'resolved':
-            return <span className={`${base} bg-ok/10 text-ok`}>Resuelta</span>;
-        case 'dismissed':
-            return <span className={`${base} bg-soft text-faint`}>Descartada</span>;
-        case 'meeting':
-            return <span className={`${base} bg-soft text-ink`}>Reunión</span>;
-        default:
-            return <span className={`${base} bg-soft text-muted`}>Sin importancia</span>;
-    }
-}
-
-/** " · 3 mensajes" when the conversation brought more than one since it was last dealt with. */
-function messageCount(alert: Alert): string {
-    const count = alert.messages?.length ?? 0;
-
-    return count > 1 ? ` · ${count} mensajes` : '';
-}
 
 /** Dismiss control shared by rows and toasts. */
 function DismissButton({ onDismiss, className = '' }: { onDismiss: () => void; className?: string }) {
@@ -100,39 +57,9 @@ function Row({ alert, onOpen, onDismiss, delay = 0 }: { alert: Alert; onOpen: (a
                 style={dismissable ? swipe.style : undefined}
                 type="button"
                 onClick={() => onOpen(alert)}
-                className={`grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-soft ${quiet ? 'opacity-70' : ''}`}
+                className={`block w-full rounded-[10px] px-3 py-2.5 text-left transition-colors hover:bg-soft ${quiet ? 'opacity-70' : ''}`}
             >
-                {addressed ? (
-                    <span aria-label="Atendida" className="mt-px grid w-[15px] place-items-center text-[11px] leading-none text-ok">
-                        ✓
-                    </span>
-                ) : (
-                    <ServiceIconFor reference={alert.source} size={15} className="mt-px" />
-                )}
-                <span className="min-w-0">
-                    <span className="flex items-center gap-2 text-[11.5px] text-muted">
-                        <span className="truncate">
-                            {alert.actor_name ?? alert.source_label} · {alert.title}
-                            {messageCount(alert)}
-                        </span>
-                        <time className="ml-auto flex-none font-mono">{timeFormat.format(new Date(alert.received_at))}</time>
-                    </span>
-                    <span className="mt-0.5 flex items-start gap-2">
-                        <span className={`line-clamp-2 min-w-0 flex-1 text-[13px] ${alert.state === 'judging' ? 'text-faint italic' : ''}`}>
-                            {alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why}
-                        </span>
-                        <StateChip state={alert.state} />
-                    </span>
-                    {alert.proposal?.summary && alert.state === 'ready' && (
-                        <span className="mt-0.5 line-clamp-1 block text-[12px] text-accent">→ {alert.proposal.summary}</span>
-                    )}
-                    {alert.task && alert.task.status !== 'cancelled' && (
-                        <span className="mt-0.5 line-clamp-1 block text-[12px] text-ok">
-                            ◷ {alert.task.status_label}
-                            {alert.task.starts_at ? ` · ${taskTime.format(new Date(alert.task.starts_at))}` : ''}
-                        </span>
-                    )}
-                </span>
+                <AlertHeadline alert={alert} reserveDismiss={dismissable} />
             </button>
         </li>
     );
@@ -177,23 +104,8 @@ function IncomingToast({
             className={`alerts-toast-in relative overflow-hidden rounded-[14px] border bg-surface shadow-card ${waiting ? 'border-accent/40' : 'border-line'}`}
         >
             <DismissButton onDismiss={swipe.dismiss} className="absolute top-2 right-2 z-10" />
-            <button type="button" onClick={() => onOpen(alert)} className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 py-3 text-left hover:bg-soft">
-                <ServiceIconFor reference={alert.source} size={18} className="mt-px" />
-                <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-2 pr-6 text-[12px] text-muted">
-                        <span className="truncate">
-                            {alert.source_label} · {alert.actor_name}
-                        </span>
-                        <StateChip state={alert.state} />
-                    </div>
-                    <b className="mt-0.5 block truncate text-[13.5px] font-semibold">
-                        {alert.title}
-                        <span className="font-normal text-muted">{messageCount(alert)}</span>
-                    </b>
-                    <p className={`mt-px line-clamp-2 text-[13px] ${alert.state === 'judging' ? 'text-faint italic' : 'text-muted'}`}>
-                        {alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why}
-                    </p>
-                </div>
+            <button type="button" onClick={() => onOpen(alert)} className="block w-full px-4 py-3 text-left hover:bg-soft">
+                <AlertHeadline alert={alert} reserveDismiss />
             </button>
 
             {(alert.meeting_url || (waiting && onTellMe)) && (

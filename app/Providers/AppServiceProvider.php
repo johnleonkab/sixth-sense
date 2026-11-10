@@ -61,9 +61,11 @@ use App\Connectors\Notion\NotionWiki;
 use App\Connectors\Slack\SlackChats;
 use App\Connectors\Wiki\FakeWiki;
 use App\Connectors\Wiki\Wiki;
+use App\Events\CommsNotificationDelivered;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\SendAlertPush;
+use App\Jobs\SendCommsPush;
 use App\Knowledge\DocumentSummarizer;
 use App\Knowledge\FakeDocumentSummarizer;
 use App\Knowledge\Gaps\FakeTermJudge;
@@ -315,6 +317,9 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(InboxItemCreated::class, $notify);
         Event::listen(InboxItemUpdated::class, $notify);
+        Event::listen(CommsNotificationDelivered::class, function (CommsNotificationDelivered $event): void {
+            SendCommsPush::dispatch($event->notification);
+        });
     }
 
     /**
