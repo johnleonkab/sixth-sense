@@ -22,7 +22,7 @@ export type IntentGroups = {
 };
 
 const groups: { key: keyof IntentGroups; title: string }[] = [
-    { key: 'waiting_on_me', title: 'Esperan algo de mí' },
+    { key: 'waiting_on_me', title: 'Para mí' },
     { key: 'waiting_on_others', title: 'Espero algo de otros' },
     { key: 'quiet', title: 'Sin movimiento' },
 ];
@@ -145,12 +145,13 @@ function Row({ row, others }: { row: IntentRow; others: { key: string; what: str
     );
 }
 
-export default function IntentBoard({ intents }: { intents: IntentGroups }) {
-    const all = groups.flatMap((group) => intents[group.key]);
+export default function IntentBoard({ intents, only }: { intents: IntentGroups; only?: keyof IntentGroups }) {
+    const shown = only ? groups.filter((group) => group.key === only) : groups;
+    const all = shown.flatMap((group) => intents[group.key]);
 
     return (
         <div className="mx-auto w-full max-w-[760px] pb-8">
-            {groups.map((group) => (
+            {shown.map((group) => (
                 <section key={group.key} aria-labelledby={`intents-${group.key}`} className="mb-8">
                     <h2 id={`intents-${group.key}`} className="text-[13px] font-medium text-muted">
                         {group.title}

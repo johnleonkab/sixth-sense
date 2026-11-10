@@ -124,6 +124,7 @@ function commsProposalOnScreen(canvases: { directive: CanvasDirective }[]): { id
 export default function Home({ alerts, openAlert = null, openComms = null, intents = emptyIntents }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; intents?: IntentGroups }) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
+    const [showMine, setShowMine] = useState(false);
     const nextCanvasId = useRef(1);
     const canvasInHistory = useRef(false);
     const wide = useMinWidth(768);
@@ -352,7 +353,6 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
     }, [openAlert]);
 
     const now = useNow();
-    const hasIntents = intents.waiting_on_me.length + intents.waiting_on_others.length + intents.quiet.length > 0;
 
     return (
         <>
@@ -385,13 +385,20 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                             onArrive={(alert) => void voice.tell(alertArrivedNote(alert), false)}
                             onTellMe={(alert) => void voice.tell(tellMeNote(alert), true)}
                         />
-                        <Link
-                            href="/shadow"
-                            viewTransition={!wide}
-                            className="hidden rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink sm:inline"
+                        <button
+                            type="button"
+                            aria-pressed={showMine && canvases.length === 0}
+                            onClick={() => {
+                                const openingMine = canvases.length > 0 || !showMine;
+
+                                setCanvases([]);
+                                canvasInHistory.current = false;
+                                setShowMine(openingMine);
+                            }}
+                            className={`hidden rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink sm:inline ${showMine && canvases.length === 0 ? 'text-ink' : ''}`}
                         >
-                            Sombra
-                        </Link>
+                            Para mí
+                        </button>
                         <Link
                             href="/settings"
                             viewTransition={!wide}
@@ -421,8 +428,8 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
                         !opening &&
-                        (hasIntents ? (
-                            <IntentBoard intents={intents} />
+                        (showMine ? (
+                            <IntentBoard intents={intents} only="waiting_on_me" />
                         ) : (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
