@@ -76,16 +76,19 @@ class DeepSeekTextModel implements TextModel
     private function withSchema(string $system, array $schema): string
     {
         $example = json_encode($this->example($schema), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $rules = json_encode($schema, JSON_UNESCAPED_UNICODE);
 
-        return $system."\n\nResponde solo con un objeto json, con esta forma:\n{$example}";
+        return $system."\n\nResponde solo con un objeto json, con esta forma:\n{$example}\n\nY que siga este esquema (campos obligatorios y valores permitidos):\n{$rules}";
     }
 
     /**
+     * Gemini schemas name types in upper case, JSON Schema in lower case.
+     *
      * @param  array<string, mixed>  $schema
      */
     private function example(array $schema): mixed
     {
-        return match ($schema['type'] ?? 'STRING') {
+        return match (strtoupper((string) ($schema['type'] ?? 'STRING'))) {
             'OBJECT' => collect($schema['properties'] ?? [])->map(fn (array $property): mixed => $this->example($property))->all(),
             'ARRAY' => [$this->example($schema['items'] ?? ['type' => 'STRING'])],
             'BOOLEAN' => false,

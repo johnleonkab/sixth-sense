@@ -54,6 +54,33 @@ test('it asks deepseek for json and shows the shape in the prompt', function () 
     });
 });
 
+test('a lower case json schema shows its fields and every allowed value', function () {
+    Http::fake([
+        'https://api.deepseek.com/chat/completions' => Http::response(['choices' => [['message' => ['content' => '{"label":"possible_intent","urgent":false,"sensitive":false,"confidence":0.9}']]]]),
+    ]);
+
+    deepSeekModel()->json('Clasifica el mensaje.', 'Hola, ¿me revisas el PR?', [
+        'type' => 'object',
+        'required' => ['label', 'urgent', 'sensitive', 'confidence'],
+        'properties' => [
+            'label' => ['type' => 'string', 'enum' => ['noise', 'possible_intent', 'possible_signal']],
+            'urgent' => ['type' => 'boolean'],
+            'sensitive' => ['type' => 'boolean'],
+            'confidence' => ['type' => 'number'],
+        ],
+    ]);
+
+    Http::assertSent(function (Request $request) {
+        $system = $request['messages'][0]['content'];
+
+        return str_contains($system, '"label": "noise"')
+            && str_contains($system, '"urgent": false')
+            && str_contains($system, '"confidence": 0')
+            && str_contains($system, 'possible_intent')
+            && str_contains($system, 'possible_signal');
+    });
+});
+
 test('a capable call keeps a little thinking on', function () {
     Http::fake([
         'https://api.deepseek.com/chat/completions' => Http::response(['choices' => [['message' => ['content' => '{"ok":true}']]]]),
