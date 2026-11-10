@@ -114,7 +114,7 @@ class Gate
         $existing = $proposal->pendingAction;
 
         if ($existing !== null) {
-            return $existing;
+            return $existing->status === ActionStatus::Failed ? $this->retry($proposal, $existing) : $existing;
         }
 
         if (! in_array($proposal->status, [ProposalStatus::Pending, ProposalStatus::Edited], true)) {
@@ -204,6 +204,29 @@ class Gate
             occurredAt: CarbonImmutable::now(),
             revision: (string) Str::uuid(),
         );
+    }
+
+    /**
+     * The send failed. The same action goes again, with the text as it is now.
+     */
+    private function retry(CommsProposal $proposal, PendingAction $action): PendingAction
+    {
+        $proposal->status = ProposalStatus::Approved;
+        $proposal->deny_reason = null;
+        $proposal->save();
+
+        $action->update([
+            'status' => ActionStatus::Pending,
+            'label' => mb_substr((string) ($proposal->payload['text'] ?? $proposal->action_class->value), 0, 240),
+            'payload' => $proposal->payload,
+            'error' => null,
+            'result' => null,
+            'executed_at' => null,
+            'undo_until' => null,
+            'expires_at' => now()->addHours(72),
+        ]);
+
+        return $this->actions->confirm($action);
     }
 
     private function arm(CommsProposal $proposal): PendingAction

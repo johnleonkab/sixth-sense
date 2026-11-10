@@ -12,6 +12,7 @@ type Proposal = {
     status: string;
     text: string;
     deny_reason: string | null;
+    error?: string | null;
     undo: boolean;
 };
 
@@ -131,7 +132,15 @@ const CommsReview: CanvasComponent<CommsReviewProps> = ({ index, ...props }) => 
                                     </Button>
                                 </Buttons>
                             )}
-                            {!open && statusLine[proposal.status] && <p className="text-[13px] text-muted">{statusLine[proposal.status]}</p>}
+                            {!open && proposal.status === 'failed' && (
+                                <>
+                                    <p className="text-[13px] text-crit">{proposal.error ? `No se pudo enviar: ${proposal.error}` : 'No se pudo enviar.'}</p>
+                                    <Button variant="primary" disabled={busy} onClick={() => void decide('approve', { status: 'approved', undo: true, error: null })}>
+                                        Reintentar
+                                    </Button>
+                                </>
+                            )}
+                            {!open && proposal.status !== 'failed' && statusLine[proposal.status] && <p className="text-[13px] text-muted">{statusLine[proposal.status]}</p>}
                             {proposal.undo && proposal.status === 'approved' && (
                                 <Button variant="secondary" disabled={busy} onClick={() => void decide('undo', { status: 'undone', undo: false })}>
                                     Deshacer

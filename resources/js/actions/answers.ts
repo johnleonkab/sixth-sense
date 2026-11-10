@@ -20,7 +20,7 @@ const NO = /^(no|cancela|cancelalo|cancelar|dejalo|olvidalo|mejor no|para)\b/;
 
 /** The whole utterance is only the answer, with nothing else to do. */
 const BARE_UNDO = /^(deshaz|deshazlo|deshacer|revierte|revertir|vuelve atras|marcha atras)$/;
-const BARE_YES = /^(si|vale|ok|okay|adelante|hazlo|dale|confirmo|confirma|confirmado|aplicalo|aplica|aplicar|perfecto|correcto|de acuerdo|publicalo|publica)$/;
+const BARE_YES = /^(si|vale|ok|okay|adelante|hazlo|dale|confirmo|confirma|confirmado|aplicalo|aplica|aplicar|perfecto|correcto|de acuerdo|publicalo|publica|envialo|envia|enviarlo|mandalo|manda|mandarlo)$/;
 const BARE_NO = /^(no|cancela|cancelalo|cancelar|dejalo|olvidalo|mejor no|para)$/;
 
 export function answerIn(text: string): Answer | null {

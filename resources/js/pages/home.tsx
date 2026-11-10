@@ -103,6 +103,24 @@ type OpenComms = {
     undo: boolean;
 };
 
+/** The communications proposal open on screen, which "sí" and "envíalo" send. */
+function commsProposalOnScreen(canvases: { directive: CanvasDirective }[]): { id: number; undo: boolean; answerable: boolean } | null {
+    const canvas = [...canvases].reverse().find((item) => item.directive.view === 'comms.review');
+    const proposal = canvas?.directive.props.proposal;
+
+    if (proposal === null || typeof proposal !== 'object' || !('id' in proposal) || typeof proposal.id !== 'number') {
+        return null;
+    }
+
+    const status = 'status' in proposal && typeof proposal.status === 'string' ? proposal.status : '';
+
+    return {
+        id: proposal.id,
+        undo: 'undo' in proposal && proposal.undo === true,
+        answerable: status === 'pending' || status === 'edited' || status === 'failed',
+    };
+}
+
 export default function Home({ alerts, openAlert = null, openComms = null, intents = emptyIntents }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; intents?: IntentGroups }) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
@@ -175,8 +193,10 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                 return ownsTheTurn();
             }
 
-            if (openComms?.undo && openComms.proposal_id !== null) {
-                await postJson(`/comms/proposals/${openComms.proposal_id}/undo`, {});
+            const onScreen = commsProposalOnScreen(canvases);
+
+            if ((onScreen?.undo || (openComms?.undo && openComms.proposal_id !== null)) && (onScreen?.id ?? openComms?.proposal_id) != null) {
+                await postJson(`/comms/proposals/${onScreen?.id ?? openComms?.proposal_id}/undo`, {});
 
                 return ownsTheTurn();
             }
@@ -210,6 +230,16 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
             await (reply === 'yes' ? actions.confirm(action.id) : actions.cancel(action.id));
 
             return ownsTheTurn();
+        }
+
+        const onScreen = commsProposalOnScreen(canvases);
+        const spoken = bareAnswer(text);
+
+        // "envíalo" sends the proposal that is open, even when the page did not load with it.
+        if (onScreen?.answerable && (spoken === 'yes' || spoken === 'no')) {
+            await postJson(`/comms/proposals/${onScreen.id}/${spoken === 'yes' ? 'approve' : 'reject'}`, {});
+
+            return spoken;
         }
 
         if ((reply === 'yes' || reply === 'no') && openComms?.proposal_id !== null && openComms?.proposal_id !== undefined) {
