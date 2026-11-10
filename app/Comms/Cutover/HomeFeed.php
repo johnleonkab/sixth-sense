@@ -5,6 +5,7 @@ namespace App\Comms\Cutover;
 use App\Alerts\AlertFeed;
 use App\Alerts\AlertSource;
 use App\Comms\Pipeline;
+use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
@@ -67,15 +68,21 @@ class HomeFeed
     public function card(CommsNotification $notification): array
     {
         $source = $this->pipeline->sourceOf($notification) ?? 'slack';
-        $text = $this->text($notification);
-        $pending = $notification->dismissed_at === null && in_array($notification->kind, ['question', 'proposal'], true);
+        $intent = $notification->subject_type === 'intent'
+            ? CommsIntent::query()->with('participants.person')->find($notification->subject_id)
+            : null;
+        $requester = $intent?->participants->firstWhere('role', 'requester')?->person?->display_name;
+        $text = $this->text($notification, $intent, $requester);
+        $waiting = in_array($notification->kind, ['question', 'proposal'], true)
+            || ($intent !== null && $intent->state !== 'settled');
+        $pending = $notification->dismissed_at === null && $waiting;
         $received = ($notification->created_at ?? now())->toIso8601String();
 
         return [
             'id' => -$notification->id,
             'source' => $source,
             'source_label' => AlertSource::from($source)->label(),
-            'actor_name' => 'sixth-sense',
+            'actor_name' => $requester ?? 'sixth-sense',
             'title' => Str::limit($text, 120, ''),
             'why' => $notification->urgency === 'now' ? 'Te lo digo ahora.' : 'Para el resumen.',
             'received_at' => $received,
@@ -93,10 +100,10 @@ class HomeFeed
             },
             'resolved_at' => $notification->dismissed_at?->toIso8601String(),
             'resolution' => $notification->dismissed_at !== null ? 'dismissed' : null,
-            'deadline' => null,
+            'deadline' => $intent?->deadline?->toDateString(),
             'blocking' => $notification->urgency === 'now',
             'quiet' => $notification->urgency !== 'now',
-            'messages' => [[
+            'messages' => $this->messages($intent) ?: [[
                 'id' => 'comms:'.$notification->id,
                 'from' => 'sixth-sense',
                 'text' => $text,
@@ -108,8 +115,40 @@ class HomeFeed
         ];
     }
 
-    private function text(CommsNotification $notification): string
+    /**
+     * The messages the intent came from, oldest first.
+     *
+     * @return list<array{id: string, from: string, text: string, at: string}>
+     */
+    private function messages(?CommsIntent $intent): array
     {
+        if ($intent === null) {
+            return [];
+        }
+
+        return $intent->links()
+            ->with('message.author')
+            ->latest('id')
+            ->limit(5)
+            ->get()
+            ->reverse()
+            ->filter(fn ($link): bool => $link->message !== null)
+            ->map(fn ($link): array => [
+                'id' => 'comms-message:'.$link->message->id,
+                'from' => (string) ($link->message->author->display_name ?? 'Alguien'),
+                'text' => (string) $link->message->text,
+                'at' => $link->message->occurred_at->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function text(CommsNotification $notification, ?CommsIntent $intent, ?string $requester): string
+    {
+        if ($intent !== null && filled($intent->what)) {
+            return $requester !== null ? "{$requester} te pide: {$intent->what}" : (string) $intent->what;
+        }
+
         if ($notification->subject_type === 'question') {
             $text = CommsQuestion::query()->find($notification->subject_id)?->text;
 

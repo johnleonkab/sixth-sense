@@ -32,7 +32,7 @@ use Illuminate\Support\Str;
     {text? : A fake message, as if someone wrote it to the user on Slack}
     {--from=Prueba sixth-sense : Who the fake message comes from}
     {--in=dm : Where the fake message is written: dm, group or channel}
-    {--rerun=0 : Send again the last N Slack messages the user received}
+    {--rerun=0 : Send again the last N real Slack messages the user received (test ones are skipped)}
     {--event=* : Send again these Slack event ids}
     {--wait=90 : Seconds to wait for the queue to process them}')]
 #[Description('Run a fake or a past Slack message through the communications pipeline and show what it did')]
@@ -117,7 +117,11 @@ class CommsProbeSlack extends Command
             ->where('source', Source::Slack)
             ->where('type', EventType::MessageReceived)
             ->when($ids !== [], fn ($query) => $query->whereIn('id', $ids))
-            ->when($ids === [], fn ($query) => $query->where('external_id', 'not like', '%:rerun-%')->latest('id')->limit($count))
+            ->when($ids === [], fn ($query) => $query
+                ->where('external_id', 'not like', 'probe:%')
+                ->where('external_id', 'not like', '%:rerun-%')
+                ->latest('id')
+                ->limit($count))
             ->get()
             ->sortBy('id');
 

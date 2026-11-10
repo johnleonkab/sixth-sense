@@ -6,6 +6,7 @@ use App\Comms\Calendar\FocusHours;
 use App\Comms\People\Relation;
 use App\Comms\Pipeline;
 use App\Comms\Watchers\BusinessCalendar;
+use App\Events\CommsNotificationDelivered;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
@@ -166,6 +167,7 @@ class Notifier
         if ($source !== null && $this->pipeline->enabled($source) && $notification->delivered_at === null) {
             $notification->delivered_at = now();
             $notification->save();
+            CommsNotificationDelivered::dispatch($notification);
         }
 
         return $notification;

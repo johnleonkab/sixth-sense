@@ -2,15 +2,21 @@
 
 use App\Comms\Events\EventType;
 use App\Comms\Ingestion\IdentityResolver;
+use App\Comms\Ingestion\Ingestor;
+use App\Comms\Ingestion\SlackInbound;
+use App\Comms\Messages\Party;
 use App\Comms\Models\CompletesTasks;
 use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
 use App\Connections\Provider;
+use App\Events\CommsNotificationDelivered;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -75,21 +81,60 @@ test('a fake direct message runs the live pipeline and the report shows each ste
         ->and($models->calls[1]['input'])->toContain('«slack:probe-marta-prueba» es quien escribe el mensaje, «self» es la persona usuaria');
 });
 
-test('a past message is sent again as a new message and the original is left alone', function () {
+test('an urgent ask reaches the open screen at once, saying who asks and what', function () {
+    Event::fake([CommsNotificationDelivered::class]);
     $user = probeUser();
     probeScript([
-        ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
-        ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
+        ['label' => 'possible_intent', 'urgent' => true, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [[
+            'op' => 'open',
+            'what' => 'Revisar el PR de pagos',
+            'quote' => '¿Me revisas el PR de pagos?',
+            'confidence' => 0.9,
+            'requesters' => ['slack:probe-marta-prueba'],
+            'responders' => ['self'],
+        ]], 'confidence' => 0.9],
     ]);
 
-    $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => 'Hola', '--wait' => 1])->assertSuccessful();
-    $original = CommsEvent::query()->where('type', EventType::MessageReceived)->sole();
+    $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => '¿Me revisas el PR de pagos?', '--from' => 'Marta Prueba', '--wait' => 1])
+        ->expectsOutputToContain('alert')
+        ->assertSuccessful();
+
+    Event::assertDispatched(CommsNotificationDelivered::class, function (CommsNotificationDelivered $event) use ($user): bool {
+        $card = $event->broadcastWith();
+
+        return $event->broadcastAs() === 'inbox.item.created'
+            && $event->broadcastOn()[0]->name === 'private-App.Models.User.'.$user->id
+            && $card['title'] === 'Marta Prueba te pide: Revisar el PR de pagos'
+            && $card['actor_name'] === 'Marta Prueba'
+            && $card['status'] === 'pending'
+            && $card['state'] === 'important'
+            && $card['messages'][0]['from'] === 'Marta Prueba'
+            && $card['messages'][0]['text'] === '¿Me revisas el PR de pagos?';
+    });
+});
+
+test('a past message is sent again as a new message and the original is left alone', function () {
+    $user = probeUser();
+    probeScript(array_fill(0, 3, ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9]));
+
+    $original = app(Ingestor::class)->ingest($user, new SlackInbound(
+        teamId: 'T1',
+        channelId: 'D1',
+        ts: '1762770000.000100',
+        channelKind: 'dm',
+        author: new Party('U-marta', 'marta@example.com', 'Marta'),
+        recipients: [],
+        text: 'Hola',
+        at: CarbonImmutable::now()->subHour(),
+    ));
+    $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => 'Esto es una prueba', '--wait' => 1])->assertSuccessful();
 
     $this->artisan('comms:probe-slack', ['user' => $user->id, '--rerun' => 1, '--wait' => 1])
         ->expectsOutputToContain('Hola')
         ->assertSuccessful();
 
-    $copy = CommsEvent::query()->where('type', EventType::MessageReceived)->whereKeyNot($original->id)->sole();
+    $copy = CommsEvent::query()->where('type', EventType::MessageReceived)->where('external_id', 'like', '%:rerun-%')->sole();
 
     expect($copy->external_id)->toStartWith($original->external_id.':rerun-')
         ->and($copy->normalized['rerun_of'])->toBe($original->id)
