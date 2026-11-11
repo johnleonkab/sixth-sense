@@ -11,15 +11,29 @@ use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsIntentParticipant;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsMetric;
+use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
+use App\Models\Comms\CommsProposal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
 test('the home groups an open intent by who it is waiting on', function () {
     [$user, $self, $marta] = boardPeople();
-    $mine = boardIntent($user, $self, $marta, 'Revisar el flujo de prepago', 'responder', 'requester', now(), 60);
+    $activity = CarbonImmutable::now()->subMinutes(25)->startOfMinute();
+    $mine = boardIntent($user, $self, $marta, 'Revisar el flujo de prepago', 'responder', 'requester', $activity, 60);
+    $proposal = CommsProposal::factory()->create([
+        'user_id' => $user->id,
+        'intent_id' => $mine->id,
+    ]);
+    $notification = CommsNotification::factory()->create([
+        'user_id' => $user->id,
+        'kind' => 'proposal',
+        'urgency' => 'now',
+        'subject_type' => 'proposal',
+        'subject_id' => $proposal->id,
+    ]);
     boardIntent($user, $self, $marta, 'Enviar el contrato', 'requester', 'responder', now(), 15, 'evt-others', 'T1:C1:2.2');
     boardIntent($user, $self, $marta, 'La nota vieja', 'responder', 'requester', now()->subDays(10), 5, 'evt-quiet', 'T1:C1:3.2');
 
@@ -28,7 +42,13 @@ test('the home groups an open intent by who it is waiting on', function () {
             ->where('intents.waiting_on_me.0.what', 'Revisar el flujo de prepago')
             ->where('intents.waiting_on_me.0.who', 'Marta')
             ->where('intents.waiting_on_me.0.importance', 'alta')
+            ->where('intents.waiting_on_me.0.source', 'slack')
+            ->where('intents.waiting_on_me.0.source_label', 'Slack')
             ->where('intents.waiting_on_me.0.source_url', 'https://slack.com/archives/C1/p12')
+            ->where('intents.waiting_on_me.0.activity_at', $activity->toIso8601String())
+            ->where('intents.waiting_on_me.0.messages_count', 1)
+            ->where('intents.waiting_on_me.0.alert_id', -$notification->id)
+            ->where('intents.waiting_on_me.0.proposal_ready', true)
             ->where('intents.waiting_on_others.0.what', 'Enviar el contrato')
             ->where('intents.quiet.0.what', 'La nota vieja')
             ->missing('intents.waiting_on_me.1'));

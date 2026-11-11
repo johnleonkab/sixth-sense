@@ -337,6 +337,25 @@
         border: 1.5px solid currentColor;
         animation: alerts-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
     }
+
+    .intent-head-in {
+        animation: alerts-row-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .intent-card-in {
+        animation: intent-card-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .intent-live-dot {
+        animation: breathe 2.4s ease-in-out infinite;
+    }
+}
+
+@keyframes intent-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.99);
+    }
 }
 
 @keyframes alerts-panel-in {

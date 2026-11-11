@@ -429,7 +429,11 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                     {canvases.length === 0 ? (
                         !opening &&
                         (showMine ? (
-                            <IntentBoard intents={intents} only="waiting_on_me" />
+                            <IntentBoard
+                                intents={intents}
+                                only="waiting_on_me"
+                                onOpenAlert={(alertId) => runFromScreen('review_alert', { alert_id: alertId })}
+                            />
                         ) : (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
