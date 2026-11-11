@@ -262,6 +262,8 @@ function Row({
     return (
         <div
             className={`grid transition-[grid-template-rows,opacity,transform,margin] duration-250 ease-out ${
+                menuOpen ? 'relative z-20' : ''
+            } ${
                 closing ? 'pointer-events-none mb-0 translate-x-3 scale-[0.985] grid-rows-[0fr] opacity-0' : 'mb-2.5 grid-rows-[1fr] opacity-100 last:mb-0'
             }`}
         >
@@ -269,6 +271,8 @@ function Row({
                 <article
                     style={{ animationDelay: `${Math.min(index * 45, 360)}ms` }}
                     className={`intent-card-in group relative rounded-2xl border bg-surface px-4 py-3.5 transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-[1px] hover:shadow-card ${
+                        menuOpen ? 'z-20' : ''
+                    } ${
                         critical ? 'border-crit/35' : high ? 'border-accent/35' : 'border-line hover:border-faint/60'
                     }`}
                 >
