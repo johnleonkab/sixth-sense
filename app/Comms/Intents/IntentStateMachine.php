@@ -189,6 +189,12 @@ class IntentStateMachine
             return [...$result, 'reason' => 'person'];
         }
 
+        $responderIds = collect($responders)->pluck('id')->all();
+        $possible = array_values(array_filter(
+            $possible,
+            fn (CommsPerson $person): bool => ! in_array($person->id, $responderIds, true),
+        ));
+
         $result['requesters'] = array_map(fn (CommsPerson $person): string => $this->people->key($person), $requesters);
         $result['responders'] = array_map(fn (CommsPerson $person): string => $this->people->key($person), $responders);
         $result['possible_responders'] = array_map(fn (CommsPerson $person): string => $this->people->key($person), $possible);
@@ -225,7 +231,7 @@ class IntentStateMachine
             return [...$result, 'reason' => 'what'];
         }
 
-        $duplicate = $this->duplicate($user, (string) $result['what'], $requesters, $responders);
+        $duplicate = $this->duplicate($user, $message, (string) $result['what'], $requesters, $responders);
 
         if ($duplicate !== null) {
             return [
@@ -354,14 +360,15 @@ class IntentStateMachine
      * @param  list<CommsPerson>  $requesters
      * @param  list<CommsPerson>  $responders
      */
-    private function duplicate(User $user, string $what, array $requesters, array $responders): ?CommsIntent
+    private function duplicate(User $user, CommsMessage $message, string $what, array $requesters, array $responders): ?CommsIntent
     {
         $threshold = (float) config('comms.candidates.duplicate_similarity', 92);
+        $sameChannelThreshold = (float) config('comms.candidates.duplicate_similarity_same_channel', 78);
         $wantedRequesters = collect($requesters)->pluck('id')->sort()->values()->all();
         $wantedResponders = collect($responders)->pluck('id')->sort()->values()->all();
 
-        return CommsIntent::query()->whereBelongsTo($user)->where('state', 'open')->with('participants')->get()
-            ->first(function (CommsIntent $intent) use ($what, $threshold, $wantedRequesters, $wantedResponders): bool {
+        return CommsIntent::query()->whereBelongsTo($user)->where('state', 'open')->with(['participants', 'links.message'])->get()
+            ->first(function (CommsIntent $intent) use ($message, $what, $threshold, $sameChannelThreshold, $wantedRequesters, $wantedResponders): bool {
                 $requesters = $intent->participants->where('role', 'requester')->pluck('person_id')->sort()->values()->all();
                 $responders = $intent->participants->where('role', 'responder')->pluck('person_id')->sort()->values()->all();
 
@@ -371,7 +378,15 @@ class IntentStateMachine
 
                 similar_text(mb_strtolower($intent->what), mb_strtolower($what), $percent);
 
-                return $percent >= $threshold;
+                if ($percent >= $threshold) {
+                    return true;
+                }
+
+                // Rapid DM / channel bursts often restate the same ask with different words.
+                $sameChannel = filled($message->channel_ref)
+                    && $intent->links->contains(fn ($link): bool => $link->message?->channel_ref === $message->channel_ref);
+
+                return $sameChannel && $percent >= $sameChannelThreshold;
             });
     }
 
@@ -406,9 +421,12 @@ class IntentStateMachine
             ],
         );
 
+        $responders = array_values($result['responders'] ?? []);
+        $possible = array_values(array_diff($result['possible_responders'] ?? [], $responders));
+
         $this->syncRole($user, $intent, 'requester', $result['requesters'] ?? []);
-        $this->syncRole($user, $intent, 'responder', $result['responders'] ?? []);
-        $this->syncRole($user, $intent, 'possible_responder', $result['possible_responders'] ?? []);
+        $this->syncRole($user, $intent, 'responder', $responders);
+        $this->syncRole($user, $intent, 'possible_responder', $possible);
         $this->link($user, $intent, $message, $result, $stateEvent);
 
         return $intent;

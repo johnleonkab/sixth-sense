@@ -70,6 +70,7 @@ class MatchStage
             'En quote copia un fragmento literal del mensaje dentro de <source>, sin reescribirlo. Si el mensaje trae saltos de línea o citas con >, puedes aplanar espacios pero las palabras tienen que coincidir.',
             'En settle, settle_reason (o reason) debe ser uno de: delivery, decision, drop, taken_by_other. No uses reason para una explicación libre en settle.',
             'En kind va uno de estos, o null: question si le preguntan algo que se responde con información; review_comment si es un comentario en una revisión que espera respuesta; choice si tiene que elegir entre opciones; prepare si le piden hacer o preparar un trabajo (revisar un PR, escribir un documento, preparar una presentación).',
+            'Si el mensaje sigue un DM o canal que ya tiene intents abiertos con la misma persona, usa attach o update cuando sea detalle o seguimiento del mismo pedido. Abre uno nuevo solo cuando el pedido es claramente distinto. No pongas a la misma persona en responders y possible_responders.',
             $this->context->block($user, new ContextRequest(Audience::Match, about: $author?->display_name)),
             '<source id="evt:'.$event->id.'" kind="'.$kind.'" author="'.$authorKey.'">',
             $message->text,
@@ -102,12 +103,24 @@ class MatchStage
             ->whereKeyNot($message->id)
             ->orderByDesc('occurred_at')
             ->limit(5)
-            ->get()
-            ->reverse();
+            ->get();
+
+        // Unthreaded Slack DMs store the message ts as thread_ref, so fall back
+        // to the recent messages in the same channel for matcher context.
+        if ($earlier->count() < 2 && filled($message->channel_ref)) {
+            $earlier = CommsMessage::query()
+                ->whereBelongsTo($user)
+                ->where('channel_ref', $message->channel_ref)
+                ->whereKeyNot($message->id)
+                ->where('occurred_at', '>=', $message->occurred_at->copy()->subDay())
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get();
+        }
 
         $blocks[] = 'Hilo reciente:';
 
-        foreach ($earlier as $previous) {
+        foreach ($earlier->reverse() as $previous) {
             $blocks[] = '- '.$previous->text;
         }
 

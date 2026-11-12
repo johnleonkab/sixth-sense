@@ -60,6 +60,12 @@ class CandidateRetriever
             $score += 3;
         }
 
+        // Unthreaded Slack DMs use the message ts as thread_ref, so same-channel
+        // is how a morning checklist of short asks stays one conversation.
+        if (filled($message->channel_ref) && $linked->contains(fn (?CommsMessage $linkedMessage): bool => $linkedMessage?->channel_ref === $message->channel_ref)) {
+            $score += 2;
+        }
+
         $participantIds = $intent->participants->pluck('person_id')->all();
 
         if (in_array($message->author_person_id, $participantIds, true)) {

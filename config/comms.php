@@ -67,6 +67,7 @@ return [
         'max' => 10,
         'settled_window_days' => 14,
         'duplicate_similarity' => 92,
+        'duplicate_similarity_same_channel' => 78,
     ],
 
     'quiet_after_days' => 7,

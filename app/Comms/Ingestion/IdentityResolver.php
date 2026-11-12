@@ -12,6 +12,7 @@ use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIdentity;
 use App\Models\Comms\CommsPerson;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 /**
  * Resolves a party to one person. Exact source id wins, then email.
@@ -62,7 +63,7 @@ class IdentityResolver
             ->first();
 
         if ($existing !== null) {
-            return $this->touch($existing->person, $party, $self);
+            return $this->touch($user, $existing->person, $party, $self, $source);
         }
 
         if ($email !== null) {
@@ -73,7 +74,7 @@ class IdentityResolver
 
             if ($byEmail !== null) {
                 $this->attach($user, $byEmail->person, $source, $party, $email);
-                $person = $this->touch($byEmail->person, $party, $self);
+                $person = $this->touch($user, $byEmail->person, $party, $self, $source);
 
                 if ($audit) {
                     $this->record($user, $source, $party, $person);
@@ -83,7 +84,7 @@ class IdentityResolver
             }
         }
 
-        $relation = $self ? Relation::Self : Relation::Unknown;
+        $relation = $this->defaultRelation($user, $source, $party, $self);
         $person = CommsPerson::query()->create([
             'user_id' => $user->id,
             'display_name' => $party->displayName,
@@ -123,11 +124,20 @@ class IdentityResolver
         );
     }
 
-    private function touch(CommsPerson $person, Party $party, bool $self): CommsPerson
+    private function touch(User $user, CommsPerson $person, Party $party, bool $self, Source $source): CommsPerson
     {
         if ($self && $person->relation === Relation::Unknown) {
             $person->relation = Relation::Self;
             $person->importance_weight = Relation::Self->weight();
+        }
+
+        if (! $self && $person->relation === Relation::Unknown) {
+            $inferred = $this->defaultRelation($user, $source, $party, false);
+
+            if ($inferred !== Relation::Unknown) {
+                $person->relation = $inferred;
+                $person->importance_weight = $inferred->weight();
+            }
         }
 
         if ($party->bot && ! $person->is_bot) {
@@ -139,6 +149,78 @@ class IdentityResolver
         }
 
         return $person;
+    }
+
+    /**
+     * Teammates start as collaborators so importance is not stuck at unknown=5.
+     * Personas can still override to boss, client, and the rest.
+     */
+    private function defaultRelation(User $user, Source $source, Party $party, bool $self): Relation
+    {
+        if ($self) {
+            return Relation::Self;
+        }
+
+        if ($party->bot) {
+            return Relation::Other;
+        }
+
+        if ($this->sharesWorkDomain($user, $party->email)) {
+            return Relation::Collaborator;
+        }
+
+        // Same Slack workspace is the working team until Personas says otherwise.
+        if ($source === Source::Slack) {
+            return Relation::Collaborator;
+        }
+
+        return Relation::Unknown;
+    }
+
+    private function sharesWorkDomain(User $user, ?string $email): bool
+    {
+        if (! filled($email) || ! str_contains($email, '@')) {
+            return false;
+        }
+
+        $domain = Str::lower(Str::after($email, '@'));
+
+        if ($domain === '' || $this->isPublicMailDomain($domain)) {
+            return false;
+        }
+
+        $user->loadMissing('connectedAccounts');
+
+        foreach ($user->connectedAccounts as $account) {
+            if (! filled($account->email) || ! str_contains((string) $account->email, '@')) {
+                continue;
+            }
+
+            $accountDomain = Str::lower(Str::after((string) $account->email, '@'));
+
+            if ($accountDomain !== '' && ! $this->isPublicMailDomain($accountDomain) && $accountDomain === $domain) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isPublicMailDomain(string $domain): bool
+    {
+        return in_array($domain, [
+            'gmail.com',
+            'googlemail.com',
+            'hotmail.com',
+            'outlook.com',
+            'live.com',
+            'yahoo.com',
+            'icloud.com',
+            'me.com',
+            'mac.com',
+            'proton.me',
+            'protonmail.com',
+        ], true);
     }
 
     private function attach(User $user, CommsPerson $person, Source $source, Party $party, ?string $email): void
