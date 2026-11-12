@@ -118,6 +118,17 @@ return [
     ],
 
     /*
+    | Sender fragments that are always noise in Comms (no dedicated connector).
+    | Matched against the author email or display name.
+    */
+
+    'noise_from' => [
+        '@m.personio.com',
+        '@personio.com',
+        'personio team',
+    ],
+
+    /*
     | Token budgets. High on purpose: when one is spent the pipeline shows
     | the item with no draft instead of calling a model.
     */

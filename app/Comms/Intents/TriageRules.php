@@ -2,7 +2,9 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Events\Source;
 use App\Comms\People\Relation;
+use App\Connections\Capability;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsPerson;
@@ -30,8 +32,18 @@ class TriageRules
             return new TriageResult('noise');
         }
 
+        // Jira already has its own watcher. Atlassian mail is a duplicate brain,
+        // including the inbox_rules "assigned to you" ask when Jira is connected.
+        if ($this->jiraMailAlreadyWatched($user, $message, $normalized)) {
+            return new TriageResult('noise');
+        }
+
         if ($allowed !== null) {
             return new TriageResult($allowed);
+        }
+
+        if ($this->automatedNoise($author, $normalized)) {
+            return new TriageResult('noise');
         }
 
         $headers = array_change_key_case(is_array($normalized['headers'] ?? null) ? $normalized['headers'] : []);
@@ -63,8 +75,8 @@ class TriageRules
      */
     private function inboxRule(?CommsPerson $author, array $normalized): ?string
     {
-        $from = strtolower((string) ($author?->identities()->value('email') ?? ''));
-        $subject = strtolower((string) ($normalized['subject'] ?? strtok($normalized['text'] ?? '', "\n")));
+        $from = $this->authorEmail($author);
+        $subject = $this->subjectOf($normalized);
         $rules = config('comms.inbox_rules', []);
 
         if (! is_array($rules)) {
@@ -87,6 +99,100 @@ class TriageRules
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $normalized
+     */
+    private function jiraMailAlreadyWatched(User $user, CommsMessage $message, array $normalized): bool
+    {
+        if ($message->source !== Source::Gmail || ! $this->watchesJira($user)) {
+            return false;
+        }
+
+        return $this->looksLikeJiraMail($message->author, $normalized, $message->text);
+    }
+
+    private function watchesJira(User $user): bool
+    {
+        return $user->accountsWith(Capability::JiraRead)->isNotEmpty();
+    }
+
+    /**
+     * @param  array<string, mixed>  $normalized
+     */
+    private function looksLikeJiraMail(?CommsPerson $author, array $normalized, string $text): bool
+    {
+        $from = $this->authorEmail($author);
+        $name = strtolower((string) ($author?->display_name ?? ''));
+        $subject = $this->subjectOf($normalized);
+        $haystack = strtolower($text);
+
+        if (str_ends_with($name, '(jira)')) {
+            return true;
+        }
+
+        if (str_starts_with($subject, '[jira]')) {
+            return true;
+        }
+
+        if ($from !== '' && (str_ends_with($from, '.atlassian.net') || str_contains($from, '@atlassian.net') || str_contains($from, 'jira@'))) {
+            return true;
+        }
+
+        return str_contains($haystack, 'atlassian.net/browse/')
+            && (str_contains($haystack, 'atl-paas.net') || str_contains($haystack, 'atlassian.com/legal/privacy'));
+    }
+
+    /**
+     * Transactional mail from systems that are not a connected source.
+     *
+     * @param  array<string, mixed>  $normalized
+     */
+    private function automatedNoise(?CommsPerson $author, array $normalized): bool
+    {
+        $from = $this->authorEmail($author);
+        $name = strtolower((string) ($author?->display_name ?? ''));
+        $patterns = config('comms.noise_from', []);
+
+        if (! is_array($patterns)) {
+            return false;
+        }
+
+        foreach ($patterns as $pattern) {
+            $needle = strtolower((string) $pattern);
+
+            if ($needle === '') {
+                continue;
+            }
+
+            if (($from !== '' && str_contains($from, $needle)) || str_contains($name, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function authorEmail(?CommsPerson $author): string
+    {
+        if ($author === null) {
+            return '';
+        }
+
+        $author->loadMissing('identities');
+
+        return strtolower((string) ($author->identities->firstWhere(fn ($identity): bool => filled($identity->email))?->email
+            ?? $author->identities->value('email')
+            ?? ''));
+    }
+
+    /**
+     * @param  array<string, mixed>  $normalized
+     */
+    private function subjectOf(array $normalized): string
+    {
+        return strtolower((string) ($normalized['subject'] ?? strtok((string) ($normalized['text'] ?? ''), "\n")));
     }
 
     private function onlyRecipientIsSelf(User $user, CommsMessage $message): bool
