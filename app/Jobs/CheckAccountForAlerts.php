@@ -18,7 +18,10 @@ class CheckAccountForAlerts implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [30, 90];
 
     public int $uniqueFor = 300;
 

@@ -6,9 +6,11 @@ use App\Connections\AccessTokens;
 use App\Connections\AccountNeedsReconnection;
 use App\Connections\AccountStatus;
 use App\Models\ConnectedAccount;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use RuntimeException;
+use Throwable;
 
 /**
  * Calls the Slack Web API as the user. Slack answers HTTP 200 with
@@ -62,7 +64,11 @@ class SlackApi
      */
     private function call(ConnectedAccount $account, string $verb, string $method, array $parameters): array
     {
-        $request = Http::withToken($this->tokens->for($account))->acceptJson()->timeout(20);
+        $request = Http::withToken($this->tokens->for($account))
+            ->acceptJson()
+            ->connectTimeout(5)
+            ->timeout(20)
+            ->retry([1000, 3000], 0, fn (Throwable $exception): bool => $exception instanceof ConnectionException);
         $parameters = array_filter($parameters, fn (mixed $value): bool => $value !== null);
 
         for ($attempt = 1; ; $attempt++) {

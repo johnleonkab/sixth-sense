@@ -29,7 +29,10 @@ class ContextHarvest implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 2;
+
+    /** @var list<int> */
+    public array $backoff = [120];
 
     public int $timeout = 540;
 

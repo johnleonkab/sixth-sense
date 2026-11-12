@@ -161,6 +161,18 @@ test('a briefly overloaded model is retried', function () {
     Sleep::assertSleptTimes(1);
 });
 
+test('a dropped connection is retried before failing the harvest call', function () {
+    Http::fake([
+        'https://api.deepseek.com/chat/completions' => Http::sequence()
+            ->pushFailedConnection('cURL error 56: Recv failure: Connection reset by peer')
+            ->push(['choices' => [['message' => ['content' => '{"ok":true}']]]]),
+    ]);
+
+    expect(deepSeekModel()->json('Decide.', 'El email.', ['type' => 'OBJECT']))->toBe(['ok' => true]);
+    Sleep::assertSleptTimes(1);
+    Http::assertSentCount(2);
+});
+
 test('it refuses to call deepseek without an api key', function () {
     deepSeekModel(['api_key' => ''])->json('Decide.', 'El email.', ['type' => 'OBJECT']);
 })->throws(RuntimeException::class, 'DEEPSEEK_API_KEY is not set.');

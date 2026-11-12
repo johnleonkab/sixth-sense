@@ -2,6 +2,7 @@
 
 namespace App\Ai;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -91,8 +92,9 @@ class GeminiTextModel implements TextModel
             ->connectTimeout(3)
             ->timeout($this->config['timeout'])
             ->acceptJson()
-            ->retry(2, 1500, fn (Throwable $exception): bool => $exception instanceof RequestException
-                && in_array($exception->response->status(), [500, 502, 503, 504], true), throw: false)
+            ->retry([1500, 3000], 0, fn (Throwable $exception): bool => $exception instanceof ConnectionException
+                || ($exception instanceof RequestException
+                    && in_array($exception->response->status(), [500, 502, 503, 504], true)), throw: false)
             ->post("/v1beta/models/{$model}:generateContent", $body);
 
         if ($context !== null && $this->observability !== null) {
