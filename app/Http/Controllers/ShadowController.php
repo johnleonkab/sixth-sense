@@ -9,7 +9,6 @@ use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Gate\QuestionDraft;
-use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
@@ -123,7 +122,7 @@ class ShadowController extends Controller
         return response()->json(['item' => $feed->card($notification)]);
     }
 
-    public function feedback(Request $request, EventLog $log, ContextWriter $context, CommsNotification $notification): RedirectResponse
+    public function feedback(Request $request, EventLog $log, ContextWriter $context, HomeFeed $feed, CommsNotification $notification): RedirectResponse
     {
         abort_unless($notification->user_id === $request->user()?->id, 404);
 
@@ -147,9 +146,7 @@ class ShadowController extends Controller
             revision: (string) Str::uuid(),
         );
 
-        $requester = $notification->subject_type === 'intent'
-            ? CommsIntent::query()->whereBelongsTo($request->user())->with('participants.person')->find($notification->subject_id)?->participants->firstWhere('role', 'requester')?->person?->display_name
-            : null;
+        $requester = $feed->actorFor($notification);
         $sentence = $requester === null ? null : match ($feedback) {
             'useful' => "Lo que pide {$requester} sí merece aviso.",
             'not_urgent' => "Lo que pide {$requester} no suele ser urgente: avisar sin interrumpir.",

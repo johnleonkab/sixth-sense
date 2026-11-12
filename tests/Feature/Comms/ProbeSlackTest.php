@@ -3,6 +3,8 @@
 use App\Alerts\Push\PushSender;
 use App\Comms\Cutover\HomeFeed;
 use App\Comms\Events\EventType;
+use App\Comms\Gate\ActionClass;
+use App\Comms\Gate\Gate;
 use App\Comms\Ingestion\IdentityResolver;
 use App\Comms\Ingestion\Ingestor;
 use App\Comms\Ingestion\SlackInbound;
@@ -10,6 +12,7 @@ use App\Comms\Messages\Party;
 use App\Comms\Models\CompletesTasks;
 use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
+use App\Comms\Playbooks\Steps\Ask;
 use App\Comms\Playbooks\Steps\Propose;
 use App\Connections\Provider;
 use App\Events\CommsNotificationDelivered;
@@ -227,4 +230,98 @@ test('an urgent comms alert reaches the device saying what the card says', funct
         ->and($pushed->first()['title'])->toBe('Marta Prueba · Slack')
         ->and($pushed->first()['body'])->toBe("{$card['title']}\n{$card['why']}")
         ->and($pushed->first()['navigate'])->toBe(url('/?alert='.$card['id']));
+});
+
+test('question and proposal notifications keep the requester and ask on the card and in web push', function () {
+    $sender = new RecordingPushSender;
+    app()->instance(PushSender::class, $sender);
+    $user = probeUser();
+    PushSubscription::factory()->for($user)->create();
+    probeScript([
+        ['label' => 'possible_intent', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [[
+            'op' => 'open',
+            'what' => 'Responder a Naiman sobre el tema pixel meta',
+            'quote' => 'necesitamos contestar algo al de naiman sobre tema pixel meta',
+            'confidence' => 0.9,
+            'requesters' => ['slack:probe-patricia-corral'],
+            'responders' => ['self'],
+        ]], 'confidence' => 0.9],
+    ]);
+
+    $this->artisan(
+        'comms:probe-slack',
+        ['user' => $user->id, 'text' => 'cuando puedas necesitamos contestar algo al de naiman sobre tema pixel meta', '--from' => 'Patricia Corral', '--wait' => 1],
+    )->assertSuccessful();
+
+    $intent = CommsIntent::query()->sole();
+    $message = CommsMessage::query()->sole();
+
+    app(Ask::class)->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id]);
+
+    $questionNotification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'question')->sole();
+    $questionCard = app(HomeFeed::class)->card($questionNotification);
+    $pushed = collect($sender->sent)->map(fn (array $sent): array => json_decode($sent['payload'], true)['notification']);
+
+    expect($questionCard['actor_name'])->toBe('Patricia Corral')
+        ->and($questionCard['title'])->toBe('Responder a Naiman sobre el tema pixel meta')
+        ->and($questionCard['why'])->toBe('Espera tu respuesta.')
+        ->and($questionCard['messages'][0]['from'])->toBe('Patricia Corral')
+        ->and($pushed->last()['title'])->toBe('Patricia Corral · Slack')
+        ->and($pushed->last()['body'])->toBe("Responder a Naiman sobre el tema pixel meta\nEspera tu respuesta.");
+
+    app(Propose::class)->submit($user, $intent, $message, 'Lo miro y te escribo cuando esté.', [], facts: false);
+    app(Gate::class)->submit(
+        user: $user,
+        class: ActionClass::NotionCreatePage,
+        target: ['ref' => 'self', 'channel' => (string) $message->channel_ref],
+        payload: [
+            'title' => $intent->what,
+            'text' => 'La afirmacion se basa en el contexto proporcionado [fact:613, fact:644].',
+            'ref' => 'notion:'.$intent->key,
+        ],
+        intent: $intent,
+        sourceEventIds: [$message->event_id],
+    );
+
+    $proposalCards = CommsNotification::query()
+        ->whereBelongsTo($user)
+        ->where('subject_type', 'proposal')
+        ->orderBy('id')
+        ->get()
+        ->map(fn (CommsNotification $row): array => app(HomeFeed::class)->card($row));
+
+    expect($proposalCards)->toHaveCount(2)
+        ->and($proposalCards[0]['actor_name'])->toBe('Patricia Corral')
+        ->and($proposalCards[0]['title'])->toBe('Responder a Naiman sobre el tema pixel meta')
+        ->and($proposalCards[0]['proposal']['summary'])->toBe('Lo miro y te escribo cuando esté.')
+        ->and($proposalCards[1]['actor_name'])->toBe('Patricia Corral')
+        ->and($proposalCards[1]['title'])->toBe('Responder a Naiman sobre el tema pixel meta')
+        ->and($proposalCards[1]['proposal']['summary'])->toBe('Página en Notion: Responder a Naiman sobre el tema pixel meta');
+});
+
+test('a signal notification without an intent shows the sender and signal summary', function () {
+    $user = probeUser();
+    probeScript([
+        ['label' => 'possible_signal', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [[
+            'op' => 'signal',
+            'quote' => 'Verdict: hard blockers, do not close.',
+            'summary' => 'CPD-7205 tiene bloqueos pendientes antes de cerrar.',
+            'confidence' => 0.85,
+        ]], 'confidence' => 0.85],
+    ]);
+
+    $this->artisan(
+        'comms:probe-slack',
+        ['user' => $user->id, 'text' => 'Close-out check. Verdict: hard blockers, do not close.', '--from' => 'David Montiel', '--wait' => 1],
+    )->assertSuccessful();
+
+    $notification = CommsNotification::query()->whereBelongsTo($user)->where('kind', 'signal')->sole();
+    $card = app(HomeFeed::class)->card($notification);
+
+    expect($card['actor_name'])->toBe('David Montiel')
+        ->and($card['title'])->toBe('CPD-7205 tiene bloqueos pendientes antes de cerrar.')
+        ->and($card['why'])->toBe('Para el resumen.')
+        ->and($card['messages'][0]['from'])->toBe('David Montiel');
 });

@@ -92,7 +92,7 @@ test('a switched gmail account is ingested as one message', function () {
 
 test('the home feed shows a cut over notification and keeps the other sources', function () {
     Config::set('comms.pipeline.slack', true);
-    $user = phase45Open($question = '¿Lo reclamo?');
+    $user = phase45Open($question = '¿Lo reclamo?', $what = 'Revisar el contrato');
     InboxItem::factory()->for($user)->create(['source' => AlertSource::Slack, 'title' => 'Viejo de Slack', 'status' => 'pending']);
     InboxItem::factory()->for($user)->create(['source' => AlertSource::Jira, 'title' => 'Jira sigue', 'status' => 'pending']);
 
@@ -102,10 +102,13 @@ test('the home feed shows a cut over notification and keeps the other sources', 
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('home')
-            ->where('alerts', function (mixed $alerts) use ($question): bool {
-                $titles = array_column(is_array($alerts) ? $alerts : $alerts->all(), 'title');
+            ->where('alerts', function (mixed $alerts) use ($what): bool {
+                $rows = is_array($alerts) ? $alerts : $alerts->all();
+                $titles = array_column($rows, 'title');
+                $comms = collect($rows)->firstWhere('title', $what);
 
-                return in_array($question, $titles, true)
+                return $comms !== null
+                    && $comms['actor_name'] === 'Marta'
                     && in_array('Jira sigue', $titles, true)
                     && ! in_array('Viejo de Slack', $titles, true);
             })
@@ -116,16 +119,16 @@ test('the home feed shows a cut over notification and keeps the other sources', 
 
 test('the home feed leaves communications quiet while the switch is off', function () {
     Config::set('comms.pipeline.slack', false);
-    $user = phase45Open('¿Lo reclamo?');
+    $user = phase45Open('¿Lo reclamo?', $what = 'Revisar el contrato');
 
     Http::preventStrayRequests(false);
 
     $this->actingAs($user)->get(route('home'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('openComms', null)->where('alerts', function (mixed $alerts): bool {
+        ->assertInertia(fn ($page) => $page->where('openComms', null)->where('alerts', function (mixed $alerts) use ($what): bool {
             $titles = array_column(is_array($alerts) ? $alerts : $alerts->all(), 'title');
 
-            return ! in_array('¿Lo reclamo?', $titles, true);
+            return ! in_array($what, $titles, true);
         }));
 });
 
@@ -257,7 +260,7 @@ function phase45Watch(ConnectedAccount $account, AlertSource $source, string $ch
     app()->instance(InboxWatchers::class, $watchers);
 }
 
-function phase45Open(string $text): User
+function phase45Open(string $text, string $what = 'Revisar el contrato'): User
 {
     $user = User::factory()->create();
     $person = CommsPerson::query()->create([
@@ -265,7 +268,7 @@ function phase45Open(string $text): User
         'display_name' => 'Marta',
         'relation' => Relation::Collaborator,
     ]);
-    $intent = CommsIntent::factory()->for($user)->create();
+    $intent = CommsIntent::factory()->for($user)->create(['what' => $what]);
     $message = CommsMessage::factory()->create([
         'author_person_id' => $person->id,
         'source' => Source::Slack,

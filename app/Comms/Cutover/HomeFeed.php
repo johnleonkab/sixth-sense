@@ -4,13 +4,19 @@ namespace App\Comms\Cutover;
 
 use App\Alerts\AlertFeed;
 use App\Alerts\AlertSource;
+use App\Comms\Gate\ActionClass;
+use App\Comms\People\Relation;
 use App\Comms\Pipeline;
+use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
+use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
+use App\Models\Comms\CommsSignal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -69,11 +75,25 @@ class HomeFeed
     public function card(CommsNotification $notification): array
     {
         $source = $this->pipeline->sourceOf($notification) ?? 'slack';
-        $intent = $notification->subject_type === 'intent'
-            ? CommsIntent::query()->with('participants.person')->find($notification->subject_id)
+        $proposal = $notification->subject_type === 'proposal'
+            ? CommsProposal::query()->find($notification->subject_id)
             : null;
-        $requester = $intent?->participants->firstWhere('role', 'requester')?->person?->display_name;
-        $text = $this->text($notification, $intent);
+        $question = $notification->subject_type === 'question'
+            ? CommsQuestion::query()->find($notification->subject_id)
+            : null;
+        $sourceMessage = $notification->subject_type === null ? $this->sourceMessage($notification) : null;
+        $signal = $sourceMessage === null ? null : CommsSignal::query()
+            ->where('user_id', $notification->user_id)
+            ->where('message_id', $sourceMessage->id)
+            ->latest('id')
+            ->first();
+        $intent = $this->resolveIntent($notification, $proposal, $question, $signal);
+        $linkedMessages = $this->linkedMessages($intent);
+        $actor = $this->actorName($intent, $linkedMessages, $proposal, $sourceMessage);
+        $text = $this->text($notification, $intent, $proposal, $question, $signal, $sourceMessage);
+        $proposalSummary = $notification->kind === 'proposal'
+            ? ($this->proposalSummary($proposal) ?? $text)
+            : null;
         $waiting = in_array($notification->kind, ['question', 'proposal'], true)
             || ($intent !== null && $intent->state !== 'settled');
         $pending = $notification->dismissed_at === null && $waiting;
@@ -83,9 +103,9 @@ class HomeFeed
             'id' => -$notification->id,
             'source' => $source,
             'source_label' => AlertSource::from($source)->label(),
-            'actor_name' => $requester ?? 'sixth-sense',
+            'actor_name' => $actor ?? 'sixth-sense',
             'title' => Str::limit($text, 120, ''),
-            'why' => $this->why($notification, $intent),
+            'why' => $this->why($notification, $intent, $question),
             'received_at' => $received,
             'external_id' => 'comms:'.$notification->id,
             'external_url' => null,
@@ -104,23 +124,167 @@ class HomeFeed
             'deadline' => $intent?->deadline?->toDateString(),
             'blocking' => $notification->urgency === 'now',
             'quiet' => $notification->urgency !== 'now',
-            'messages' => $this->messages($intent) ?: [[
+            'messages' => $this->formatMessages($linkedMessages, $sourceMessage) ?: [[
                 'id' => 'comms:'.$notification->id,
-                'from' => 'sixth-sense',
+                'from' => $actor ?? 'sixth-sense',
                 'text' => $text,
                 'at' => $received,
             ]],
-            'proposal' => $notification->kind === 'proposal' ? ['summary' => $text] : null,
+            'proposal' => $proposalSummary !== null ? ['summary' => Str::limit($proposalSummary, 140, '')] : null,
             'task' => null,
             'comms' => true,
         ];
+    }
+
+    public function intentFor(CommsNotification $notification): ?CommsIntent
+    {
+        $proposal = $notification->subject_type === 'proposal'
+            ? CommsProposal::query()->find($notification->subject_id)
+            : null;
+        $question = $notification->subject_type === 'question'
+            ? CommsQuestion::query()->find($notification->subject_id)
+            : null;
+        $sourceMessage = $notification->subject_type === null ? $this->sourceMessage($notification) : null;
+        $signal = $sourceMessage === null ? null : CommsSignal::query()
+            ->where('user_id', $notification->user_id)
+            ->where('message_id', $sourceMessage->id)
+            ->latest('id')
+            ->first();
+
+        return $this->resolveIntent($notification, $proposal, $question, $signal);
+    }
+
+    public function actorFor(CommsNotification $notification): ?string
+    {
+        $proposal = $notification->subject_type === 'proposal'
+            ? CommsProposal::query()->find($notification->subject_id)
+            : null;
+        $sourceMessage = $notification->subject_type === null ? $this->sourceMessage($notification) : null;
+        $intent = $this->intentFor($notification);
+
+        return $this->actorName($intent, $this->linkedMessages($intent), $proposal, $sourceMessage);
+    }
+
+    public function sourceMessage(CommsNotification $notification): ?CommsMessage
+    {
+        $eventIds = array_values(array_filter(
+            $notification->source_event_ids ?? [],
+            fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)),
+        ));
+
+        if ($eventIds === []) {
+            return null;
+        }
+
+        $direct = CommsMessage::query()
+            ->where('user_id', $notification->user_id)
+            ->whereIn('event_id', $eventIds)
+            ->with('author')
+            ->latest('id')
+            ->first();
+
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        foreach (CommsEvent::query()->whereIn('id', $eventIds)->get(['source', 'external_id']) as $event) {
+            if ($event->external_id === null || $event->external_id === '') {
+                continue;
+            }
+
+            $matched = CommsMessage::query()
+                ->where('user_id', $notification->user_id)
+                ->where('source', $event->source)
+                ->where('external_id', $event->external_id)
+                ->with('author')
+                ->latest('id')
+                ->first();
+
+            if ($matched !== null) {
+                return $matched;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveIntent(
+        CommsNotification $notification,
+        ?CommsProposal $proposal,
+        ?CommsQuestion $question,
+        ?CommsSignal $signal,
+    ): ?CommsIntent {
+        $id = match ($notification->subject_type) {
+            'intent' => $notification->subject_id,
+            'proposal' => $proposal?->intent_id,
+            'question' => $question?->intent_id,
+            default => $signal?->intent_id,
+        };
+
+        return $id === null
+            ? null
+            : CommsIntent::query()
+                ->where('user_id', $notification->user_id)
+                ->with('participants.person')
+                ->find($id);
+    }
+
+    /**
+     * @param  Collection<int, CommsMessage>  $linkedMessages
+     */
+    private function actorName(
+        ?CommsIntent $intent,
+        Collection $linkedMessages,
+        ?CommsProposal $proposal,
+        ?CommsMessage $sourceMessage,
+    ): ?string {
+        if ($intent !== null) {
+            $requester = $intent->participants
+                ->where('role', 'requester')
+                ->map(fn ($participant) => $participant->person)
+                ->first(fn ($person): bool => $person !== null && $person->relation !== Relation::Self && filled($person->display_name));
+
+            if ($requester !== null) {
+                return (string) $requester->display_name;
+            }
+
+            $other = $intent->participants
+                ->map(fn ($participant) => $participant->person)
+                ->first(fn ($person): bool => $person !== null && $person->relation !== Relation::Self && filled($person->display_name));
+
+            if ($other !== null) {
+                return (string) $other->display_name;
+            }
+
+            $fromLinked = $linkedMessages
+                ->reverse()
+                ->first(fn (CommsMessage $message): bool => $message->author !== null && $message->author->relation !== Relation::Self && filled($message->author->display_name));
+
+            if ($fromLinked !== null) {
+                return (string) $fromLinked->author->display_name;
+            }
+        }
+
+        if ($sourceMessage?->author !== null && $sourceMessage->author->relation !== Relation::Self && filled($sourceMessage->author->display_name)) {
+            return (string) $sourceMessage->author->display_name;
+        }
+
+        if ($proposal !== null) {
+            $toName = trim((string) ($proposal->payload['to_name'] ?? ''));
+
+            if ($toName !== '') {
+                return $toName;
+            }
+        }
+
+        return null;
     }
 
     /**
      * Why it is on the list, in a line: by when, and whether it is urgent. Who
      * asks is already the card's actor.
      */
-    private function why(CommsNotification $notification, ?CommsIntent $intent): string
+    private function why(CommsNotification $notification, ?CommsIntent $intent, ?CommsQuestion $question): string
     {
         if ($intent === null) {
             return match ($notification->kind) {
@@ -131,6 +295,14 @@ class HomeFeed
             };
         }
 
+        if ($this->userAsked($intent) && $question !== null && filled($question->text)) {
+            $line = trim((string) $question->text);
+
+            return ($intent->flags['urgent'] ?? false) === true && ! str_starts_with($line, 'Urgente.')
+                ? 'Urgente. '.$line
+                : $line;
+        }
+
         $line = $intent->deadline !== null
             ? 'Lo necesita para el '.CarbonImmutable::parse($intent->deadline)->locale('es')->isoFormat('dddd D [de] MMMM').'.'
             : 'Espera tu respuesta.';
@@ -138,15 +310,23 @@ class HomeFeed
         return ($intent->flags['urgent'] ?? false) === true ? 'Urgente. '.$line : $line;
     }
 
+    private function userAsked(CommsIntent $intent): bool
+    {
+        $requesters = $intent->participants->where('role', 'requester');
+
+        return $requesters->isNotEmpty()
+            && $requesters->every(fn ($participant): bool => $participant->person?->relation === Relation::Self);
+    }
+
     /**
      * The messages the intent came from, oldest first.
      *
-     * @return list<array{id: string, from: string, text: string, at: string}>
+     * @return Collection<int, CommsMessage>
      */
-    private function messages(?CommsIntent $intent): array
+    private function linkedMessages(?CommsIntent $intent): Collection
     {
         if ($intent === null) {
-            return [];
+            return collect();
         }
 
         return $intent->links()
@@ -155,37 +335,76 @@ class HomeFeed
             ->limit(5)
             ->get()
             ->reverse()
-            ->filter(fn ($link): bool => $link->message !== null)
-            ->map(fn ($link): array => [
-                'id' => 'comms-message:'.$link->message->id,
-                'from' => (string) ($link->message->author->display_name ?? 'Alguien'),
-                'text' => (string) $link->message->text,
-                'at' => $link->message->occurred_at->toIso8601String(),
+            ->map(fn ($link): ?CommsMessage => $link->message)
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, CommsMessage>  $linkedMessages
+     * @return list<array{id: string, from: string, text: string, at: string}>
+     */
+    private function formatMessages(Collection $linkedMessages, ?CommsMessage $sourceMessage): array
+    {
+        $messages = $linkedMessages->isNotEmpty()
+            ? $linkedMessages
+            : ($sourceMessage !== null ? collect([$sourceMessage]) : collect());
+
+        return $messages
+            ->map(fn (CommsMessage $message): array => [
+                'id' => 'comms-message:'.$message->id,
+                'from' => (string) ($message->author->display_name ?? 'Alguien'),
+                'text' => (string) $message->text,
+                'at' => $message->occurred_at->toIso8601String(),
             ])
             ->values()
             ->all();
     }
 
-    private function text(CommsNotification $notification, ?CommsIntent $intent): string
+    private function proposalSummary(?CommsProposal $proposal): ?string
     {
+        if ($proposal === null) {
+            return null;
+        }
+
+        $title = trim((string) ($proposal->payload['title'] ?? ''));
+        $text = trim((string) ($proposal->payload['text'] ?? ''));
+
+        return match ($proposal->action_class) {
+            ActionClass::NotionCreatePage => $title !== '' ? "Página en Notion: {$title}" : 'Crear página en Notion',
+            ActionClass::CalendarCreate, ActionClass::CalendarUpdate => $title !== '' ? $title : ($text !== '' ? $text : 'Bloque en el calendario'),
+            default => $text !== '' ? $text : ($title !== '' ? $title : null),
+        };
+    }
+
+    private function text(
+        CommsNotification $notification,
+        ?CommsIntent $intent,
+        ?CommsProposal $proposal,
+        ?CommsQuestion $question,
+        ?CommsSignal $signal,
+        ?CommsMessage $sourceMessage,
+    ): string {
         if ($intent !== null && filled($intent->what)) {
             return (string) $intent->what;
         }
 
-        if ($notification->subject_type === 'question') {
-            $text = CommsQuestion::query()->find($notification->subject_id)?->text;
-
-            if (is_string($text) && $text !== '') {
-                return $text;
-            }
+        if ($signal !== null && filled($signal->summary)) {
+            return (string) $signal->summary;
         }
 
-        if ($notification->subject_type === 'proposal') {
-            $text = CommsProposal::query()->find($notification->subject_id)?->payload['text'] ?? null;
+        if ($question !== null && filled($question->text)) {
+            return (string) $question->text;
+        }
 
-            if (is_string($text) && $text !== '') {
-                return $text;
-            }
+        $summary = $this->proposalSummary($proposal);
+
+        if ($summary !== null) {
+            return $summary;
+        }
+
+        if ($sourceMessage !== null && filled($sourceMessage->text)) {
+            return (string) $sourceMessage->text;
         }
 
         return match ($notification->kind) {

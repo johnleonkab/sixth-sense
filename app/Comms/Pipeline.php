@@ -45,6 +45,7 @@ class Pipeline
 
         $intentId = match ($notification->subject_type) {
             'intent' => $notification->subject_id,
+            'proposal' => CommsProposal::query()->find($notification->subject_id)?->intent_id,
             'question' => CommsQuestion::query()->find($notification->subject_id)?->intent_id,
             default => null,
         };
