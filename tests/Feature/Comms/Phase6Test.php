@@ -39,7 +39,7 @@ afterEach(function () {
 });
 
 test('approved work waits for the page and then asks without a model', function () {
-    Carbon::setTestNow('2026-11-08 12:00:00');
+    Carbon::setTestNow('2026-11-09 12:00:00');
     $user = phase6User();
     $text = 'Necesito el dato de prepago para el lunes.';
 
@@ -51,12 +51,17 @@ test('approved work waits for the page and then asks without a model', function 
         ])]),
         ['band' => 30, 'reason' => 'Hay que sacarlo de la hoja.', 'underspecified' => false],
     ]);
-    phase6Say($user, 's-3', $text, phase6Marta(), phase6At('2026-11-08T12:00:00Z'));
+    phase6Say($user, 's-3', $text, phase6Marta(), phase6At('2026-11-09T12:00:00Z'));
 
     $run = CommsPlaybookRun::query()->sole();
+    $proposalNotifications = CommsNotification::query()->where('kind', 'proposal')->get();
 
     expect($run->state)->toBe('awaiting_approval')
-        ->and(CommsProposal::query()->where('action_class', ActionClass::CalendarCreate)->count())->toBe(1);
+        ->and(CommsProposal::query()->count())->toBe(3)
+        ->and(CommsProposal::query()->where('action_class', ActionClass::CalendarCreate)->count())->toBe(1)
+        ->and($proposalNotifications)->toHaveCount(1)
+        ->and($proposalNotifications->sole()->urgency)->toBe('now')
+        ->and(CommsProposal::query()->find($proposalNotifications->sole()->subject_id)?->action_class)->toBe(ActionClass::SendSlack);
 
     $page = CommsProposal::query()->where('action_class', ActionClass::NotionCreatePage)->sole();
     app(Gate::class)->approve($page);
@@ -135,6 +140,26 @@ test('a transcript opens commitments and records a contradiction', function () {
     expect(CommsIntent::query()->count())->toBe(2)
         ->and(CommsWatcher::query()->count())->toBe(1)
         ->and(CommsQuestion::query()->sole()->text)->toContain('No coincide');
+});
+
+test('an underspecified prepare asks quietly unless the intent is urgent', function () {
+    Carbon::setTestNow('2026-11-09 12:00:00');
+    $user = phase6User();
+    $text = 'Mira esto cuando puedas.';
+
+    phase6Script([
+        phase6Heard(),
+        phase6Match([phase6Open('Mirar el encargo', $text, ['slack:U-marta'], ['self'], [
+            'kind' => 'prepare',
+        ])]),
+        ['band' => 30, 'reason' => 'No se entiende el encargo.', 'underspecified' => true],
+    ]);
+    phase6Say($user, 's-vague', $text, phase6Marta(), phase6At('2026-11-09T12:00:00Z'));
+
+    expect(CommsPlaybookRun::query()->sole()->step)->toBe('clarify')
+        ->and(CommsQuestion::query()->sole()->text)->toBe('Falta concretar el encargo.')
+        ->and(CommsNotification::query()->where('kind', 'question')->sole()->urgency)->toBe('digest')
+        ->and(CommsProposal::query()->count())->toBe(0);
 });
 
 test('no free slot proposes asking for more time', function () {

@@ -158,6 +158,40 @@ test('a thin ticket proposes a jira comment listing what is missing', function (
         ->and($proposal->payload['text'])->toContain('criterios de aceptación');
 });
 
+test('a sourced reply without inline refs still becomes a proposal', function () {
+    $user = phase5User();
+    $text = '¿Cuál es el tope de prepago?';
+    $draft = 'El tope es 50 euros.';
+
+    phase5Script([
+        phase5Heard(),
+        phase5Match([phase5Open('Responder el tope de prepago', $text, ['slack:U-marta'], ['self'], ['kind' => 'question'])]),
+        phase5Points([['text' => $draft, 'refs' => ['jira:PAY-1'], 'unknown' => false]]),
+        phase5Keep([$draft]),
+    ]);
+    phase5Say($user, 's-cite', $text, phase5Marta(), phase5At('2026-11-09T12:00:00Z'));
+
+    expect(CommsProposal::query()->sole()->payload['text'])->toBe($draft)
+        ->and(CommsQuestion::query()->count())->toBe(0)
+        ->and(CommsNotification::query()->where('kind', 'question')->count())->toBe(0);
+});
+
+test('a generic unknown stays quiet instead of pushing an empty draft question', function () {
+    $user = phase5User();
+    $text = '¿Cuál es la fecha de corte?';
+
+    phase5Script([
+        phase5Heard(),
+        phase5Match([phase5Open('Responder la fecha de corte', $text, ['slack:U-marta'], ['self'], ['kind' => 'question'])]),
+        phase5Points([['text' => 'No se encontró información en las fuentes.', 'refs' => [], 'unknown' => true]]),
+    ]);
+    phase5Say($user, 's-empty', $text, phase5Marta(), phase5At('2026-11-09T12:00:00Z'));
+
+    expect(CommsProposal::query()->count())->toBe(0)
+        ->and(CommsQuestion::query()->count())->toBe(0)
+        ->and(CommsNotification::query()->where('kind', 'question')->count())->toBe(0);
+});
+
 test('a compliance ask stays a draft', function () {
     $user = phase5User();
     CommsOwnedArea::query()->create([

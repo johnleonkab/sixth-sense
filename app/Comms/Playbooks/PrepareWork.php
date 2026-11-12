@@ -50,10 +50,22 @@ class PrepareWork
             ],
         );
 
+        $contextBlock = $this->container->make(ContextRenderer::class)->block(
+            $user,
+            new ContextRequest(Audience::Scheduler, intent: $intent, query: $intent->what),
+        );
+        $instructions = implode("\n", array_filter([
+            'Tarea a preparar: '.$intent->what,
+            filled($intent->expects) ? 'Qué espera quien lo pide: '.$intent->expects : null,
+            'Elige band en minutos (15, 30, 45, 60 o 90). Marca underspecified=true SOLO cuando el mensaje sea tan ambiguo que la propia persona no pueda saber qué se le pide (por ejemplo «mira esto» sin enlace ni tema). Que el tema no aparezca en <context> NO significa underspecified.',
+            'Mensaje original:',
+            $message->text,
+        ]));
+
         $answer = $this->container->make(ModelRouter::class)->ask(
             user: $user,
             task: 'draft',
-            input: trim($this->container->make(ContextRenderer::class)->block($user, new ContextRequest(Audience::Scheduler, intent: $intent))."\n".$message->text),
+            input: ltrim($contextBlock."\n".$instructions),
             schema: [
                 'type' => 'object',
                 'required' => ['band', 'reason', 'underspecified'],
@@ -71,7 +83,8 @@ class PrepareWork
         }
 
         if (($answer->output['underspecified'] ?? false) === true) {
-            $this->ask->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id]);
+            $urgency = ($intent->flags['urgent'] ?? false) === true ? 'now' : 'digest';
+            $this->ask->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id], $urgency);
             $run->state = 'waiting';
             $run->step = 'clarify';
             $run->save();
@@ -86,7 +99,7 @@ class PrepareWork
             $user,
             CarbonImmutable::now(),
             $deadline,
-            (int) $answer->output['band'],
+            max(15, (int) $answer->output['band']),
             (bool) ($intent->flags['urgent'] ?? false),
         );
 
@@ -123,6 +136,7 @@ class PrepareWork
             ],
             intent: $intent,
             sourceEventIds: [$message->event_id],
+            notify: false,
         ));
         $this->attach($run, $this->gate->submit(
             user: $user,
@@ -136,6 +150,7 @@ class PrepareWork
             ],
             intent: $intent,
             sourceEventIds: [$message->event_id],
+            notify: false,
         ));
         $this->attach($run, $this->propose->submit(
             $user,

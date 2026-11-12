@@ -72,14 +72,14 @@ class AnswerFromSources
      */
     private function apply(User $user, CommsIntent $intent, CommsMessage $message, array $gathered, array $output, bool $proposing): void
     {
-        $rendered = $this->render($gathered, $output);
+        $rendered = $this->render($gathered, $output, $message->event_id);
         $kind = $intent->flags['kind'] ?? null;
         $restricted = $this->restricted($user);
         $choice = $kind === 'choice';
         $draft = $rendered['draft'];
 
         if ($proposing && ! $restricted && ! $choice && $draft !== '') {
-            $checked = $this->resolver()->verify($user, $message, $draft);
+            $checked = $this->resolver()->verify($user, $message, $draft, $rendered['refs']);
 
             if ($checked->kind === ModelAnswerKind::NoDraft) {
                 $this->noDraft($user, $intent, $message);
@@ -88,19 +88,27 @@ class AnswerFromSources
             }
 
             if (is_array($checked->output)) {
-                $draft = $this->kept($checked->output['keep'] ?? [], $rendered['refs']);
+                $draft = $this->kept($checked->output['keep'] ?? [], $rendered['sentences'], $rendered['refs']);
             }
         }
 
         if ($rendered['unknowns'] !== [] || $restricted || $choice || $draft === '') {
-            $text = $choice
-                ? $rendered['options']
-                : ($rendered['unknowns'] !== []
-                    ? 'No está resuelto: '.implode(' ', $rendered['unknowns'])
-                    : 'Borrador para revisar, no se envía.');
+            if ($choice) {
+                $text = $rendered['options'];
+                $urgency = $this->notifier->urgencyForIntent($user, $intent);
+            } elseif ($restricted && $draft !== '') {
+                $text = 'Borrador para revisar, no se envía.';
+                $urgency = $this->notifier->urgencyForIntent($user, $intent);
+            } elseif ($rendered['unknowns'] !== []) {
+                $text = 'No está resuelto: '.implode(' ', $rendered['unknowns']);
+                $urgency = ($intent->flags['urgent'] ?? false) === true ? 'now' : 'digest';
+            } else {
+                $text = '';
+                $urgency = 'digest';
+            }
 
             if ($text !== '') {
-                $this->ask->open($user, $intent, $text, ['draft' => $draft], [$message->event_id]);
+                $this->ask->open($user, $intent, $text, ['draft' => $draft], [$message->event_id], $urgency);
             }
         }
 
@@ -121,11 +129,12 @@ class AnswerFromSources
     /**
      * @param  array{hits?: list<array{document: CorpusDocument, similarity: float}>, findings?: list<array{refs: list<string>, summary: string}>}  $gathered
      * @param  array<string, mixed>  $output
-     * @return array{draft: string, unknowns: list<string>, refs: list<string>, options: string}
+     * @return array{draft: string, sentences: list<string>, unknowns: list<string>, refs: list<string>, options: string}
      */
-    private function render(array $gathered, array $output): array
+    private function render(array $gathered, array $output, ?int $sourceEventId = null): array
     {
         $refs = [];
+        $sourceRef = $sourceEventId !== null ? 'evt:'.$sourceEventId : null;
 
         foreach ($gathered['hits'] ?? [] as $hit) {
             $refs[] = $hit['document']->ref;
@@ -141,7 +150,15 @@ class AnswerFromSources
             }
 
             if (($point['unknown'] ?? false) === true) {
-                $found = trim((string) ($point['found'] ?? $point['text'] ?? ''));
+                $found = trim((string) ($point['found'] ?? ''));
+
+                if ($found === '') {
+                    $candidate = trim((string) ($point['text'] ?? ''));
+
+                    if ($candidate !== '' && ! $this->genericUnknown($candidate)) {
+                        $found = $candidate;
+                    }
+                }
 
                 if ($found !== '') {
                     $unknowns[] = $found;
@@ -150,7 +167,10 @@ class AnswerFromSources
                 continue;
             }
 
-            $pointRefs = array_values(array_filter($point['refs'] ?? [], is_string(...)));
+            $pointRefs = array_values(array_filter(
+                $point['refs'] ?? [],
+                fn (mixed $ref): bool => is_string($ref) && $ref !== '' && $ref !== $sourceRef,
+            ));
             $text = trim((string) ($point['text'] ?? ''));
 
             if ($text === '' || $pointRefs === []) {
@@ -163,7 +183,7 @@ class AnswerFromSources
             foreach (preg_split('/(?<=\.)\s+/u', $text) ?: [] as $sentence) {
                 $sentence = trim((string) $sentence);
 
-                if ($sentence !== '' && $this->cites($sentence, $pointRefs)) {
+                if ($sentence !== '') {
                     $lines[] = $sentence;
                 }
             }
@@ -177,6 +197,7 @@ class AnswerFromSources
 
         return [
             'draft' => implode(' ', $lines),
+            'sentences' => $lines,
             'unknowns' => $unknowns,
             'refs' => array_values(array_unique($refs)),
             'options' => implode(' ', $options),
@@ -185,19 +206,78 @@ class AnswerFromSources
 
     /**
      * @param  list<mixed>  $keep
+     * @param  list<string>  $sourcedSentences
      * @param  list<string>  $refs
      */
-    private function kept(array $keep, array $refs): string
+    private function kept(array $keep, array $sourcedSentences, array $refs): string
     {
+        if ($refs === []) {
+            return '';
+        }
+
         $sentences = [];
 
         foreach ($keep as $sentence) {
-            if (is_string($sentence) && $this->cites($sentence, $refs)) {
-                $sentences[] = trim($sentence);
+            if (! is_string($sentence)) {
+                continue;
+            }
+
+            $trimmed = trim($sentence);
+
+            if ($trimmed !== '' && ($this->cites($trimmed, $refs) || $this->matchesSourced($trimmed, $sourcedSentences))) {
+                $sentences[] = $trimmed;
             }
         }
 
         return implode(' ', $sentences);
+    }
+
+    /**
+     * @param  list<string>  $sourcedSentences
+     */
+    private function matchesSourced(string $sentence, array $sourcedSentences): bool
+    {
+        $needle = $this->normalized($sentence);
+
+        if ($needle === '') {
+            return false;
+        }
+
+        foreach ($sourcedSentences as $sourced) {
+            $haystack = $this->normalized($sourced);
+
+            if ($haystack !== '' && ($haystack === $needle || str_contains($haystack, $needle))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalized(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', mb_strtolower($text)));
+    }
+
+    private function genericUnknown(string $text): bool
+    {
+        $lower = mb_strtolower($text);
+
+        foreach ([
+            'no se encuentra información',
+            'no se encontró información',
+            'no hay información',
+            'no hay consejo específico',
+            'no information found',
+            'not found in the provided sources',
+            'no se confirma en las fuentes',
+        ] as $prefix) {
+            if (str_starts_with($lower, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

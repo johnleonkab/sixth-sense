@@ -21,10 +21,12 @@ class Resolve
 
     public function answer(User $user, CommsIntent $intent, CommsMessage $message): ModelAnswer
     {
+        $context = $this->context->block($user, new ContextRequest(Audience::Reply, intent: $intent, query: $intent->what));
+
         return $this->router->ask(
             user: $user,
             task: 'answer',
-            input: ltrim($this->context->block($user, new ContextRequest(Audience::Reply, intent: $intent, query: $intent->what))."\n".$this->wrapped($message, $intent->what)),
+            input: ltrim($context."\n".$this->wrapped($message, $intent->what."\n".$message->text)),
             schema: [
                 'type' => 'object',
                 'required' => ['points'],
@@ -48,12 +50,18 @@ class Resolve
         );
     }
 
-    public function verify(User $user, CommsMessage $message, string $draft): ModelAnswer
+    /**
+     * @param  list<string>  $refs
+     */
+    public function verify(User $user, CommsMessage $message, string $draft, array $refs = []): ModelAnswer
     {
+        $context = $this->context->block($user, new ContextRequest(Audience::Reply, query: $draft));
+        $sources = $refs === [] ? '' : 'Fuentes citadas: '.implode(', ', $refs)."\n";
+
         return $this->router->ask(
             user: $user,
             task: 'verify_claims',
-            input: $this->wrapped($message, $draft),
+            input: ltrim($context."\n".$sources.$this->wrapped($message, $draft)),
             schema: [
                 'type' => 'object',
                 'required' => ['keep'],

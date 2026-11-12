@@ -51,6 +51,7 @@ class Gate
         bool $commitsDate = false,
         ?array $verification = null,
         ?array $allows = null,
+        bool $notify = true,
     ): CommsProposal {
         $proposal = CommsProposal::query()->create([
             'user_id' => $user->id,
@@ -68,10 +69,10 @@ class Gate
             'status' => ProposalStatus::Pending,
         ]);
 
-        return $this->decide($proposal);
+        return $this->decide($proposal, $notify);
     }
 
-    public function decide(CommsProposal $proposal): CommsProposal
+    public function decide(CommsProposal $proposal, bool $notify = true): CommsProposal
     {
         $user = $proposal->user;
 
@@ -82,14 +83,14 @@ class Gate
         $reason = $this->denies->reason($user, $proposal);
 
         if ($reason !== null) {
-            return $this->deny($user, $proposal, $reason);
+            return $this->deny($user, $proposal, $reason, $notify);
         }
 
         $outcome = $this->policy($user, $proposal->action_class);
         $proposal->policy_outcome = $outcome;
 
         if ($outcome === PolicyOutcome::Deny) {
-            return $this->deny($user, $proposal, 'policy');
+            return $this->deny($user, $proposal, 'policy', $notify);
         }
 
         if ($outcome === PolicyOutcome::Allow) {
@@ -98,13 +99,20 @@ class Gate
             $proposal->save();
             $this->runs->approved($proposal);
             $this->arm($proposal);
-            $this->notify($user, $proposal, 'now');
+
+            if ($notify) {
+                $this->notify($user, $proposal, 'now');
+            }
 
             return $proposal->refresh();
         }
 
         $proposal->save();
-        $this->notify($user, $proposal, 'digest');
+
+        if ($notify) {
+            $proposal->loadMissing('intent');
+            $this->notify($user, $proposal, $this->notifier->urgencyForProposal($user, $proposal->intent));
+        }
 
         return $proposal->refresh();
     }
@@ -249,14 +257,17 @@ class Gate
         return $this->actions->confirm($action);
     }
 
-    private function deny(User $user, CommsProposal $proposal, string $reason): CommsProposal
+    private function deny(User $user, CommsProposal $proposal, string $reason, bool $notify = true): CommsProposal
     {
         $proposal->policy_outcome = PolicyOutcome::Deny;
         $proposal->deny_reason = $reason;
         $proposal->status = ProposalStatus::Rejected;
         $proposal->decided_at = now();
         $proposal->save();
-        $this->notify($user, $proposal, 'digest');
+
+        if ($notify) {
+            $this->notify($user, $proposal, 'digest');
+        }
 
         return $proposal->refresh();
     }

@@ -11,6 +11,7 @@ use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsPerson;
+use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -213,12 +214,50 @@ class Notifier
         );
     }
 
+    public function urgencyForIntent(User $user, ?CommsIntent $intent, ?CarbonImmutable $at = null): string
+    {
+        if ($intent === null) {
+            return 'digest';
+        }
+
+        $moment = $at ?? CarbonImmutable::now();
+        $urgent = (bool) ($intent->flags['urgent'] ?? false);
+        $important = $intent->importance >= (int) config('comms.notify.followup_importance');
+        $soon = $intent->state !== 'settled'
+            && $intent->deadline !== null
+            && CarbonImmutable::parse($intent->deadline)->endOfDay()->lessThanOrEqualTo($moment->addHours(24));
+
+        if (! $urgent && ! $important && ! $soon) {
+            return 'digest';
+        }
+
+        return $urgent || $this->calendar->isWorking($user, $moment) ? 'now' : 'digest';
+    }
+
+    public function urgencyForProposal(User $user, ?CommsIntent $intent, ?CarbonImmutable $at = null): string
+    {
+        $moment = $at ?? CarbonImmutable::now();
+
+        if ($intent !== null && ($intent->flags['urgent'] ?? false) === true) {
+            return 'now';
+        }
+
+        return $this->calendar->isWorking($user, $moment) ? 'now' : 'digest';
+    }
+
     private function urgentSubject(?string $type, ?int $id): bool
     {
-        if ($type !== 'intent' || $id === null) {
+        if ($id === null) {
             return false;
         }
 
-        return (bool) (CommsIntent::query()->find($id)?->flags['urgent'] ?? false);
+        $intentId = match ($type) {
+            'intent' => $id,
+            'proposal' => CommsProposal::query()->whereKey($id)->value('intent_id'),
+            'question' => CommsQuestion::query()->whereKey($id)->value('intent_id'),
+            default => null,
+        };
+
+        return $intentId !== null && (bool) (CommsIntent::query()->find($intentId)?->flags['urgent'] ?? false);
     }
 }

@@ -257,7 +257,7 @@ test('question and proposal notifications keep the requester and ask on the card
     $intent = CommsIntent::query()->sole();
     $message = CommsMessage::query()->sole();
 
-    app(Ask::class)->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id]);
+    app(Ask::class)->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id], 'now');
 
     $questionNotification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'question')->sole();
     $questionCard = app(HomeFeed::class)->card($questionNotification);

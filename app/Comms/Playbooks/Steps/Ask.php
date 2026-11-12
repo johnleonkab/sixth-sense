@@ -18,7 +18,7 @@ class Ask
      * @param  array<string, mixed>  $context
      * @param  list<int>  $eventIds
      */
-    public function open(User $user, CommsIntent $intent, string $text, array $context, array $eventIds, string $urgency = 'now'): CommsQuestion
+    public function open(User $user, CommsIntent $intent, string $text, array $context, array $eventIds, string $urgency = 'digest'): CommsQuestion
     {
         $question = CommsQuestion::query()->updateOrCreate(
             ['user_id' => $user->id, 'key' => 'q:'.$intent->key],
