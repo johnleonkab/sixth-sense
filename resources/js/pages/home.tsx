@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { answerIn, bareAnswer, type Answer } from '@/actions/answers';
@@ -295,10 +295,16 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
             }
         };
 
+        const onIntents = () => {
+            router.reload({ only: ['intents'], preserveScroll: true, preserveState: true });
+        };
+
         channel.listen('.scene.updated', onScene);
+        channel.listen('.intents.updated', onIntents);
 
         return () => {
             channel.stopListening('.scene.updated', onScene);
+            channel.stopListening('.intents.updated', onIntents);
         };
     }, [auth.user?.id, voice.active, voice.tell]);
 

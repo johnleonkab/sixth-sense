@@ -2,8 +2,10 @@
 
 namespace App\Comms\Ingestion;
 
+use App\Comms\Events\Source;
 use App\Comms\Messages\Party;
 use App\Connections\AccountNeedsReconnection;
+use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsScope;
 use App\Models\ConnectedAccount;
@@ -13,7 +15,8 @@ use RuntimeException;
 /**
  * Reads Slack history for channels we already know: the allow list, and
  * channels stored from earlier messages. Listing every conversation is not
- * one of the methods this client may call.
+ * one of the methods this client may call. Thread replies are fetched with
+ * conversations.replies — history alone never returns them.
  */
 class SlackHistory
 {
@@ -29,6 +32,19 @@ class SlackHistory
             ? $account->metadata['team_id']
             : explode(':', (string) $account->external_account_id)[0];
         $items = [];
+        $seen = [];
+        $fetchedThreads = [];
+
+        $add = function (SlackInbound $item) use (&$items, &$seen): void {
+            $key = $item->channelId.':'.$item->ts;
+
+            if (isset($seen[$key])) {
+                return;
+            }
+
+            $seen[$key] = true;
+            $items[] = $item;
+        };
 
         foreach ($this->channels($account) as $channelId) {
             $kind = $this->kind($account, $channelId);
@@ -50,7 +66,27 @@ class SlackHistory
                     $mapped = $this->message($account, $teamId, $channelId, $kind, $selfId, $message);
 
                     if ($mapped !== null) {
-                        $items[] = $mapped;
+                        $add($mapped);
+                    }
+
+                    $threadTs = (string) ($message['thread_ts'] ?? $message['ts'] ?? '');
+                    $replyCount = (int) ($message['reply_count'] ?? 0);
+                    $latestReply = isset($message['latest_reply']) ? (float) $message['latest_reply'] : 0.0;
+
+                    if ($threadTs === '' || $replyCount < 1 || $latestReply < $since->getTimestamp()) {
+                        continue;
+                    }
+
+                    $threadKey = $channelId.':'.$threadTs;
+
+                    if (isset($fetchedThreads[$threadKey])) {
+                        continue;
+                    }
+
+                    $fetchedThreads[$threadKey] = true;
+
+                    foreach ($this->replies($account, $teamId, $channelId, $kind, $selfId, $threadTs, $since) as $reply) {
+                        $add($reply);
                     }
                 }
 
@@ -59,6 +95,21 @@ class SlackHistory
                 if (! is_string($cursor) || $cursor === '') {
                     break;
                 }
+            }
+        }
+
+        foreach ($this->openThreads($account) as [$channelId, $threadTs]) {
+            $threadKey = $channelId.':'.$threadTs;
+
+            if (isset($fetchedThreads[$threadKey])) {
+                continue;
+            }
+
+            $fetchedThreads[$threadKey] = true;
+            $kind = $this->kind($account, $channelId);
+
+            foreach ($this->replies($account, $teamId, $channelId, $kind, $selfId, $threadTs, $since) as $reply) {
+                $add($reply);
             }
         }
 
@@ -74,7 +125,7 @@ class SlackHistory
         $allowed = $stored->slack_channel_ids ?? [];
         $seen = CommsMessage::query()
             ->where('user_id', $account->user_id)
-            ->where('source', 'slack')
+            ->where('source', Source::Slack)
             ->whereNotNull('channel_ref')
             ->distinct()
             ->pluck('channel_ref')
@@ -84,6 +135,84 @@ class SlackHistory
             [...$allowed, ...$seen],
             fn (mixed $id): bool => is_string($id) && $id !== '',
         )));
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    private function openThreads(ConnectedAccount $account): array
+    {
+        $messageIds = CommsIntent::query()
+            ->where('user_id', $account->user_id)
+            ->where('state', 'open')
+            ->with('links')
+            ->get()
+            ->flatMap(fn (CommsIntent $intent) => $intent->links->pluck('message_id'))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($messageIds === []) {
+            return [];
+        }
+
+        return CommsMessage::query()
+            ->where('user_id', $account->user_id)
+            ->where('source', Source::Slack)
+            ->whereIn('id', $messageIds)
+            ->whereNotNull('channel_ref')
+            ->whereNotNull('thread_ref')
+            ->get(['channel_ref', 'thread_ref'])
+            ->map(fn (CommsMessage $message): array => [(string) $message->channel_ref, (string) $message->thread_ref])
+            ->unique(fn (array $pair): string => $pair[0].':'.$pair[1])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<SlackInbound>
+     */
+    private function replies(
+        ConnectedAccount $account,
+        string $teamId,
+        string $channelId,
+        string $kind,
+        string $selfId,
+        string $threadTs,
+        CarbonImmutable $since,
+    ): array {
+        $items = [];
+        $cursor = null;
+
+        for ($page = 0; $page < 5; $page++) {
+            $response = $this->slack->call($account, 'conversations.replies', [
+                'channel' => $channelId,
+                'ts' => $threadTs,
+                'oldest' => (string) $since->getTimestamp(),
+                'limit' => 200,
+                'cursor' => $cursor,
+            ]);
+
+            foreach ($response['messages'] ?? [] as $message) {
+                if (! is_array($message)) {
+                    continue;
+                }
+
+                $mapped = $this->message($account, $teamId, $channelId, $kind, $selfId, $message);
+
+                if ($mapped !== null) {
+                    $items[] = $mapped;
+                }
+            }
+
+            $cursor = $response['response_metadata']['next_cursor'] ?? null;
+
+            if (! is_string($cursor) || $cursor === '') {
+                break;
+            }
+        }
+
+        return $items;
     }
 
     private function kind(ConnectedAccount $account, string $channelId): string

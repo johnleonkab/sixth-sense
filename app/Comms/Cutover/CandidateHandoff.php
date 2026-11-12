@@ -49,12 +49,19 @@ class CandidateHandoff
             $thread = Str::afterLast($candidate->threadKey, ':');
         }
 
+        $author = $this->party($candidate->from, 'slack');
+        $selfId = is_string($account->metadata['user_id'] ?? null) ? $account->metadata['user_id'] : '';
+        $selfEmail = filled($account->email) ? strtolower((string) $account->email) : null;
+        $authorEmail = filled($author->email) ? strtolower((string) $author->email) : null;
+        $mine = ($selfId !== '' && $author->externalId === $selfId)
+            || ($selfEmail !== null && $authorEmail !== null && $selfEmail === $authorEmail);
+
         return new SlackInbound(
             teamId: (string) ($account->metadata['team_id'] ?? 'slack'),
             channelId: is_string($channel) && $channel !== '' ? $channel : 'dm',
             ts: is_string($ts) && $ts !== '' ? $ts : $candidate->externalId,
             channelKind: $kind,
-            author: $this->party($candidate->from, 'slack'),
+            author: $author,
             recipients: [],
             text: $candidate->excerpt,
             at: $candidate->receivedAt,
@@ -62,6 +69,7 @@ class CandidateHandoff
             mentionsUser: ($candidate->labels[0] ?? '') === 'mention',
             userInThread: $candidate->isReply,
             channelAllowed: in_array($candidate->labels[0] ?? '', ['channel', 'mention'], true),
+            mine: $mine,
         );
     }
 

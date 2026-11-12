@@ -19,6 +19,7 @@ use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
+use App\Events\IntentsUpdated;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
@@ -158,6 +159,10 @@ class Pipeline
 
         $this->notifier->onState($event->user, $applied);
         $this->playbooks->afterApplied($event->user, $applied);
+
+        if (collect($results)->contains(fn (array $result): bool => ($result['status'] ?? '') === 'accepted')) {
+            IntentsUpdated::dispatch($event->user);
+        }
     }
 
     private function correct(CommsEvent $event): void

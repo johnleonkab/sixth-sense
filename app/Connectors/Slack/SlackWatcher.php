@@ -6,6 +6,7 @@ use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
 use App\Alerts\InboxWatcher;
 use App\Comms\Context\ContextEngine;
+use App\Comms\Pipeline;
 use App\Connectors\Chat\ChatMessage;
 use App\Connectors\Mail\MailAddress;
 use App\Models\ConnectedAccount;
@@ -36,6 +37,7 @@ class SlackWatcher implements InboxWatcher
     public function __construct(
         private SlackApi $slack,
         private SlackChats $chats,
+        private Pipeline $pipeline,
     ) {}
 
     public function source(): AlertSource
@@ -56,9 +58,16 @@ class SlackWatcher implements InboxWatcher
         $since = $cursor - self::LAG_SECONDS;
         $seen = Cache::get($this->seenKey($account), []);
         $after = CarbonImmutable::createFromTimestamp($since)->subDay()->toDateString();
+        $comms = $this->pipeline->enabled('slack');
         $queries = ["to:<@{$me}> after:{$after}", "<@{$me}> after:{$after}"];
         $ownedChannel = [];
         $signals = app(ContextEngine::class)->slackSignals($account->user);
+
+        // Own replies in threads never match to:/mention searches. When Comms
+        // owns Slack, pull them so Para mí can settle from what the person wrote.
+        if ($comms) {
+            $queries[] = "from:<@{$me}> after:{$after}";
+        }
 
         foreach (array_slice(is_array($signals) ? ($signals['owned_channels'] ?? []) : [], 0, 5) as $channel) {
             if (is_string($channel) && str_starts_with($channel, '#')) {
@@ -101,8 +110,12 @@ class SlackWatcher implements InboxWatcher
 
             $handled[] = $key;
 
-            // The user's own messages, and apps', never need an answer.
-            if (($match['user'] ?? null) === $me || blank($match['user'] ?? null) || isset($match['bot_id']) || ($match['subtype'] ?? null) === 'bot_message') {
+            $own = ($match['user'] ?? null) === $me;
+            $bot = blank($match['user'] ?? null) || isset($match['bot_id']) || ($match['subtype'] ?? null) === 'bot_message';
+
+            // Apps never need an answer. Own messages stay out of the old alert
+            // brain, but enter Comms when Slack has cut over.
+            if ($bot || ($own && ! $comms)) {
                 continue;
             }
 
