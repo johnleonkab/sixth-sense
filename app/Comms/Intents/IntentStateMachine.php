@@ -177,7 +177,7 @@ class IntentStateMachine
             'intent_key' => isset($operation['intent_id']) ? (string) $operation['intent_id'] : null,
         ];
 
-        if ($quote === '' || ! str_contains($message->text, $quote)) {
+        if (! $this->quoteInMessage($message->text, $quote)) {
             return $result;
         }
 
@@ -196,7 +196,7 @@ class IntentStateMachine
         $result['expects'] = isset($operation['expects']) ? (string) $operation['expects'] : null;
         $result['deadline'] = isset($operation['deadline']) ? (string) $operation['deadline'] : null;
         $result['deadline_text'] = isset($operation['deadline_text']) ? (string) $operation['deadline_text'] : null;
-        $result['settle_reason'] = isset($operation['reason']) ? (string) $operation['reason'] : null;
+        $result['settle_reason'] = $this->settleReason($operation);
         $result['summary'] = isset($operation['summary']) ? mb_substr((string) $operation['summary'], 0, 280) : null;
         $result['flags'] = $this->flags($operation, $triage, $result['uncertain']);
 
@@ -286,6 +286,11 @@ class IntentStateMachine
         }
 
         $reason = (string) ($result['settle_reason'] ?? '');
+
+        if ($reason === '') {
+            $reason = 'decision';
+            $result['settle_reason'] = $reason;
+        }
 
         if (! in_array($reason, ['delivery', 'decision', 'drop', 'taken_by_other'], true)) {
             return [...$result, 'reason' => 'reason'];
@@ -699,5 +704,46 @@ class IntentStateMachine
         $current->uncertain = false;
         $current->state_event_id = $event->id;
         $current->save();
+    }
+
+    private function quoteInMessage(string $message, string $quote): bool
+    {
+        if ($quote === '') {
+            return false;
+        }
+
+        if (str_contains($message, $quote)) {
+            return true;
+        }
+
+        $haystack = $this->normalizedForQuote($message);
+        $needle = $this->normalizedForQuote($quote);
+
+        return $needle !== '' && str_contains($haystack, $needle);
+    }
+
+    private function normalizedForQuote(string $text): string
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = (string) preg_replace('/^[ \t]*>+[ \t]?/mu', '', $text);
+        $text = (string) preg_replace('/\s+/u', ' ', $text);
+
+        return trim($text);
+    }
+
+    /**
+     * @param  array<string, mixed>  $operation
+     */
+    private function settleReason(array $operation): ?string
+    {
+        foreach (['settle_reason', 'reason'] as $key) {
+            $value = (string) ($operation[$key] ?? '');
+
+            if (in_array($value, ['delivery', 'decision', 'drop', 'taken_by_other'], true)) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

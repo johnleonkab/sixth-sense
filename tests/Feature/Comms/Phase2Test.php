@@ -398,6 +398,58 @@ test('a quote that is not in the message is rejected', function () {
         ->and($applied->normalized['results'][0]['reason'])->toBe('quote');
 });
 
+test('a quote still matches when whitespace and reply markers differ', function () {
+    $user = phase2User();
+    $text = "Hola John,\r\n\r\n> ¿puedes confirmar el PoC de Q4?\r\n\r\nNecesitamos saber si Seatmap Pro\r\nentra en el piloto.";
+
+    phase2Script([
+        phase2Heard(),
+        phase2Match([phase2Open(
+            'Confirmar el PoC de Q4 con Seatmap Pro',
+            'Necesitamos saber si Seatmap Pro entra en el piloto.',
+        )]),
+    ]);
+    phase2Say($user, 's-ws', $text, phase2Marta(), phase2At('2026-11-02'));
+
+    expect(CommsIntent::query()->sole()->what)->toBe('Confirmar el PoC de Q4 con Seatmap Pro');
+});
+
+test('a settle without settle_reason still closes the intent as a decision', function () {
+    $user = phase2User();
+    $ask = '¿El pago con Google Pay funciona?';
+
+    phase2Script([
+        phase2Heard(),
+        phase2Match([phase2Open('Comprobar Google Pay', $ask)]),
+    ]);
+    phase2Say($user, 's-1', $ask, phase2Marta(), phase2At('2026-11-02'));
+
+    $intent = CommsIntent::query()->firstOrFail();
+
+    phase2Script([
+        phase2Heard(),
+        phase2Match([[
+            'op' => 'settle',
+            'intent_id' => $intent->key,
+            'quote' => 'Google Pay on the website works',
+            'confidence' => 0.95,
+        ]]),
+    ]);
+    phase2Say(
+        $user,
+        'g-2',
+        'Google Pay on the website works. I made a test payment this afternoon and it went through fine, so John, nothing wrong with the payment page',
+        phase2Marta(),
+        phase2At('2026-11-03'),
+        source: Source::Gmail,
+        channel: 'inbox',
+        thread: 'thread-pay',
+    );
+
+    expect($intent->refresh()->state)->toBe('settled')
+        ->and($intent->settle_reason)->toBe('decision');
+});
+
 test('one message with two asks opens two intents', function () {
     $user = phase2User();
     $text = 'Revisa el contrato. Prepara la demo.';
