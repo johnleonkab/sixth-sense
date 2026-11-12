@@ -16,6 +16,10 @@ use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
 use App\Comms\Watchers\Clock;
 use App\Connections\Provider;
+use App\Connectors\Calendar\CalendarWriter;
+use App\Connectors\Calendar\FakeCalendarWriter;
+use App\Connectors\Wiki\FakeWiki;
+use App\Connectors\Wiki\Wiki;
 use App\Models\Comms\CommsCalendarEvent;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
@@ -40,6 +44,8 @@ afterEach(function () {
 
 test('approved work waits for the page and then asks without a model', function () {
     Carbon::setTestNow('2026-11-09 12:00:00');
+    app()->instance(Wiki::class, new FakeWiki);
+    app()->instance(CalendarWriter::class, new FakeCalendarWriter);
     $user = phase6User();
     $text = 'Necesito el dato de prepago para el lunes.';
 
@@ -182,6 +188,8 @@ test('no free slot proposes asking for more time', function () {
 });
 
 test('a calendar event is written only after approval and can be deleted', function () {
+    $writer = new FakeCalendarWriter;
+    app()->instance(CalendarWriter::class, $writer);
     $user = phase6User();
     $intent = CommsIntent::factory()->for($user)->create();
     $proposal = app(Gate::class)->submit(
@@ -193,16 +201,20 @@ test('a calendar event is written only after approval and can be deleted', funct
     );
 
     expect($proposal->external_id)->toBeNull()
-        ->and(CommsEvent::query()->where('type', EventType::ActionExecuted)->count())->toBe(0);
+        ->and(CommsEvent::query()->where('type', EventType::ActionExecuted)->count())->toBe(0)
+        ->and($writer->changes)->toBeEmpty();
 
     app(Gate::class)->approve($proposal->refresh());
 
-    expect($proposal->refresh()->external_id)->toStartWith('calendar:');
+    expect($proposal->refresh()->external_id)->toStartWith('demo:')
+        ->and($writer->changes)->toHaveCount(1)
+        ->and(CommsEvent::query()->where('type', EventType::MessageSent)->count())->toBe(0);
 
     $undone = app(Gate::class)->undo($proposal->refresh());
 
     expect($undone->status)->toBe(ProposalStatus::Undone)
         ->and($undone->payload['deleted'])->toBeTrue()
+        ->and($writer->changes[1][0])->toBe('cancel')
         ->and(CommsEvent::query()->where('type', EventType::ActionUndone)->count())->toBe(1);
 });
 

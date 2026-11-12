@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
 
 /**
  * The sent message comes back through the log, linked to the proposal.
+ * Internal writes (calendar blocks, Notion pages, Drive) stay ActionExecuted only.
  */
 class ProposalEcho
 {
@@ -47,6 +48,10 @@ class ProposalEcho
             occurredAt: CarbonImmutable::now(),
         );
 
+        if (! $this->isMessage($proposal->action_class)) {
+            return;
+        }
+
         $self = CommsPerson::query()->whereBelongsTo($user)->where('relation', Relation::Self)->with('identities')->first();
         $identity = $self?->identities->first(fn (CommsIdentity $row): bool => $row->source === $source) ?? $self?->identities->first();
 
@@ -76,5 +81,17 @@ class ProposalEcho
             causation: $executed,
             occurredAt: $message->at,
         );
+    }
+
+    private function isMessage(ActionClass $class): bool
+    {
+        return match ($class) {
+            ActionClass::SendSlack,
+            ActionClass::SendEmailReply,
+            ActionClass::SendEmailNew,
+            ActionClass::JiraComment,
+            ActionClass::NotionComment => true,
+            default => false,
+        };
     }
 }

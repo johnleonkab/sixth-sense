@@ -7,6 +7,7 @@ use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Events\Source as EventSource;
 use App\Comms\People\Relation;
+use App\Connections\Capability;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
@@ -77,18 +78,40 @@ class QuestionDraft
                     'to_label' => $responder?->person->display_name ?? 'Slack',
                     'thread_ref' => $message?->thread_ref,
                 ]
-                : [
-                    'text' => $text,
-                    'to_email' => (string) ($identity?->email ?? ''),
-                    'to_name' => $responder?->person->display_name ?? '',
-                    'from' => 'me@example.com',
-                    'subject' => 'Re: '.$intent->what,
-                    'thread_id' => $message?->thread_ref,
-                    'in_reply_to' => $message?->external_id,
-                    'references' => $message?->external_id,
-                ],
+                : $this->emailPayload($user, $text, $intent->what, $message, $responder?->person->display_name, $identity?->email),
             intent: $intent,
             userInitiated: true,
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emailPayload(
+        User $user,
+        string $text,
+        string $what,
+        ?CommsMessage $message,
+        ?string $toName,
+        ?string $toEmail,
+    ): array {
+        $account = $user->accountsWith(Capability::GmailSend)->first();
+        $messageId = (string) ($message?->external_id ?? '');
+        $original = $account !== null && $messageId !== '' && ! str_contains($messageId, '.')
+            ? $account->id.'.'.$messageId
+            : ($messageId !== '' ? $messageId : null);
+
+        return [
+            'text' => $text,
+            'to_email' => (string) ($toEmail ?? ''),
+            'to_name' => $toName ?? '',
+            'account_id' => $account?->id,
+            'from' => (string) ($account?->email ?? ''),
+            'subject' => 'Re: '.$what,
+            'thread_id' => $message?->thread_ref,
+            'in_reply_to' => $messageId !== '' ? $messageId : null,
+            'references' => $messageId !== '' ? $messageId : null,
+            'original' => $original,
+        ];
     }
 }
