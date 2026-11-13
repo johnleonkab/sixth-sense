@@ -37,13 +37,13 @@ export default function CanvasFrame({ index, title, source, aside, children }: C
                 <div className="flex min-w-0 items-center gap-2.5">
                     <span
                         aria-label={`Número ${index}`}
-                        className="grid size-5 flex-none place-items-center rounded-full border border-line font-mono text-[11px] text-muted"
+                        className="grid size-6 flex-none place-items-center rounded-full border border-line font-mono text-[13px] text-muted md:size-5 md:text-[11px]"
                     >
                         {index}
                     </span>
-                    <h3 className="min-w-0 truncate text-[15px] font-medium tracking-[-0.01em]">{title}</h3>
+                    <h3 className="min-w-0 truncate text-[17px] font-medium tracking-[-0.01em] md:text-[15px]">{title}</h3>
                 </div>
-                <span className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] text-muted md:ml-auto md:flex-none md:whitespace-nowrap">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-muted md:ml-auto md:flex-none md:text-[12px] md:whitespace-nowrap">
                     {aside}
                     <span className="flex items-center gap-1.5">
                         <ServiceIconFor reference={source} size={14} label={false} />

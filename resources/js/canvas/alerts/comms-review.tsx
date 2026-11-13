@@ -1,10 +1,12 @@
 import { useState } from 'react';
 
-import AlertHeadline from '@/alerts/alert-headline';
+import AlertCallout from '@/alerts/alert-callout';
+import { AlertCtaBar, PlanStep } from '@/alerts/alert-plan';
+import AlertThread from '@/alerts/alert-thread';
 import type { Alert } from '@/alerts/types';
 import CanvasFrame from '@/canvas/canvas-frame';
 import type { CanvasComponent } from '@/canvas/types';
-import { Button, Buttons } from '@/components/button';
+import { Button } from '@/components/button';
 import { HttpError, postJson } from '@/lib/http';
 
 type Proposal = {
@@ -38,10 +40,13 @@ const statusLine: Record<string, string> = {
     expired: 'Caducó sin que nadie la decidiera.',
 };
 
+const draftClass =
+    'w-full resize-y rounded-md border border-line bg-bg px-3 py-2.5 text-[16px] leading-[1.5] outline-none focus:border-accent md:text-[13.5px]';
+
 /**
- * One alert from the communications pipeline: what is asked and by whom on
- * the left, and on the right the proposal waiting for a yes. Nothing is
- * sent until the person approves it here.
+ * One alert from the communications pipeline: the ask first, then the
+ * conversation, then the plan waiting for a yes. Nothing is sent until the
+ * person approves it here.
  */
 const CommsReview: CanvasComponent<CommsReviewProps> = ({ index, ...props }) => {
     const [proposal, setProposal] = useState<Proposal | null>(props.proposal);
@@ -72,96 +77,89 @@ const CommsReview: CanvasComponent<CommsReviewProps> = ({ index, ...props }) => 
 
     return (
         <CanvasFrame index={index} title="Aviso" source={props.source_label}>
-            <div className="mb-4 rounded-[14px] border border-line bg-surface px-4 py-3">
-                <AlertHeadline alert={props.alert} />
-                {props.state === 'settled' && <p className="mt-1.5 pl-7 text-[12.5px] text-muted">Ya está resuelto.</p>}
-            </div>
+            <AlertCallout
+                ask={props.what || props.alert.why || props.alert.title}
+                actor={props.requester ?? props.alert.actor_name}
+                source={props.source_label}
+                deadline={props.deadline}
+            >
+                {props.state === 'settled' && <p className="mt-2 text-[15px] text-muted md:text-[13px]">Ya está resuelto.</p>}
+            </AlertCallout>
 
-            <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-                <section aria-label="Mensajes" className="min-w-0">
-                    {props.messages.length === 0 ? (
-                        <p className="text-[14px] text-muted">{props.alert.title}</p>
-                    ) : (
-                        <ol className="max-h-[40vh] space-y-3 overflow-auto">
-                            {props.messages.map((message, position) => (
-                                <li key={position}>
-                                    <p className="text-[12.5px]">
-                                        <b className="font-medium text-ink">{message.from}</b> <span className="font-mono text-[11px] text-faint">{message.when}</span>
-                                    </p>
-                                    <p className="text-[14px] leading-[1.55] break-words whitespace-pre-wrap">{message.text}</p>
-                                </li>
-                            ))}
-                        </ol>
-                    )}
-                </section>
+            <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-start">
+                <AlertThread messages={props.messages} source={props.source_label} />
 
-                <section aria-label="Propuesta" className="grid min-w-0 content-start gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3.5">
+                <section aria-label="Qué voy a hacer" className="grid min-w-0 content-start gap-3">
+                    <h4 className="text-[13px] font-medium tracking-wide text-muted uppercase">Qué voy a hacer</h4>
                     {proposal ? (
                         <>
-                            <p className="text-[12px] text-muted">Respuesta propuesta</p>
-                            {editing ? (
-                                <textarea
-                                    aria-label="Texto de la propuesta"
-                                    value={text}
-                                    onChange={(event) => setText(event.target.value)}
-                                    rows={Math.min(10, Math.max(3, text.split('\n').length + 1))}
-                                    className="w-full resize-y rounded-md border border-line bg-bg px-2.5 py-2 text-[13.5px] leading-[1.5] outline-none focus:border-accent"
-                                />
-                            ) : (
-                                <p className="rounded-lg bg-soft px-3 py-2.5 text-[13.5px] leading-[1.5] whitespace-pre-wrap">{text}</p>
-                            )}
-                            {proposal.deny_reason && <p className="text-[13px] text-crit">No se envía: {proposal.deny_reason}</p>}
-                            {open && (
-                                <Buttons className="gap-x-3 gap-y-1.5">
-                                    {editing ? (
-                                        <Button variant="primary" disabled={busy || text.trim() === ''} onClick={() => void decide('edit', { status: 'edited', text })}>
-                                            Guardar texto
-                                        </Button>
-                                    ) : (
-                                        <>
-                                            <Button variant="primary" disabled={busy} onClick={() => void decide('approve', { status: 'approved', undo: true })}>
-                                                Aprobar y enviar
-                                            </Button>
-                                            <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
-                                                Cambiar texto
-                                            </Button>
-                                        </>
-                                    )}
-                                    <Button variant="secondary" destructive disabled={busy} onClick={() => void decide('reject', { status: 'rejected' })}>
-                                        Rechazar
-                                    </Button>
-                                </Buttons>
-                            )}
+                            <PlanStep kind={props.reply_to ? `Responder en ${props.source_label}` : 'Respuesta propuesta'}>
+                                {editing ? (
+                                    <textarea
+                                        aria-label="Texto de la propuesta"
+                                        value={text}
+                                        onChange={(event) => setText(event.target.value)}
+                                        rows={Math.min(10, Math.max(3, text.split('\n').length + 1))}
+                                        className={draftClass}
+                                    />
+                                ) : (
+                                    <p className="text-[16px] leading-[1.5] whitespace-pre-wrap md:text-[13.5px]">{text}</p>
+                                )}
+                            </PlanStep>
+                            {proposal.deny_reason && <p className="text-[15px] text-crit md:text-[13px]">No se envía: {proposal.deny_reason}</p>}
                             {!open && proposal.status === 'failed' && (
-                                <>
-                                    <p className="text-[13px] text-crit">{proposal.error ? `No se pudo enviar: ${proposal.error}` : 'No se pudo enviar.'}</p>
-                                    <Button variant="primary" disabled={busy} onClick={() => void decide('approve', { status: 'approved', undo: true, error: null })}>
-                                        Reintentar
-                                    </Button>
-                                </>
+                                <p className="text-[15px] text-crit md:text-[13px]">{proposal.error ? `No se pudo enviar: ${proposal.error}` : 'No se pudo enviar.'}</p>
                             )}
-                            {!open && proposal.status !== 'failed' && statusLine[proposal.status] && <p className="text-[13px] text-muted">{statusLine[proposal.status]}</p>}
-                            {proposal.undo && proposal.status === 'approved' && (
-                                <Button variant="secondary" disabled={busy} onClick={() => void decide('undo', { status: 'undone', undo: false })}>
-                                    Deshacer
-                                </Button>
+                            {!open && proposal.status !== 'failed' && statusLine[proposal.status] && (
+                                <p className="text-[15px] text-muted md:text-[13px]">{statusLine[proposal.status]}</p>
                             )}
-                            {error && <p className="text-[13px] text-crit">{error}</p>}
+                            {error && <p className="text-[15px] text-crit md:text-[13px]">{error}</p>}
                         </>
                     ) : props.question ? (
-                        <>
-                            <p className="text-[12px] text-muted">Necesito saber</p>
-                            <p className="text-[14px] leading-[1.5]">{props.question.text}</p>
-                            <p className="text-[12px] text-muted">Dímelo y lo preparo.</p>
-                        </>
+                        <PlanStep kind="Necesito saber">
+                            <p className="text-[16px] leading-[1.5] md:text-[14px]">{props.question.text}</p>
+                            <p className="mt-2 text-[15px] text-muted md:text-[12px]">Dímelo y lo preparo.</p>
+                        </PlanStep>
                     ) : (
-                        <>
-                            <p className="text-[14px] leading-[1.5]">Todavía no hay una respuesta preparada.</p>
-                            <p className="text-[12px] text-muted">Dime cómo quieres responder y la preparo para que la apruebes.</p>
-                        </>
+                        <p className="text-[16px] leading-[1.5] text-muted md:text-[14px]">Todavía no hay una respuesta preparada. Dime cómo quieres responder y la preparo para que la apruebes.</p>
                     )}
                 </section>
             </div>
+
+            {proposal && (open || proposal.status === 'failed' || (proposal.undo && proposal.status === 'approved')) && (
+                <AlertCtaBar>
+                    {open &&
+                        (editing ? (
+                            <Button variant="primary" size="large" disabled={busy || text.trim() === ''} onClick={() => void decide('edit', { status: 'edited', text })}>
+                                Guardar el texto
+                            </Button>
+                        ) : (
+                            <>
+                                <Button variant="primary" size="large" disabled={busy} onClick={() => void decide('approve', { status: 'approved', undo: true })}>
+                                    Aprobar y enviar
+                                </Button>
+                                <Button variant="secondary" size="large" disabled={busy} onClick={() => setEditing(true)}>
+                                    Cambiar el texto
+                                </Button>
+                            </>
+                        ))}
+                    {open && (
+                        <Button variant="tertiary" size="large" destructive disabled={busy} onClick={() => void decide('reject', { status: 'rejected' })}>
+                            No enviar
+                        </Button>
+                    )}
+                    {!open && proposal.status === 'failed' && (
+                        <Button variant="primary" size="large" disabled={busy} onClick={() => void decide('approve', { status: 'approved', undo: true, error: null })}>
+                            Reintentar el envío
+                        </Button>
+                    )}
+                    {proposal.undo && proposal.status === 'approved' && (
+                        <Button variant="secondary" size="large" disabled={busy} onClick={() => void decide('undo', { status: 'undone', undo: false })}>
+                            Deshacer el envío
+                        </Button>
+                    )}
+                </AlertCtaBar>
+            )}
         </CanvasFrame>
     );
 };

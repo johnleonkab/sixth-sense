@@ -15,7 +15,7 @@ export default function SlackCorrections({ onCorrect, className = 'mt-3' }: { on
     return (
         <Buttons aria-label="Corregir el aviso" className={`gap-1.5 ${className}`}>
             {taps.map((tap) => (
-                <Button key={tap.correction} variant="tertiary" size="small" onClick={() => onCorrect(tap.correction)}>
+                <Button key={tap.correction} variant="tertiary" size="medium" className="max-md:min-h-11" onClick={() => onCorrect(tap.correction)}>
                     {tap.label}
                 </Button>
             ))}

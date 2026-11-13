@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import ActionBar from '@/actions/action-bar';
 import ProposalBar from '@/actions/proposal-bar';
 import type { ActionState } from '@/actions/types';
-import AlertHeadline from '@/alerts/alert-headline';
+import AlertCallout from '@/alerts/alert-callout';
+import { AlertCtaBar, joinEs, PlanStep } from '@/alerts/alert-plan';
+import AlertThread from '@/alerts/alert-thread';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
 import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
 import type { Alert } from '@/alerts/types';
@@ -11,7 +13,7 @@ import { useCanvas } from '@/canvas/canvas-context';
 import CanvasFrame from '@/canvas/canvas-frame';
 import SlackCorrections from '@/canvas/slack/slack-corrections';
 import type { CanvasComponent } from '@/canvas/types';
-import { Button, Buttons } from '@/components/button';
+import { Button } from '@/components/button';
 import { browserTimezone, HttpError, postJson } from '@/lib/http';
 
 type Proposal = {
@@ -77,18 +79,18 @@ function CallNeeds({ action, busy, onSettle }: { action: ProposedAction; busy: b
     const ready = (!needs.includes('people') || people.length > 0) && (!needs.includes('duration') || minutes !== null);
 
     return (
-        <div className="mt-2 grid gap-2">
+        <div className="mt-2 grid gap-3">
             {needs.includes('people') && (
                 <fieldset>
-                    <legend className="text-[12px] text-muted">¿Quiénes van?</legend>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <legend className="text-[14px] text-muted md:text-[12px]">¿Quiénes van?</legend>
+                    <div className="mt-1.5 flex flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-3 md:gap-y-1">
                         {(action.data?.candidates ?? []).map((candidate) => (
-                            <label key={candidate.name} className="flex items-center gap-1.5 text-[13px]">
+                            <label key={candidate.name} className="flex min-h-11 items-center gap-2.5 text-[16px] md:min-h-0 md:gap-1.5 md:text-[13px]">
                                 <input
                                     type="checkbox"
                                     checked={people.includes(candidate.name)}
                                     onChange={() => setPeople((current) => (current.includes(candidate.name) ? current.filter((name) => name !== candidate.name) : [...current, candidate.name]))}
-                                    className="accent-[var(--color-accent)]"
+                                    className="size-[18px] accent-[var(--color-accent)] md:size-[13px]"
                                 />
                                 <span className={candidate.checked ? '' : 'text-muted'}>{candidate.name}</span>
                             </label>
@@ -97,10 +99,10 @@ function CallNeeds({ action, busy, onSettle }: { action: ProposedAction; busy: b
                 </fieldset>
             )}
             {needs.includes('duration') && (
-                <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[12px] text-muted">¿Cuánto dura?</span>
+                <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-2">
+                    <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">¿Cuánto dura?</span>
                     {callLengths.map((length) => (
-                        <Button key={length} variant={minutes === length ? 'primary' : 'secondary'} disabled={busy} onClick={() => setMinutes(length)}>
+                        <Button key={length} size="large" variant={minutes === length ? 'primary' : 'secondary'} disabled={busy} onClick={() => setMinutes(length)}>
                             {length} min
                         </Button>
                     ))}
@@ -108,7 +110,8 @@ function CallNeeds({ action, busy, onSettle }: { action: ProposedAction; busy: b
             )}
             <div>
                 <Button
-                    variant="secondary"
+                    variant="primary"
+                    size="large"
                     disabled={busy || !ready}
                     onClick={() => onSettle({ ...(needs.includes('people') ? { people } : {}), ...(needs.includes('duration') && minutes !== null ? { duration_minutes: minutes } : {}) })}
                 >
@@ -151,9 +154,9 @@ const audience: Record<NonNullable<Proposal['reply']>['to'], string> = {
 };
 
 /**
- * One alert under review: the message on the left, and on the right how the
- * reply engine proposes to resolve it. The person changes it by voice; the
- * assistant then prepares each action as a draft to confirm.
+ * One alert under review: the ask first, then the conversation, then the
+ * plan. The person changes it by voice; the assistant then prepares each
+ * action as a draft to confirm.
  */
 const resolutionText: Record<string, string> = {
     replied: 'Respondiste tú: se resolvió sola.',
@@ -211,19 +214,27 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const [excluded, setExcluded] = useState<Part[]>([]);
     const included = parts.filter((part) => !excluded.includes(part));
     const toggle = (part: Part) => setExcluded((current) => (current.includes(part) ? current.filter((other) => other !== part) : [...current, part]));
-    const sendLabel = props.is_email
-        ? props.proposal?.reply?.to === 'all'
-            ? 'Responder a todos'
-            : 'Enviar respuesta'
-        : reaction && relay
-          ? `Reaccionar ${reaction.emoji} y enviar a ${relay.to}`
-          : reaction
-            ? `Reaccionar con ${reaction.emoji}`
-            : props.proposal?.reply?.text && relay
-              ? 'Enviar los dos'
-              : relay
-                ? `Enviar a ${relay.to}`
-                : 'Enviar en Slack';
+    const partLabel = (part: Part): string => {
+        if (part === 'reply') {
+            if (reaction) {
+                return `Reaccionar con ${reaction.emoji}`;
+            }
+
+            if (props.is_email) {
+                return props.proposal?.reply?.to === 'all' ? 'Responder a todos' : 'Enviar la respuesta';
+            }
+
+            return 'Enviar en Slack';
+        }
+
+        if (part === 'relay') {
+            return `Enviar a ${relay?.to}`;
+        }
+
+        return props.task?.kind === 'meeting' ? 'Convocar la reunión' : 'Reservar el hueco';
+    };
+    const primaryLabel = busy ? 'Enviando…' : included.length === 0 ? 'Elige qué hacer' : joinEs(included.map(partLabel));
+    const toggleable = parts.length > 1 && !sent;
 
     /** One tap is the "sí": it goes out when the undo window closes. */
     // What goes out: the proposal as it is, or as the person edited it before sending.
@@ -321,16 +332,17 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
         runTool('settle_alert_action', { alert_id: alert.id, action: action.key, ...(answer ? { answer } : {}), ...changes });
     };
 
-    /** Ticked, it goes out with the "sí"; shown only when the "sí" covers more than one thing. */
-    const includeBox = (part: Part, label: string) =>
-        parts.length > 1 && !sent ? (
-            <label className="flex items-center gap-1.5 text-[12px] text-muted">
-                <input type="checkbox" checked={!excluded.includes(part)} onChange={() => toggle(part)} className="accent-[var(--color-accent)]" />
-                {label}
-            </label>
-        ) : (
-            <p className="text-[12px] text-muted">{label}</p>
-        );
+    const extraActions = (props.proposal?.actions ?? []).filter((action) => action.class !== 'reply');
+    const numbered =
+        Number(Boolean(props.proposal?.reply || reaction)) +
+        Number(Boolean(props.proposal?.redirect?.text)) +
+        (props.proposal?.other_actions?.length ?? 0) +
+        extraActions.length +
+        Number(Boolean(props.task));
+    let step = 0;
+    const mark = () => (numbered > 1 ? ++step : undefined);
+    const draftClass =
+        'w-full resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-[16px] leading-[1.5] outline-none focus:border-accent md:text-[13.5px]';
 
     return (
         <CanvasFrame
@@ -345,170 +357,133 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 )
             }
         >
-            <div key={alert.state} className="alerts-row-in mb-4 rounded-[14px] border border-line bg-surface px-4 py-3">
-                <AlertHeadline alert={alert} />
-                {!pending && stateLine(alert) && <p className="mt-1.5 pl-7 text-[12.5px] text-muted">{stateLine(alert)}</p>}
-            </div>
+            <AlertCallout
+                ask={alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why || alert.title}
+                actor={props.from ?? alert.actor_name}
+                source={props.source_label}
+                where={props.is_email ? props.subject : props.where}
+                deadline={alert.deadline}
+            >
+                {!pending && stateLine(alert) && <p className="mt-2 text-[15px] text-muted md:text-[13px]">{stateLine(alert)}</p>}
+                {pending && slack && (
+                    <SlackCorrections className="mt-3" onCorrect={(correction) => runTool('correct_slack_triage', { alert_id: alert.id, correction })} />
+                )}
+            </AlertCallout>
 
-            <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-                <section aria-label="Mensaje" className="min-w-0">
-                    {props.is_email && (
-                        <p className="mb-1.5 text-[12.5px] text-muted">
-                            <b className="font-medium text-ink">{props.from}</b>
-                            {props.participants.length > 0 && <> · con {props.participants.join(', ')}</>}
-                        </p>
-                    )}
-                    <div className="max-h-[40vh] overflow-auto">
-                        {props.conversation.length > 0 && (
-                            <ol className="mb-3 space-y-2 border-l-2 border-line pl-3 text-[12.5px] text-muted">
-                                {props.conversation.map((message, position) => (
-                                    <li key={position}>
-                                        <b className="font-medium text-ink/80">{message.from}</b>{' '}
-                                        <span className="font-mono text-[11px] text-faint">{message.when}</span>
-                                        <p className="line-clamp-3 whitespace-pre-wrap">{message.text}</p>
-                                    </li>
-                                ))}
-                            </ol>
-                        )}
-                        {!props.is_email && props.conversation.length > 0 && <p className="text-[12.5px] font-medium">{props.from}</p>}
-                        <p className="text-[14px] leading-[1.55] break-words whitespace-pre-wrap">{props.text}</p>
-                    </div>
-                </section>
+            <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-start">
+                <AlertThread
+                    messages={props.conversation}
+                    latestFrom={props.from}
+                    latestText={props.text}
+                    participants={props.is_email ? props.participants : []}
+                    source={props.source_label}
+                />
 
-                <section aria-label="Propuesta" className="grid min-w-0 content-start gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3.5">
+                <section aria-label="Qué voy a hacer" className="grid min-w-0 content-start gap-3">
+                    <h4 className="text-[13px] font-medium tracking-wide text-muted uppercase">Qué voy a hacer</h4>
                     {props.proposal ? (
                         <>
-                            <h4 className="text-[14px] leading-[1.45] font-medium">{props.proposal.summary}</h4>
+                            <p className="text-[17px] leading-[1.35] font-medium md:text-[15px]">{props.proposal.summary}</p>
 
                             {props.proposal.reply && (
-                                <div className="rounded-lg bg-soft px-3 py-2.5">
-                                    {includeBox('reply', audience[props.proposal.reply.to])}
+                                <PlanStep
+                                    n={mark()}
+                                    kind={audience[props.proposal.reply.to]}
+                                    included={!excluded.includes('reply')}
+                                    onToggle={toggleable ? () => toggle('reply') : undefined}
+                                >
                                     {editing ? (
                                         <textarea
                                             aria-label="Respuesta"
                                             value={replyText}
                                             onChange={(event) => setReplyText(event.target.value)}
                                             rows={Math.min(10, Math.max(3, replyText.split('\n').length + 1))}
-                                            className="mt-1 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-2 text-[13.5px] leading-[1.5] outline-none focus:border-accent"
+                                            className={draftClass}
                                         />
                                     ) : (
-                                        <p className="mt-1 max-h-[22vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">{replyText}</p>
+                                        <p className="max-h-[22vh] overflow-auto text-[16px] leading-[1.5] whitespace-pre-wrap md:text-[13.5px]">{replyText}</p>
                                     )}
-                                </div>
+                                </PlanStep>
                             )}
 
                             {reaction && (
-                                <div className="flex items-center gap-2.5 rounded-lg bg-soft px-3 py-2.5">
-                                    <span aria-hidden className="text-[20px] leading-none">
+                                <PlanStep
+                                    n={mark()}
+                                    kind={`Reaccionar con ${reaction.emoji}`}
+                                    included={!excluded.includes('reply')}
+                                    onToggle={toggleable ? () => toggle('reply') : undefined}
+                                >
+                                    <p className="text-[28px] leading-none" aria-hidden>
                                         {reaction.emoji}
-                                    </span>
-                                    {includeBox('reply', 'Reaccionar a su mensaje, sin escribir nada')}
-                                </div>
+                                    </p>
+                                    <p className="mt-1.5 text-[15px] text-muted md:text-[13px]">Sin escribir nada.</p>
+                                </PlanStep>
                             )}
 
                             {props.proposal.redirect?.text && (
-                                <div className="rounded-lg bg-soft px-3 py-2.5">
-                                    {includeBox('relay', `Pasárselo a ${props.proposal.redirect.to ?? 'otra persona'}`)}
+                                <PlanStep
+                                    n={mark()}
+                                    kind={`Pasárselo a ${props.proposal.redirect.to ?? 'otra persona'}`}
+                                    included={!excluded.includes('relay')}
+                                    onToggle={toggleable ? () => toggle('relay') : undefined}
+                                >
                                     {editing && slack ? (
                                         <textarea
                                             aria-label="Mensaje para pasarlo"
                                             value={relayText}
                                             onChange={(event) => setRelayText(event.target.value)}
                                             rows={Math.min(8, Math.max(3, relayText.split('\n').length + 1))}
-                                            className="mt-1 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-2 text-[13.5px] leading-[1.5] outline-none focus:border-accent"
+                                            className={draftClass}
                                         />
                                     ) : (
-                                        <p className="mt-1 max-h-[16vh] overflow-auto text-[13.5px] leading-[1.5] whitespace-pre-wrap">{relayText}</p>
+                                        <p className="max-h-[16vh] overflow-auto text-[16px] leading-[1.5] whitespace-pre-wrap md:text-[13.5px]">{relayText}</p>
                                     )}
-                                </div>
+                                </PlanStep>
                             )}
 
-                            {sent ? (
-                                <div className="grid gap-1">
+                            {(props.proposal.other_actions ?? []).map((action) => (
+                                <PlanStep key={action} n={mark()} kind={action} />
+                            ))}
+
+                            {extraActions.map((action) => (
+                                <PlanStep key={action.key} n={mark()} kind={`${actionClass[action.class]} · ${action.summary}`}>
+                                    {action.confidence === 'doubt' && pending && (
+                                        <div className="grid gap-2">
+                                            <p className="text-[15px] text-accent md:text-[13px]">{action.doubt}</p>
+                                            <Button variant="primary" size="large" disabled={busy} onClick={() => settle(action, 'yes')}>
+                                                Sí, preparar esto
+                                            </Button>
+                                            <Button variant="secondary" size="large" disabled={busy} onClick={() => settle(action, 'no')}>
+                                                No, quitarlo
+                                            </Button>
+                                        </div>
+                                    )}
+                                    {action.confidence === 'sure' && pending && (action.data?.needs ?? []).length > 0 && (
+                                        <CallNeeds action={action} busy={busy} onSettle={(changes) => settle(action, null, changes)} />
+                                    )}
+                                </PlanStep>
+                            ))}
+
+                            {sent && (
+                                <div className="grid gap-2">
                                     {sent.map((action) => (
                                         <div key={action.id}>
-                                            <p className="text-[12px] text-muted">{action.label}</p>
+                                            <p className="text-[14px] text-muted md:text-[12px]">{action.label}</p>
                                             <ActionBar initial={action} verb="enviar" doneLabel="Enviado" linkLabel={props.is_email ? 'Abrir en Gmail' : 'Abrir en Slack'} />
                                         </div>
                                     ))}
                                 </div>
-                            ) : (
-                                canSend && (
-                                    <Buttons className="gap-x-3 gap-y-1.5">
-                                        <Button variant="primary" disabled={busy || included.length === 0} onClick={() => void send()}>
-                                            {busy
-                                                ? 'Enviando…'
-                                                : included.length === 1 && included[0] === 'task'
-                                                  ? props.task?.kind === 'meeting'
-                                                      ? 'Convocar'
-                                                      : 'Reservar'
-                                                  : included.includes('task')
-                                                    ? `${sendLabel} y ${props.task?.kind === 'meeting' ? 'convocar' : 'reservar'}`
-                                                    : sendLabel}
-                                        </Button>
-                                        {(props.proposal.reply || relay) && !editing && (
-                                            <Button variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
-                                                Modificar
-                                            </Button>
-                                        )}
-                                        <span className="text-[12px] text-muted">{editing ? 'Cambia el texto y envía' : 'o dime qué cambio'}</span>
-                                        {confirmInternal && (
-                                            <span className="flex basis-full flex-wrap items-center gap-2 text-[12.5px] text-warn">
-                                                {confirmInternal}
-                                                <Button variant="secondary" destructive disabled={busy} onClick={() => void send(true)}>
-                                                    Enviar igualmente
-                                                </Button>
-                                            </span>
-                                        )}
-                                        {sendError && <span className="basis-full text-[12.5px] text-crit">{sendError}</span>}
-                                    </Buttons>
-                                )
-                            )}
-
-                            {props.proposal.other_actions.length > 0 && (
-                                <ul className="space-y-1 text-[13px]">
-                                    {props.proposal.other_actions.map((action) => (
-                                        <li key={action}>+ {action}</li>
-                                    ))}
-                                </ul>
-                            )}
-
-                            {(props.proposal.actions ?? []).filter((action) => action.class !== 'reply').length > 0 && (
-                                <ul aria-label="Acciones" className="grid gap-1.5 text-[13px]">
-                                    {(props.proposal.actions ?? [])
-                                        .filter((action) => action.class !== 'reply')
-                                        .map((action) => (
-                                            <li key={action.key} className={action.confidence === 'doubt' ? 'rounded-lg border border-dashed border-line px-3 py-2' : ''}>
-                                                <span className="mr-1.5 text-[11.5px] font-medium tracking-wide text-muted uppercase">{actionClass[action.class]}</span>
-                                                {action.summary}
-                                                {action.confidence === 'doubt' && pending && (
-                                                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                        <span className="text-accent">{action.doubt}</span>
-                                                        <Button variant="secondary" disabled={busy} onClick={() => settle(action, 'yes')}>
-                                                            Sí
-                                                        </Button>
-                                                        <Button variant="tertiary" disabled={busy} onClick={() => settle(action, 'no')}>
-                                                            No
-                                                        </Button>
-                                                    </span>
-                                                )}
-                                                {action.confidence === 'sure' && pending && (action.data?.needs ?? []).length > 0 && (
-                                                    <CallNeeds action={action} busy={busy} onSettle={(changes) => settle(action, null, changes)} />
-                                                )}
-                                            </li>
-                                        ))}
-                                </ul>
                             )}
 
                             {props.proposal.recipient && (
-                                <p className="text-[12.5px] text-warn">
+                                <p className="text-[15px] text-warn md:text-[12.5px]">
                                     {props.proposal.recipient.label}
                                     {props.proposal.recipient.internal.length > 0 && `: la respuesta lleva datos internos (${props.proposal.recipient.internal.join(', ')}).`}
                                 </p>
                             )}
 
                             {(props.proposal.sources ?? []).length > 0 && research?.outcome !== 'found' && (
-                                <p className="text-[12px] text-muted">
+                                <p className="text-[14px] text-muted md:text-[12px]">
                                     Fuentes:{' '}
                                     {(props.proposal.sources ?? []).map((source, position) => (
                                         <span key={source.title}>
@@ -527,9 +502,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             )}
 
                             {research?.outcome === 'several' && questionAction && pending && (
-                                <div role="group" aria-label="Candidatos" className="grid gap-1.5">
+                                <div role="group" aria-label="Candidatos" className="grid gap-2">
                                     {research.sources.map((source, position) => (
-                                        <Button key={source.title} variant="secondary" disabled={busy} onClick={() => settle(questionAction, null, { choice: position })}>
+                                        <Button key={source.title} variant="secondary" size="large" disabled={busy} onClick={() => settle(questionAction, null, { choice: position })}>
                                             {source.title}
                                         </Button>
                                     ))}
@@ -537,7 +512,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             )}
 
                             {research?.outcome === 'found' && research.sources[0] && (
-                                <p className="text-[12.5px] text-muted">
+                                <p className="text-[15px] text-muted md:text-[12.5px]">
                                     Fuente:{' '}
                                     {research.sources[0].url ? (
                                         <a href={research.sources[0].url} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">
@@ -551,119 +526,139 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                 </p>
                             )}
 
-                            {research?.stale && <p className="text-[12.5px] text-warn">{research.stale}</p>}
+                            {research?.stale && <p className="text-[15px] text-warn md:text-[12.5px]">{research.stale}</p>}
 
-                            {research?.outcome === 'none' && <p className="text-[12.5px] text-warn">No he encontrado la respuesta en Jira, el archivo ni Notion.</p>}
+                            {research?.outcome === 'none' && (
+                                <p className="text-[15px] text-warn md:text-[12.5px]">No he encontrado la respuesta en Jira, el archivo ni Notion.</p>
+                            )}
 
-                            {props.proposal.question && <p className="text-[13px] text-accent">{props.proposal.question}</p>}
+                            {props.proposal.question && <p className="text-[16px] text-accent md:text-[13px]">{props.proposal.question}</p>}
 
-                            {props.proposal.context && props.proposal.context !== props.proposal.question && <p className="text-[12px] leading-[1.45] text-muted">{props.proposal.context}</p>}
+                            {props.proposal.context && props.proposal.context !== props.proposal.question && (
+                                <p className="text-[15px] leading-[1.45] text-muted md:text-[12px]">{props.proposal.context}</p>
+                            )}
+
+                            {editing && <p className="text-[14px] text-muted md:text-[12px]">Cambia el texto y pulsa enviar.</p>}
                         </>
                     ) : alert.state === 'planning' ? (
                         <div className="space-y-2" aria-label="Preparando la propuesta">
-                            <div className="alerts-shimmer h-4 w-4/5 rounded" />
-                            <div className="alerts-shimmer h-16 rounded-lg" />
-                            <div className="alerts-shimmer h-3 w-1/2 rounded" />
+                            <div className="alerts-shimmer h-5 w-4/5 rounded" />
+                            <div className="alerts-shimmer h-20 rounded-2xl" />
+                            <div className="alerts-shimmer h-4 w-1/2 rounded" />
                         </div>
                     ) : (
-                        <p className="text-[13.5px] text-muted">{pending ? 'Sin propuesta todavía. Dime cómo quieres responder.' : 'Sin propuesta.'}</p>
+                        <p className="text-[16px] text-muted md:text-[13.5px]">{pending ? 'Sin propuesta todavía. Dime cómo quieres responder.' : 'Sin propuesta.'}</p>
                     )}
                 </section>
             </div>
 
             {props.task && (
-                <section aria-label="Agendado" className="mt-4 rounded-xl border border-line p-4">
-                    <h4 className="mb-2 text-[12px] font-medium tracking-wide text-muted uppercase">Agendador · {props.task.title}</h4>
-                    <AgendaTaskSummary task={props.task} compact />
-                    {/* Work asked for in a message: which of its slots, and how long, with one tap each. */}
-                    {pending && taskAction && props.task.kind === 'task' && props.task.status === 'proposed' && !sent && (
-                        <div className="mt-2 grid gap-1.5">
-                            {(props.task.options ?? []).length > 1 && (
-                                <div role="group" aria-label="Hueco" className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[12px] text-muted">Otro hueco:</span>
-                                    {(props.task.options ?? []).map(([start], position) => (
+                <section aria-label="Agendado" className="mt-6">
+                    <PlanStep
+                        n={mark()}
+                        kind={props.task.kind === 'meeting' ? `Reunión · ${props.task.title}` : `Hueco · ${props.task.title}`}
+                        included={bundlesTask ? !excluded.includes('task') : undefined}
+                        onToggle={bundlesTask && toggleable ? () => toggle('task') : undefined}
+                    >
+                        <AgendaTaskSummary task={props.task} compact />
+                        {pending && taskAction && props.task.kind === 'task' && props.task.status === 'proposed' && !sent && (
+                            <div className="mt-3 grid gap-3">
+                                {(props.task.options ?? []).length > 1 && (
+                                    <div role="group" aria-label="Hueco" className="flex flex-wrap items-center gap-2">
+                                        <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Otro hueco:</span>
+                                        {(props.task.options ?? []).map(([start], position) => (
+                                            <Button
+                                                key={start}
+                                                size="large"
+                                                variant={start === props.task?.starts_at ? 'primary' : 'secondary'}
+                                                disabled={busy || start === props.task?.starts_at}
+                                                onClick={() => settle(taskAction, null, { slot: position })}
+                                            >
+                                                {slotDay.format(new Date(start))} · {slotTime.format(new Date(start))}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+                                <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-2">
+                                    <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Duración:</span>
+                                    {taskLengths.map((length) => (
                                         <Button
-                                            key={start}
-                                            variant={start === props.task?.starts_at ? 'primary' : 'secondary'}
-                                            disabled={busy || start === props.task?.starts_at}
-                                            onClick={() => settle(taskAction, null, { slot: position })}
+                                            key={length}
+                                            size="large"
+                                            variant={length === props.task?.duration_minutes ? 'primary' : 'secondary'}
+                                            disabled={busy || length === props.task?.duration_minutes}
+                                            onClick={() => settle(taskAction, null, { duration_minutes: length })}
                                         >
-                                            {slotDay.format(new Date(start))} · {slotTime.format(new Date(start))}
+                                            {length < 60 ? `${length} min` : `${length / 60} h`.replace('.5', ',5')}
                                         </Button>
                                     ))}
                                 </div>
-                            )}
-                            <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[12px] text-muted">Duración:</span>
-                                {taskLengths.map((length) => (
-                                    <Button
-                                        key={length}
-                                        variant={length === props.task?.duration_minutes ? 'primary' : 'tertiary'}
-                                        disabled={busy || length === props.task?.duration_minutes}
-                                        onClick={() => settle(taskAction, null, { duration_minutes: length })}
-                                    >
-                                        {length < 60 ? `${length} min` : `${length / 60} h`.replace('.5', ',5')}
-                                    </Button>
-                                ))}
                             </div>
-                        </div>
-                    )}
-                    {/* Nothing reaches the calendar before the "sí". */}
-                    {bundlesTask && !sent ? (
-                        <div className="mt-2">{includeBox('task', 'Va con el «sí» de la propuesta')}</div>
-                    ) : (
-                        props.task.status === 'proposed' &&
-                        props.task.pending_action_id && (
-                        <ProposalBar
-                            action={props.task.pending_action_id}
-                            verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
-                            done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
-                        />
-                        )
-                    )}
+                        )}
+                        {!bundlesTask && props.task.status === 'proposed' && props.task.pending_action_id && (
+                            <div className="mt-3">
+                                <ProposalBar
+                                    action={props.task.pending_action_id}
+                                    verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
+                                    done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
+                                />
+                            </div>
+                        )}
+                    </PlanStep>
                 </section>
             )}
 
-            {/* Every action in one row: how Slack should treat this kind of message, and what to do with this one. */}
-            {!sent && (
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[13px]">
-                    {pending && props.source_label === 'Slack' && (
-                        <SlackCorrections className="mr-auto" onCorrect={(correction) => runTool('correct_slack_triage', { alert_id: alert.id, correction })} />
+            {!sent && (pending || alert.state !== 'judging') && (
+                <AlertCtaBar>
+                    {canSend && (
+                        <Button variant="primary" size="large" disabled={busy || included.length === 0} onClick={() => void send()}>
+                            {primaryLabel}
+                        </Button>
                     )}
-                    {busy && <span aria-hidden className="size-3 animate-spin rounded-full border-[1.5px] border-muted border-t-transparent" />}
-                    <Buttons className="ml-auto">
-                        {pending ? (
+                    {canSend && (props.proposal?.reply || relay) && !editing && (
+                        <Button variant="secondary" size="large" disabled={busy} onClick={() => setEditing(true)}>
+                            Cambiar el texto
+                        </Button>
+                    )}
+                    {confirmInternal && (
+                        <>
+                            <p className="text-[15px] text-warn md:text-[13px]">{confirmInternal}</p>
+                            <Button variant="secondary" size="large" destructive disabled={busy} onClick={() => void send(true)}>
+                                Enviar igualmente
+                            </Button>
+                        </>
+                    )}
+                    {sendError && <p className="text-[15px] text-crit md:text-[13px]">{sendError}</p>}
+                    {pending ? (
+                        discarding ? (
                             <>
-                                {discarding ? (
-                                    <>
-                                        {discardReasons.map((option) => (
-                                            <Button key={option.reason} size="small" disabled={busy} onClick={() => change('dismissed', option.reason)}>
-                                                {option.label}
-                                            </Button>
-                                        ))}
-                                        <Button size="small" variant="tertiary" disabled={busy} onClick={() => change('dismissed')}>
-                                            Sin motivo
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <Button disabled={busy} onClick={() => setDiscarding(true)}>
-                                        Descartar
+                                {discardReasons.map((option) => (
+                                    <Button key={option.reason} size="large" disabled={busy} onClick={() => change('dismissed', option.reason)}>
+                                        {option.label}
                                     </Button>
-                                )}
-                                {/* With a reply ready to send, sending is the main thing to do. */}
-                                <Button variant={canSend ? 'secondary' : 'primary'} disabled={busy} onClick={() => change('done')}>
-                                    Ya está resuelta
+                                ))}
+                                <Button size="large" variant="tertiary" disabled={busy} onClick={() => change('dismissed')}>
+                                    Descartar sin motivo
                                 </Button>
                             </>
                         ) : (
-                            alert.state !== 'judging' && (
-                                <Button disabled={busy} onClick={() => change('reopen')}>
-                                    {closed ? 'Reabrir' : 'Dejar pendiente'}
+                            <>
+                                <Button variant={canSend ? 'secondary' : 'primary'} size="large" disabled={busy} onClick={() => change('done')}>
+                                    Marcar como resuelta
                                 </Button>
-                            )
-                        )}
-                    </Buttons>
-                </div>
+                                <Button variant="tertiary" size="large" destructive disabled={busy} onClick={() => setDiscarding(true)}>
+                                    Descartar este aviso
+                                </Button>
+                            </>
+                        )
+                    ) : (
+                        alert.state !== 'judging' && (
+                            <Button size="large" disabled={busy} onClick={() => change('reopen')}>
+                                {closed ? 'Reabrir este aviso' : 'Dejar pendiente'}
+                            </Button>
+                        )
+                    )}
+                </AlertCtaBar>
             )}
         </CanvasFrame>
     );

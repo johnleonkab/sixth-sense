@@ -7,7 +7,7 @@ const taskTime = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'nume
 
 /** Where an alert stands, as a small label: what it is, and whether work is going on. */
 export function StateChip({ state }: { state: Alert['state'] }) {
-    const base = 'inline-flex flex-none items-center gap-1 rounded-full px-2 py-[2px] text-[10.5px] font-medium whitespace-nowrap';
+    const base = 'inline-flex flex-none items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium whitespace-nowrap md:px-2 md:py-[2px] md:text-[10.5px]';
 
     switch (state) {
         case 'judging':
@@ -57,33 +57,34 @@ function messageCount(alert: Alert): string {
 export default function AlertHeadline({ alert, reserveDismiss = false }: { alert: Alert; reserveDismiss?: boolean }) {
     const addressed = alert.state === 'resolved' || alert.state === 'dismissed';
 
+    const ask = alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why || alert.title;
+    const where = alert.title !== ask ? alert.title : null;
+
     return (
         <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-3 text-left">
             {addressed ? (
-                <span aria-label="Atendida" className="mt-px grid w-4 place-items-center text-[12px] leading-none text-ok">
+                <span aria-label="Atendida" className="mt-1 grid w-5 place-items-center text-[15px] leading-none text-ok md:mt-px md:w-4 md:text-[12px]">
                     ✓
                 </span>
             ) : (
-                <ServiceIconFor reference={alert.source} size={16} className="mt-px" />
+                <ServiceIconFor reference={alert.source} size={20} className="mt-1 md:mt-px" />
             )}
             <div className="min-w-0">
-                <div className={`flex items-center gap-2 text-[12px] text-muted ${reserveDismiss ? 'pr-7' : ''}`}>
+                <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted md:text-[12px] ${reserveDismiss ? 'pr-12 md:pr-7' : ''}`}>
                     <span className="min-w-0 truncate">{alert.actor_name ? `${alert.actor_name} · ${alert.source_label}` : alert.source_label}</span>
-                    <time className="ml-auto flex-none font-mono text-[11px]">{timeFormat.format(new Date(alert.received_at))}</time>
+                    <time className="ml-auto flex-none font-mono text-[13px] md:text-[11px]">{timeFormat.format(new Date(alert.received_at))}</time>
                     <StateChip state={alert.state} />
                 </div>
-                <b className="mt-0.5 line-clamp-2 block text-[13.5px] leading-[1.35] font-semibold">
-                    {alert.title}
+                <b className="mt-1 line-clamp-4 block text-[16px] leading-[1.35] font-semibold md:mt-0.5 md:line-clamp-2 md:text-[13.5px]">
+                    {ask}
                     <span className="font-normal text-muted">{messageCount(alert)}</span>
                 </b>
-                <p className={`mt-px line-clamp-2 text-[13px] ${alert.state === 'judging' ? 'text-faint italic' : 'text-muted'}`}>
-                    {alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why}
-                </p>
-                {alert.proposal?.summary && alert.state === 'ready' && alert.proposal.summary !== alert.title && (
-                    <p className="mt-0.5 line-clamp-1 text-[12px] text-accent">→ {alert.proposal.summary}</p>
+                {where && <p className="mt-0.5 line-clamp-1 text-[14px] text-muted md:text-[13px]">{where}</p>}
+                {alert.proposal?.summary && alert.state === 'ready' && alert.proposal.summary !== ask && (
+                    <p className="mt-1 line-clamp-2 text-[14px] text-accent md:mt-0.5 md:line-clamp-1 md:text-[12px]">Plan: {alert.proposal.summary}</p>
                 )}
                 {alert.task && alert.task.status !== 'cancelled' && (
-                    <p className="mt-0.5 line-clamp-1 text-[12px] text-ok">
+                    <p className="mt-1 line-clamp-1 text-[14px] text-ok md:mt-0.5 md:text-[12px]">
                         ◷ {alert.task.status_label}
                         {alert.task.starts_at ? ` · ${taskTime.format(new Date(alert.task.starts_at))}` : ''}
                     </p>

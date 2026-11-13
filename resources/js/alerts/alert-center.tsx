@@ -36,7 +36,7 @@ function DismissButton({ onDismiss, className = '' }: { onDismiss: () => void; c
                 event.stopPropagation();
                 onDismiss();
             }}
-            className={`grid size-6 place-items-center rounded-full text-[12px] text-faint hover:bg-soft hover:text-ink ${className}`}
+            className={`grid size-11 place-items-center rounded-full text-[15px] text-faint hover:bg-soft hover:text-ink md:size-6 md:text-[12px] ${className}`}
         >
             ✕
         </button>
@@ -51,13 +51,13 @@ function Row({ alert, onOpen, onDismiss, delay = 0 }: { alert: Alert; onOpen: (a
 
     return (
         <li className="alerts-row-in group relative" style={{ animationDelay: `${delay}ms` }}>
-            {dismissable && <DismissButton onDismiss={swipe.dismiss} className="absolute top-1 right-1.5 z-10 bg-soft opacity-0 group-focus-within:opacity-100 group-hover:opacity-100" />}
+            {dismissable && <DismissButton onDismiss={swipe.dismiss} className="absolute top-1 right-1 z-10 bg-soft opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100" />}
             <button
                 {...(dismissable ? swipe.handlers : {})}
                 style={dismissable ? swipe.style : undefined}
                 type="button"
                 onClick={() => onOpen(alert)}
-                className={`block w-full rounded-[10px] px-3 py-2.5 text-left transition-colors hover:bg-soft ${quiet ? 'opacity-70' : ''}`}
+                className={`block w-full rounded-[12px] px-3 py-3.5 text-left transition-colors hover:bg-soft md:py-2.5 ${quiet ? 'opacity-70' : ''}`}
             >
                 <AlertHeadline alert={alert} reserveDismiss={dismissable} />
             </button>
@@ -104,21 +104,21 @@ function IncomingToast({
             className={`alerts-toast-in relative overflow-hidden rounded-[14px] border bg-surface shadow-card ${waiting ? 'border-accent/40' : 'border-line'}`}
         >
             <DismissButton onDismiss={swipe.dismiss} className="absolute top-2 right-2 z-10" />
-            <button type="button" onClick={() => onOpen(alert)} className="block w-full px-4 py-3 text-left hover:bg-soft">
+            <button type="button" onClick={() => onOpen(alert)} className="block w-full px-4 py-4 text-left hover:bg-soft md:py-3">
                 <AlertHeadline alert={alert} reserveDismiss />
             </button>
 
             {(alert.meeting_url || (waiting && onTellMe)) && (
-                <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-2 text-[12.5px]">
+                <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-2.5 text-[15px] md:text-[12.5px]">
                     {alert.meeting_url && (
                         <a
                             href={alert.meeting_url}
                             target="_blank"
                             rel="noreferrer noopener"
                             onClick={onClose}
-                            className="mr-auto rounded-full border border-line px-3 py-1 font-medium text-accent hover:bg-accent-soft"
+                            className="mr-auto inline-flex min-h-11 items-center rounded-full border border-line px-4 font-medium text-accent hover:bg-accent-soft md:min-h-0 md:px-3 md:py-1"
                         >
-                            Unirse
+                            Unirse a la reunión
                         </a>
                     )}
                     {waiting && onTellMe &&
@@ -133,7 +133,7 @@ function IncomingToast({
                                     onClose();
                                     onTellMe(alert);
                                 }}
-                                className="rounded-full bg-ink px-3 py-1 font-medium text-bg hover:opacity-90"
+                                className="inline-flex min-h-11 items-center rounded-full bg-ink px-4 font-medium text-bg hover:opacity-90 md:min-h-0 md:px-3 md:py-1"
                             >
                                 Dime
                             </button>
@@ -222,7 +222,7 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
         <>
             {waiting.length > 0 && (
                 <section aria-label="Pendientes de responder">
-                    <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
+                    <h3 className="px-3 pt-3 pb-1.5 text-[13px] font-medium tracking-wide text-muted uppercase">Pendientes</h3>
                     <ol>
                         {waiting.map((item, index) => (
                             <Row key={item.id} alert={item} onOpen={openAlert} onDismiss={dismissAlert} delay={index * 35} />
@@ -232,9 +232,9 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
             )}
 
             <section aria-label="Entrantes">
-                <h3 className="px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
+                <h3 className="px-3 pt-3 pb-1.5 text-[13px] font-medium tracking-wide text-muted uppercase">Entrantes</h3>
                 {recent.length === 0 ? (
-                    <p className="px-2.5 pb-3 text-[13px] text-faint">Nada nuevo en las últimas 48 horas.</p>
+                    <p className="px-3 pb-4 text-[15px] text-faint md:text-[13px]">Nada nuevo en las últimas 48 horas.</p>
                 ) : (
                     <ol>
                         {recent.map((item, index) => (
@@ -251,7 +251,7 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
                         setOpen(false);
                         onHistory();
                     }}
-                    className="mt-1 min-h-11 w-full rounded-[10px] border-t border-line px-2.5 py-2.5 text-center text-[12.5px] text-accent hover:bg-soft"
+                    className="mt-1 min-h-12 w-full rounded-[12px] border-t border-line px-3 py-3 text-center text-[15px] font-medium text-accent hover:bg-soft md:min-h-11 md:text-[12.5px] md:font-normal"
                 >
                     Ver todo el historial
                 </button>
@@ -353,14 +353,19 @@ export default function AlertCenter({ pending: initial = [], onOpen, onHistory, 
 
                         setOpen(!open);
                     }}
-                    className={`flex h-11 touch-none items-center gap-1.5 rounded-full border bg-surface px-2.5 text-[12.5px] shadow-card transition-all hover:bg-soft md:h-auto md:touch-auto md:gap-2 md:px-3 md:py-1.5 ${open ? 'border-accent/50' : 'border-line'}`}
+                    className={`flex min-h-12 touch-none items-center gap-2 rounded-full border bg-surface px-3.5 text-[15px] font-medium shadow-card transition-all hover:bg-soft md:min-h-0 md:h-auto md:touch-auto md:px-3 md:py-1.5 md:text-[13px] md:font-normal ${open ? 'border-accent/50' : 'border-line'}`}
                 >
                     <span
                         title={feed.live ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real: se actualiza cada poco'}
-                        className={`relative size-[7px] rounded-full ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
+                        className={`relative size-2 rounded-full md:size-[7px] ${feed.live ? 'bg-ok text-ok' : 'bg-faint text-faint'} ${working ? 'alerts-ping' : ''}`}
                     />
-                    {embedInHeader && waiting.length > 0 && <span className="font-medium tabular-nums md:hidden">{waiting.length}</span>}
-                    <span className={embedInHeader ? 'max-md:sr-only' : ''}>
+                    <span className="md:hidden">Avisos</span>
+                    {waiting.length > 0 && (
+                        <span className="grid min-h-6 min-w-6 place-items-center rounded-full bg-accent px-1.5 text-[13px] font-semibold tabular-nums text-accent-ink md:hidden">
+                            {waiting.length}
+                        </span>
+                    )}
+                    <span className="max-md:sr-only">
                         {waiting.length === 0 ? 'Al día' : waiting.length === 1 ? '1 pendiente' : `${waiting.length} pendientes`}
                         {working && <span className="text-muted"> · analizando</span>}
                     </span>
@@ -517,17 +522,20 @@ function AlertSheet({ open, reveal, onClose, children }: { open: boolean; reveal
             <div
                 ref={sheet}
                 data-dragging={dragging ? 'true' : undefined}
-                className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card transition-transform duration-300 ease-out data-[dragging=true]:transition-none"
+                className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl border border-line bg-surface shadow-card transition-transform duration-300 ease-out data-[dragging=true]:transition-none"
                 style={{ transform: `translateY(${y}px)` }}
                 onPointerDown={beginDrag}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
             >
-                <div data-handle="true" className="flex shrink-0 cursor-grab justify-center py-3 touch-none">
-                    <span aria-hidden data-handle="true" className="h-1 w-10 rounded-full bg-line" />
+                <div data-handle="true" className="flex shrink-0 cursor-grab flex-col items-center gap-2 py-3.5 touch-none">
+                    <span aria-hidden data-handle="true" className="h-1.5 w-12 rounded-full bg-line" />
+                    <p data-handle="true" className="text-[17px] font-medium text-ink">
+                        Avisos
+                    </p>
                 </div>
-                <div ref={scroller} className="min-h-0 overflow-auto p-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <div ref={scroller} className="min-h-0 overflow-auto p-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.75rem))]">
                     {children}
                 </div>
             </div>

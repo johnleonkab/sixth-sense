@@ -365,7 +365,7 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
             <Head title="Inicio" />
 
             <div className="relative grid h-full grid-rows-[auto_minmax(0,1fr)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
-                <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1.5 text-[13px] text-muted md:grid-cols-[1fr_auto_1fr]">
+                <header className="chrome mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-1.5 text-[13px] text-muted md:grid-cols-[1fr_auto_1fr]">
                     <div className="flex min-w-0 items-center gap-3">
                         <Wordmark to="/" />
                         <span className="hidden sm:inline">
@@ -376,7 +376,7 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
 
                     <ListenToggle voice={voice} />
 
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-2">
                         <span className="hidden px-2.5 sm:inline">{auth.user?.name}</span>
                         <AlertCenter
                             embedInHeader
@@ -412,7 +412,7 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                                 document.documentElement.dataset.nav = 'forward';
                             }}
                             aria-label="Configuración"
-                            className="grid size-11 place-items-center rounded-lg hover:bg-soft hover:text-ink md:size-auto md:px-2.5 md:py-1"
+                            className="grid size-12 place-items-center rounded-lg hover:bg-soft hover:text-ink md:size-auto md:px-2.5 md:py-1"
                         >
                             <SettingsIcon />
                             <span className="max-md:sr-only">Configuración</span>

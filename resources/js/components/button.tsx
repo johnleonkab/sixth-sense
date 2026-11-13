@@ -16,7 +16,7 @@ const sizes: Record<ButtonSize, string> = {
     'extra-small': 'gap-1 px-2.5 py-0.5 text-[12px]',
     small: 'gap-1.5 px-3 py-1 text-[12.5px]',
     medium: 'gap-1.5 px-3.5 py-1.5 text-[13px]',
-    large: 'gap-2 px-5 py-2 text-[14px] max-md:min-h-11',
+    large: 'gap-2 px-5 py-2.5 text-[15px] max-md:min-h-12 max-md:whitespace-normal max-md:text-center max-md:leading-snug',
 };
 
 const variants: Record<ButtonVariant, string> = {
