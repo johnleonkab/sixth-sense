@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import VoiceOrb from '@/components/voice/voice-orb';
+import { press, type TapKind } from '@/voice/haptics';
 import { useTypewriter } from '@/voice/use-typewriter';
 import type { VoiceSession } from '@/voice/use-voice-session';
 
-function MicrophoneIcon() {
+function MicrophoneIcon({ off = false }: { off?: boolean }) {
     return (
-        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+        <svg viewBox="0 0 24 24" className="size-[1.15em]" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden>
             <rect x="9" y="3" width="6" height="11" rx="3" />
             <path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />
+            {off && <path d="M5 5l14 14" strokeLinecap="round" />}
+        </svg>
+    );
+}
+
+function StopIcon() {
+    return (
+        <svg viewBox="0 0 24 24" className="size-[1.05em]" fill="currentColor" aria-hidden>
+            <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
         </svg>
     );
 }
@@ -20,11 +30,47 @@ function placeholderReply(voice: VoiceSession): string {
         case 'thinking':
             return voice.activity ?? 'Pensando…';
         case 'listening':
+            return voice.muted ? 'Micrófono silenciado.' : 'Te escucho.';
         case 'speaking':
             return 'Te escucho.';
         default:
-            return 'Pulsa «Hablar» y pregúntame lo que quieras.';
+            return '';
     }
+}
+
+/**
+ * A voice key: click sound, vibration, and the press-in of `.press`.
+ */
+function PressButton({
+    tap,
+    className = '',
+    children,
+    onClick,
+    ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { tap: TapKind; children: ReactNode }) {
+    return (
+        <button
+            type="button"
+            {...rest}
+            className={className}
+            onPointerDown={(event) => {
+                rest.onPointerDown?.(event);
+
+                if (event.button === 0) {
+                    press(tap);
+                }
+            }}
+            onClick={(event) => {
+                if (event.detail === 0) {
+                    press(tap);
+                }
+
+                onClick?.(event);
+            }}
+        >
+            {children}
+        </button>
+    );
 }
 
 /**
@@ -44,7 +90,7 @@ function SaidLine({ voice }: { voice: VoiceSession }) {
 
     if (voice.active) {
         return (
-            <p className="mx-auto min-h-[23px] max-w-full px-2 text-[15px] text-muted">
+            <p className="mx-auto min-h-[1.2em] max-w-full px-2 text-[14px] text-muted md:min-h-[23px] md:text-[15px]">
                 {voice.heard}
                 <span aria-hidden className="ml-0.5 inline-block h-[15px] w-px translate-y-[2px] animate-pulse bg-accent" />
             </p>
@@ -85,9 +131,9 @@ function SaidLine({ voice }: { voice: VoiceSession }) {
             type="button"
             onClick={() => setTyping(true)}
             title="Escribir en lugar de hablar"
-            className="mx-auto block min-h-[23px] max-w-full cursor-text rounded-md px-2 text-[15px] text-muted hover:bg-soft"
+            className="mx-auto block max-w-full cursor-text rounded-md px-2 text-[13px] text-faint hover:bg-soft md:min-h-[23px] md:text-[15px]"
         >
-            {voice.heard || <span className="text-faint">o escribe aquí…</span>}
+            {voice.heard || 'o escribe aquí…'}
         </button>
     );
 }
@@ -130,6 +176,16 @@ function useKeyboardLift(): number {
     return lift;
 }
 
+function markStandalone(): void {
+    const standalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        ('standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+
+    document.documentElement.toggleAttribute('data-standalone', standalone);
+}
+
 /**
  * Bottom voice zone: what the person says, what the assistant answers, and
  * the control to start or end the conversation.
@@ -139,6 +195,16 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
     const typedReply = useTypewriter(showsReply ? voice.reply : '');
     const lift = useKeyboardLift();
     const dock = useRef<HTMLElement>(null);
+    const spoken = voice.status === 'error' || showsReply || voice.active;
+    const replyText = voice.status === 'error' ? voice.error : showsReply ? typedReply : placeholderReply(voice);
+
+    useEffect(() => {
+        markStandalone();
+        const media = window.matchMedia('(display-mode: standalone)');
+        media.addEventListener('change', markStandalone);
+
+        return () => media.removeEventListener('change', markStandalone);
+    }, []);
 
     useEffect(() => {
         const element = dock.current;
@@ -163,18 +229,18 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
         <section
             ref={dock}
             style={lift > 0 ? { transform: `translateY(-${lift}px)` } : undefined}
-            className="chrome pointer-events-none absolute inset-x-0 bottom-0 z-20 px-[max(1rem,env(safe-area-inset-left))] pt-6 pb-[max(1rem,env(safe-area-inset-bottom))] text-center"
+            className="voice-dock chrome pointer-events-none absolute inset-x-0 bottom-0 z-20 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] text-center"
         >
             {/* Floats over the canvas: frosted glass that fades in from the top, so what is behind still shows. */}
-            <div aria-hidden className="absolute inset-0 bg-bg/70 [mask-image:linear-gradient(to_bottom,transparent,black_2.5rem)] backdrop-blur-xl" />
+            <div aria-hidden className="absolute inset-0 bg-bg/70 [mask-image:linear-gradient(to_bottom,transparent,black_1.25rem)] backdrop-blur-xl md:[mask-image:linear-gradient(to_bottom,transparent,black_2.5rem)]" />
 
             <div className="pointer-events-auto relative mx-auto w-full max-w-[760px]">
-                <div className="mb-1.5">
+                <div className="mb-1 md:mb-1.5">
                     <VoiceOrb status={voice.status} />
                 </div>
 
                 {agent && (
-                    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink">
+                    <p className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink md:mb-2">
                         <i aria-hidden className="size-1.5 rounded-full bg-accent" />
                         {agent}
                     </p>
@@ -186,36 +252,44 @@ export default function VoiceDock({ voice, agent }: { voice: VoiceSession; agent
                     {voice.status === 'error' ? voice.error : showsReply ? voice.reply : placeholderReply(voice)}
                 </p>
 
-                <p
-                    aria-hidden
-                    data-reply
-                    className={
-                        'mx-auto mt-1 line-clamp-3 min-h-[26px] max-w-[680px] text-[17px] leading-[1.35] tracking-[-0.015em] text-pretty md:text-[19px] md:leading-[1.4] ' +
-                        (voice.status === 'error' ? 'text-crit' : showsReply ? 'text-ink' : 'text-faint')
-                    }
-                >
-                    {voice.status === 'error' ? voice.error : showsReply ? typedReply : placeholderReply(voice)}
-                </p>
+                {spoken && replyText !== '' && (
+                    <p
+                        aria-hidden
+                        data-reply
+                        className={
+                            'mx-auto mt-0.5 line-clamp-3 max-w-[680px] text-[16px] leading-[1.35] tracking-[-0.015em] text-pretty md:mt-1 md:min-h-[26px] md:text-[19px] md:leading-[1.4] ' +
+                            (voice.status === 'error' ? 'text-crit' : showsReply ? 'text-ink' : 'text-faint')
+                        }
+                    >
+                        {replyText}
+                    </p>
+                )}
 
-                <div className="mt-2.5 flex justify-center">
-                    {voice.active ? (
-                        <button
-                            type="button"
-                            onClick={voice.stop}
-                            className="min-h-14 w-full rounded-2xl border border-line bg-surface text-[16px] font-medium text-ink shadow-card hover:bg-soft md:min-h-0 md:w-auto md:rounded-full md:px-4 md:py-1.5 md:text-[13px] md:font-normal md:shadow-none"
+                <div className="voice-keys mt-2 md:mt-2.5" data-live={voice.active ? 'on' : undefined}>
+                    <PressButton
+                        tap={voice.active ? 'stop' : 'talk'}
+                        onClick={() => (voice.active ? voice.stop() : void voice.start('voice'))}
+                        className={`voice-key-main ${voice.active ? 'is-stop' : ''}`}
+                    >
+                        <span key={voice.active ? 'stop' : 'talk'} className="voice-key-label">
+                            {voice.active ? <StopIcon /> : <MicrophoneIcon />}
+                            {voice.active ? 'Parar' : 'Hablar'}
+                        </span>
+                    </PressButton>
+                    <div className="voice-mute-slot">
+                        <PressButton
+                            tap={voice.muted ? 'unmute' : 'mute'}
+                            aria-pressed={voice.muted}
+                            aria-hidden={voice.active ? undefined : true}
+                            tabIndex={voice.active ? 0 : -1}
+                            aria-label={voice.muted ? 'Activar el micrófono' : 'Silenciar el micrófono'}
+                            title={voice.muted ? 'Activar el micrófono' : 'Silenciar'}
+                            onClick={() => voice.active && voice.setMuted(!voice.muted)}
+                            className="voice-key-mute"
                         >
-                            Terminar
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => void voice.start('voice')}
-                            className="inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-accent text-[17px] font-medium text-accent-ink shadow-card transition-opacity hover:opacity-90 md:min-h-0 md:w-auto md:gap-2 md:rounded-full md:px-5 md:py-2 md:text-[14px]"
-                        >
-                            <MicrophoneIcon />
-                            Hablar
-                        </button>
-                    )}
+                            <MicrophoneIcon off={voice.muted} />
+                        </PressButton>
+                    </div>
                 </div>
             </div>
         </section>

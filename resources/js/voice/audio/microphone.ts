@@ -6,13 +6,29 @@ import workletUrl from './pcm-capture.worklet.ts?worker&url';
  */
 export class Microphone {
     onChunk: (pcm: Int16Array) => void = () => {};
+    private silenced = false;
 
     private constructor(
         private readonly context: AudioContext,
         private readonly stream: MediaStream,
         private readonly node: AudioWorkletNode,
     ) {
-        node.port.onmessage = (event: MessageEvent<Int16Array>) => this.onChunk(event.data);
+        node.port.onmessage = (event: MessageEvent<Int16Array>) => {
+            if (!this.silenced) {
+                this.onChunk(event.data);
+            }
+        };
+    }
+
+    /**
+     * Stop sending what the person says, without closing the conversation.
+     * The track is disabled so the system mic indicator follows.
+     */
+    setMuted(muted: boolean): void {
+        this.silenced = muted;
+        this.stream.getAudioTracks().forEach((track) => {
+            track.enabled = !muted;
+        });
     }
 
     static async open(sampleRate: number): Promise<Microphone> {

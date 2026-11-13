@@ -52,6 +52,9 @@ export type VoiceSession = {
     error: string | null;
     /** A spoken conversation is open. */
     active: boolean;
+    /** The microphone is open but not sending what the person says. */
+    muted: boolean;
+    setMuted: (muted: boolean) => void;
     /** What a running tool is doing, shown instead of a generic wait. */
     activity: string | null;
     /** The spoken conversation dropped and is being opened again. */
@@ -78,6 +81,8 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
     const [activity, setActivity] = useState<string | null>(null);
     const [mode, setMode] = useState<VoiceMode | null>(null);
     const [reconnecting, setReconnecting] = useState(false);
+    const [muted, setMutedState] = useState(false);
+    const mutedRef = useRef(false);
     const idleTimer = useRef<number | undefined>(undefined);
     const reconnectTimer = useRef<number | undefined>(undefined);
     const reconnects = useRef(0);
@@ -127,6 +132,8 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
         resources.current = null;
         window.clearTimeout(idleTimer.current);
         setMode(null);
+        mutedRef.current = false;
+        setMutedState(false);
 
         current?.microphone?.close();
         current?.transport?.close();
@@ -217,6 +224,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
 
             if (microphone) {
                 session.microphone = microphone;
+                microphone.setMuted(mutedRef.current);
                 microphone.onChunk = (pcm) => earlyAudio.push(pcm);
             }
 
@@ -434,6 +442,12 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
         [start],
     );
 
+    const setMuted = useCallback((next: boolean) => {
+        mutedRef.current = next;
+        resources.current?.microphone?.setMuted(next);
+        setMutedState(next);
+    }, []);
+
     useEffect(
         () => () => {
             window.clearTimeout(reconnectTimer.current);
@@ -449,6 +463,8 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
         reply: transcript.reply,
         error,
         active: mode === 'voice' && status !== 'idle' && status !== 'error',
+        muted,
+        setMuted,
         activity,
         reconnecting,
         start,

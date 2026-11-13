@@ -179,7 +179,7 @@
 /* Voice orb from docs/prototype.html: seven bars that idle, listen, speak or wait. */
 @layer components {
     .orb {
-        @apply flex h-[26px] items-center justify-center gap-1;
+        @apply flex h-[18px] items-center justify-center gap-1 md:h-[26px];
     }
 
     .orb span {
@@ -232,6 +232,175 @@
     .listen-dot[aria-pressed='true'] i {
         background: var(--accent);
         animation: breathe 2.4s ease-in-out infinite;
+    }
+
+    /*
+     * Voice keys. One control morphs between Hablar and Parar; the mute
+     * circle grows in beside it. Press is a small scale, the way a current
+     * system button answers a tap.
+     */
+    .voice-keys {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 0px;
+        column-gap: 0;
+        align-items: center;
+        transition:
+            grid-template-columns 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            column-gap 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .voice-keys[data-live='on'] {
+        grid-template-columns: minmax(0, 1fr) 44px;
+        column-gap: 12px;
+    }
+
+    .voice-key-main {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        border-radius: 18px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 17px;
+        font-weight: 500;
+        box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 32%, transparent);
+        transition:
+            background-color 0.42s ease,
+            color 0.42s ease,
+            box-shadow 0.42s ease,
+            transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .voice-key-main.is-stop {
+        background: var(--ink);
+        color: var(--bg);
+        box-shadow: 0 10px 24px color-mix(in srgb, black 22%, transparent);
+    }
+
+    .voice-key-main:active {
+        transform: scale(0.97);
+    }
+
+    .voice-key-label {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        animation: voice-label-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .voice-mute-slot {
+        min-width: 0;
+        overflow: hidden;
+        opacity: 0;
+        transform: scale(0.72) translateX(6px);
+        pointer-events: none;
+        transition:
+            opacity 0.28s ease,
+            transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .voice-keys[data-live='on'] .voice-mute-slot {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+        transition-delay: 0.06s;
+    }
+
+    .voice-key-mute {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--surface) 86%, transparent);
+        color: var(--ink);
+        box-shadow: 0 6px 16px color-mix(in srgb, black 8%, transparent);
+        backdrop-filter: blur(16px);
+        transition:
+            background-color 0.28s ease,
+            color 0.28s ease,
+            border-color 0.28s ease,
+            transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .voice-key-mute[aria-pressed='true'] {
+        border-color: transparent;
+        background: var(--ink);
+        color: var(--bg);
+    }
+
+    .voice-key-mute:active {
+        transform: scale(0.92);
+    }
+
+    @media (min-width: 768px) {
+        .voice-keys,
+        .voice-keys[data-live='on'] {
+            display: flex;
+            grid-template-columns: none;
+            column-gap: 0;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .voice-key-main {
+            width: auto;
+            min-height: 0;
+            padding: 0.5rem 1.25rem;
+            border-radius: 999px;
+            font-size: 14px;
+            box-shadow: none;
+        }
+
+        .voice-mute-slot {
+            width: 40px;
+        }
+
+        .voice-keys:not([data-live='on']) .voice-mute-slot {
+            width: 0;
+            margin-left: -10px;
+        }
+
+        .voice-key-mute {
+            width: 40px;
+            height: 40px;
+        }
+    }
+
+    .voice-dock {
+        padding-top: 0.75rem;
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    }
+
+    @media (min-width: 768px) {
+        .voice-dock {
+            padding-top: 1.5rem;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+    }
+
+    /* Installed PWA: no Safari toolbar, sit on the home indicator. */
+    @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+        .voice-dock {
+            padding-top: 0.65rem;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+    }
+
+    html[data-standalone] .voice-dock {
+        padding-top: 0.65rem;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+}
+
+@keyframes voice-label-in {
+    from {
+        opacity: 0;
+        transform: translateY(7px);
     }
 }
 
