@@ -9,6 +9,12 @@ type CanvasFrameProps = {
     title: string;
     source: string;
     aside?: ReactNode;
+    /** When false, the card is recognized by its icon, not by a title. */
+    showTitle?: boolean;
+    /** When false, the source is only its icon. */
+    showSourceName?: boolean;
+    /** Service icons when one card spans more than one channel. */
+    marks?: string[];
     children: ReactNode;
 };
 
@@ -16,14 +22,28 @@ type CanvasFrameProps = {
  * Card every canvas is drawn in, as in docs/prototype.html: its number, a
  * title and where the data comes from.
  */
-export default function CanvasFrame({ index, title, source, aside, children }: CanvasFrameProps) {
+export default function CanvasFrame({ index, title, source, aside, showTitle = true, showSourceName = true, marks, children }: CanvasFrameProps) {
+    const references = marks?.length ? marks : [source];
+    const sourceMark = (
+        <span className="flex items-center gap-1.5">
+            {references.map((reference) => (
+                <ServiceIconFor key={reference} reference={reference} size={16} label={showSourceName ? false : undefined} />
+            ))}
+            {showSourceName && source}
+        </span>
+    );
+
     // Inside a composed view, beside another detail: the view already has the number.
     if (useContext(EmbeddedContext)) {
         return (
             <article className="min-w-0 rounded-xl border border-line bg-bg">
                 <header className="flex items-center gap-2 px-3.5 pt-3 text-[12px] text-muted">
-                    <ServiceIconFor reference={source} size={13} label={false} />
-                    <h4 className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink">{title}</h4>
+                    <span className="flex items-center gap-1">
+                        {references.map((reference) => (
+                            <ServiceIconFor key={reference} reference={reference} size={13} label={false} />
+                        ))}
+                    </span>
+                    {showTitle && <h4 className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink">{title}</h4>}
                     {aside}
                 </header>
                 <div className="overflow-x-auto px-3.5 pt-3 pb-4">{children}</div>
@@ -41,15 +61,18 @@ export default function CanvasFrame({ index, title, source, aside, children }: C
                     >
                         {index}
                     </span>
-                    <h3 className="min-w-0 truncate text-[17px] font-medium tracking-[-0.01em] md:text-[15px]">{title}</h3>
+                    {showTitle ? (
+                        <h3 className="min-w-0 truncate text-[17px] font-medium tracking-[-0.01em] md:text-[15px]">{title}</h3>
+                    ) : (
+                        sourceMark
+                    )}
                 </div>
-                <span className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-muted md:ml-auto md:flex-none md:text-[12px] md:whitespace-nowrap">
-                    {aside}
-                    <span className="flex items-center gap-1.5">
-                        <ServiceIconFor reference={source} size={14} label={false} />
-                        {source}
+                {(aside || showTitle) && (
+                    <span className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-muted md:ml-auto md:flex-none md:text-[12px] md:whitespace-nowrap">
+                        {aside}
+                        {showTitle && sourceMark}
                     </span>
-                </span>
+                )}
             </header>
 
             <div className="overflow-x-auto px-4 pt-4 pb-[22px] md:px-[22px]">{children}</div>

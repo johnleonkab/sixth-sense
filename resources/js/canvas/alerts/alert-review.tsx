@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import ActionBar from '@/actions/action-bar';
 import ProposalBar from '@/actions/proposal-bar';
 import type { ActionState } from '@/actions/types';
-import AlertCallout from '@/alerts/alert-callout';
+import AlertCallout, { isHollowAsk } from '@/alerts/alert-callout';
 import { AlertCtaBar, joinEs, PlanStep } from '@/alerts/alert-plan';
 import AlertThread from '@/alerts/alert-thread';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
@@ -343,12 +343,17 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     const mark = () => (numbered > 1 ? ++step : undefined);
     const draftClass =
         'w-full resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-[16px] leading-[1.5] outline-none focus:border-accent md:text-[13.5px]';
+    const summary = alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : !isHollowAsk(alert.why) ? alert.why : !isHollowAsk(alert.title) ? alert.title : null;
+    const people = [...new Set([props.from, ...props.participants].filter((name): name is string => Boolean(name)))];
 
     return (
         <CanvasFrame
             index={index}
             title="Aviso"
             source={props.source_label}
+            showTitle={false}
+            showSourceName={false}
+            marks={[props.source_label]}
             aside={
                 props.alert.external_url && (
                     <a href={props.alert.external_url} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">
@@ -358,9 +363,10 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
             }
         >
             <AlertCallout
-                ask={alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : alert.why || alert.title}
-                actor={props.from ?? alert.actor_name}
-                source={props.source_label}
+                ask={summary ?? props.text}
+                quoted={summary === null && Boolean(props.text)}
+                people={people}
+                sources={[props.source_label]}
                 where={props.is_email ? props.subject : props.where}
                 deadline={alert.deadline}
             >
@@ -370,7 +376,7 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                 )}
             </AlertCallout>
 
-            <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-start">
+            <div className="mt-6 grid gap-8">
                 <AlertThread
                     messages={props.conversation}
                     latestFrom={props.from}

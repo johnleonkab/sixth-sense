@@ -22,6 +22,10 @@ type CommsReviewProps = {
     alert: Alert;
     source_label: string;
     what: string | null;
+    ask: string | null;
+    ask_kind: 'summary' | 'words' | null;
+    people: string[];
+    sources: string[];
     requester: string | null;
     state: string | null;
     deadline: string | null;
@@ -76,17 +80,19 @@ const CommsReview: CanvasComponent<CommsReviewProps> = ({ index, ...props }) => 
     };
 
     return (
-        <CanvasFrame index={index} title="Aviso" source={props.source_label}>
+        <CanvasFrame index={index} title="Aviso" source={props.source_label} showTitle={false} showSourceName={false} marks={props.sources}>
             <AlertCallout
-                ask={props.what || props.alert.why || props.alert.title}
+                ask={props.ask}
+                quoted={props.ask_kind === 'words'}
+                people={props.people}
+                sources={props.sources}
                 actor={props.requester ?? props.alert.actor_name}
-                source={props.source_label}
                 deadline={props.deadline}
             >
                 {props.state === 'settled' && <p className="mt-2 text-[15px] text-muted md:text-[13px]">Ya está resuelto.</p>}
             </AlertCallout>
 
-            <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-start">
+            <div className="mt-6 grid gap-8">
                 <AlertThread messages={props.messages} source={props.source_label} />
 
                 <section aria-label="Qué voy a hacer" className="grid min-w-0 content-start gap-3">
