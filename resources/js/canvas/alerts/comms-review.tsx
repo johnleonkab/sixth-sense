@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import AlertCallout from '@/alerts/alert-callout';
-import { AlertCtaBar, PlanStep } from '@/alerts/alert-plan';
+import { AlertCtaBar, PlanStep, SectionMark } from '@/alerts/alert-plan';
 import AlertThread from '@/alerts/alert-thread';
 import type { Alert } from '@/alerts/types';
 import CanvasFrame from '@/canvas/canvas-frame';
@@ -95,37 +95,41 @@ const CommsReview: CanvasComponent<CommsReviewProps> = ({ index, ...props }) => 
             <div className="mt-6 grid gap-8">
                 <AlertThread messages={props.messages} source={props.source_label} />
 
-                <section aria-label="Qué voy a hacer" className="grid min-w-0 content-start gap-3">
-                    <h4 className="text-[13px] font-medium tracking-wide text-muted uppercase">Qué voy a hacer</h4>
+                <section aria-label="Qué voy a hacer" className="min-w-0">
+                    <SectionMark label="Qué voy a hacer" kind="plan" />
                     {proposal ? (
                         <>
-                            <PlanStep kind={props.reply_to ? `Responder en ${props.source_label}` : 'Respuesta propuesta'}>
-                                {editing ? (
-                                    <textarea
-                                        aria-label="Texto de la propuesta"
-                                        value={text}
-                                        onChange={(event) => setText(event.target.value)}
-                                        rows={Math.min(10, Math.max(3, text.split('\n').length + 1))}
-                                        className={draftClass}
-                                    />
-                                ) : (
-                                    <p className="text-[16px] leading-[1.5] whitespace-pre-wrap md:text-[13.5px]">{text}</p>
-                                )}
-                            </PlanStep>
-                            {proposal.deny_reason && <p className="text-[15px] text-crit md:text-[13px]">No se envía: {proposal.deny_reason}</p>}
+                            <ol className="list-none p-0">
+                                <PlanStep n={1} kind={props.reply_to ? `Responder en ${props.source_label}` : 'Respuesta propuesta'}>
+                                    {editing ? (
+                                        <textarea
+                                            aria-label="Texto de la propuesta"
+                                            value={text}
+                                            onChange={(event) => setText(event.target.value)}
+                                            rows={Math.min(10, Math.max(3, text.split('\n').length + 1))}
+                                            className={draftClass}
+                                        />
+                                    ) : (
+                                        <p className="text-[16px] leading-[1.5] whitespace-pre-wrap md:text-[13.5px]">{text}</p>
+                                    )}
+                                </PlanStep>
+                            </ol>
+                            {proposal.deny_reason && <p className="mt-3 text-[15px] text-crit md:text-[13px]">No se envía: {proposal.deny_reason}</p>}
                             {!open && proposal.status === 'failed' && (
-                                <p className="text-[15px] text-crit md:text-[13px]">{proposal.error ? `No se pudo enviar: ${proposal.error}` : 'No se pudo enviar.'}</p>
+                                <p className="mt-3 text-[15px] text-crit md:text-[13px]">{proposal.error ? `No se pudo enviar: ${proposal.error}` : 'No se pudo enviar.'}</p>
                             )}
                             {!open && proposal.status !== 'failed' && statusLine[proposal.status] && (
-                                <p className="text-[15px] text-muted md:text-[13px]">{statusLine[proposal.status]}</p>
+                                <p className="mt-3 text-[15px] text-muted md:text-[13px]">{statusLine[proposal.status]}</p>
                             )}
-                            {error && <p className="text-[15px] text-crit md:text-[13px]">{error}</p>}
+                            {error && <p className="mt-3 text-[15px] text-crit md:text-[13px]">{error}</p>}
                         </>
                     ) : props.question ? (
-                        <PlanStep kind="Necesito saber">
-                            <p className="text-[16px] leading-[1.5] md:text-[14px]">{props.question.text}</p>
-                            <p className="mt-2 text-[15px] text-muted md:text-[12px]">Dímelo y lo preparo.</p>
-                        </PlanStep>
+                        <ol className="list-none p-0">
+                            <PlanStep n={1} kind="Necesito saber">
+                                <p className="text-[16px] leading-[1.5] md:text-[14px]">{props.question.text}</p>
+                                <p className="mt-2 text-[15px] text-muted md:text-[12px]">Dímelo y lo preparo.</p>
+                            </PlanStep>
+                        </ol>
                     ) : (
                         <p className="text-[16px] leading-[1.5] text-muted md:text-[14px]">Todavía no hay una respuesta preparada. Dime cómo quieres responder y la preparo para que la apruebes.</p>
                     )}

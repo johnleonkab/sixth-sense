@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { SectionMark } from '@/alerts/alert-plan';
+
 export type ThreadMessage = { from: string; when: string; text: string };
 
 type AlertThreadProps = {
@@ -46,7 +48,7 @@ export default function AlertThread({ messages, latestFrom, latestText, particip
 
     return (
         <section aria-label={contextLabel} className="min-w-0">
-            <h4 className="mb-3 text-[13px] font-medium tracking-wide text-muted uppercase">{contextLabel}</h4>
+            <SectionMark label={contextLabel} kind="conversation" />
             {participants.length > 0 && <p className="mb-3 text-[14px] text-muted md:text-[12.5px]">Con {participants.join(', ')}</p>}
             {older.length > 0 && (
                 <>

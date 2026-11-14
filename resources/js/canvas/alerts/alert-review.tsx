@@ -4,7 +4,7 @@ import ActionBar from '@/actions/action-bar';
 import ProposalBar from '@/actions/proposal-bar';
 import type { ActionState } from '@/actions/types';
 import AlertCallout, { isHollowAsk } from '@/alerts/alert-callout';
-import { AlertCtaBar, joinEs, PlanStep } from '@/alerts/alert-plan';
+import { AlertCtaBar, joinEs, PlanStep, SectionMark } from '@/alerts/alert-plan';
 import AlertThread from '@/alerts/alert-thread';
 import { ALERT_CHANGED } from '@/alerts/use-alert-feed';
 import { AgendaTaskSummary, type AgendaTaskCard } from '@/canvas/agenda/agenda-task';
@@ -333,18 +333,66 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
     };
 
     const extraActions = (props.proposal?.actions ?? []).filter((action) => action.class !== 'reply');
-    const numbered =
-        Number(Boolean(props.proposal?.reply || reaction)) +
-        Number(Boolean(props.proposal?.redirect?.text)) +
-        (props.proposal?.other_actions?.length ?? 0) +
-        extraActions.length +
-        Number(Boolean(props.task));
     let step = 0;
-    const mark = () => (numbered > 1 ? ++step : undefined);
+    const mark = () => ++step;
     const draftClass =
         'w-full resize-y rounded-md border border-line bg-surface px-3 py-2.5 text-[16px] leading-[1.5] outline-none focus:border-accent md:text-[13.5px]';
     const summary = alert.state === 'judging' ? 'Viendo si espera tu respuesta…' : !isHollowAsk(alert.why) ? alert.why : !isHollowAsk(alert.title) ? alert.title : null;
     const people = [...new Set([props.from, ...props.participants].filter((name): name is string => Boolean(name)))];
+    const taskStep = () =>
+        props.task ? (
+            <PlanStep
+                n={mark()}
+                kind={props.task.kind === 'meeting' ? `Reunión · ${props.task.title}` : `Hueco · ${props.task.title}`}
+                included={bundlesTask ? !excluded.includes('task') : undefined}
+                onToggle={bundlesTask && toggleable ? () => toggle('task') : undefined}
+            >
+                <AgendaTaskSummary task={props.task} compact />
+                {pending && taskAction && props.task.kind === 'task' && props.task.status === 'proposed' && !sent && (
+                    <div className="mt-3 grid gap-3">
+                        {(props.task.options ?? []).length > 1 && (
+                            <div role="group" aria-label="Hueco" className="flex flex-wrap items-center gap-2">
+                                <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Otro hueco:</span>
+                                {(props.task.options ?? []).map(([start], position) => (
+                                    <Button
+                                        key={start}
+                                        size="large"
+                                        variant={start === props.task?.starts_at ? 'primary' : 'secondary'}
+                                        disabled={busy || start === props.task?.starts_at}
+                                        onClick={() => settle(taskAction, null, { slot: position })}
+                                    >
+                                        {slotDay.format(new Date(start))} · {slotTime.format(new Date(start))}
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                        <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-2">
+                            <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Duración:</span>
+                            {taskLengths.map((length) => (
+                                <Button
+                                    key={length}
+                                    size="large"
+                                    variant={length === props.task?.duration_minutes ? 'primary' : 'secondary'}
+                                    disabled={busy || length === props.task?.duration_minutes}
+                                    onClick={() => settle(taskAction, null, { duration_minutes: length })}
+                                >
+                                    {length < 60 ? `${length} min` : `${length / 60} h`.replace('.5', ',5')}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {!bundlesTask && props.task.status === 'proposed' && props.task.pending_action_id && (
+                    <div className="mt-3">
+                        <ProposalBar
+                            action={props.task.pending_action_id}
+                            verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
+                            done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
+                        />
+                    </div>
+                )}
+            </PlanStep>
+        ) : null;
 
     return (
         <CanvasFrame
@@ -385,11 +433,12 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                     source={props.source_label}
                 />
 
-                <section aria-label="Qué voy a hacer" className="grid min-w-0 content-start gap-3">
-                    <h4 className="text-[13px] font-medium tracking-wide text-muted uppercase">Qué voy a hacer</h4>
+                <section aria-label="Qué voy a hacer" className="min-w-0">
+                    <SectionMark label="Qué voy a hacer" kind="plan" />
                     {props.proposal ? (
                         <>
-                            <p className="text-[17px] leading-[1.35] font-medium md:text-[15px]">{props.proposal.summary}</p>
+                            <p className="mb-4 text-[17px] leading-[1.35] font-medium md:text-[15px]">{props.proposal.summary}</p>
+                            <ol className="list-none p-0">
 
                             {props.proposal.reply && (
                                 <PlanStep
@@ -469,6 +518,9 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                                     )}
                                 </PlanStep>
                             ))}
+                                {taskStep()}
+                            </ol>
+                            <div className="mt-4 grid gap-3 empty:hidden">
 
                             {sent && (
                                 <div className="grid gap-2">
@@ -545,7 +597,10 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                             )}
 
                             {editing && <p className="text-[14px] text-muted md:text-[12px]">Cambia el texto y pulsa enviar.</p>}
+                            </div>
                         </>
+                    ) : props.task ? (
+                        <ol className="list-none p-0">{taskStep()}</ol>
                     ) : alert.state === 'planning' ? (
                         <div className="space-y-2" aria-label="Preparando la propuesta">
                             <div className="alerts-shimmer h-5 w-4/5 rounded" />
@@ -557,62 +612,6 @@ const AlertReview: CanvasComponent<AlertReviewProps> = ({ index, ...props }) => 
                     )}
                 </section>
             </div>
-
-            {props.task && (
-                <section aria-label="Agendado" className="mt-6">
-                    <PlanStep
-                        n={mark()}
-                        kind={props.task.kind === 'meeting' ? `Reunión · ${props.task.title}` : `Hueco · ${props.task.title}`}
-                        included={bundlesTask ? !excluded.includes('task') : undefined}
-                        onToggle={bundlesTask && toggleable ? () => toggle('task') : undefined}
-                    >
-                        <AgendaTaskSummary task={props.task} compact />
-                        {pending && taskAction && props.task.kind === 'task' && props.task.status === 'proposed' && !sent && (
-                            <div className="mt-3 grid gap-3">
-                                {(props.task.options ?? []).length > 1 && (
-                                    <div role="group" aria-label="Hueco" className="flex flex-wrap items-center gap-2">
-                                        <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Otro hueco:</span>
-                                        {(props.task.options ?? []).map(([start], position) => (
-                                            <Button
-                                                key={start}
-                                                size="large"
-                                                variant={start === props.task?.starts_at ? 'primary' : 'secondary'}
-                                                disabled={busy || start === props.task?.starts_at}
-                                                onClick={() => settle(taskAction, null, { slot: position })}
-                                            >
-                                                {slotDay.format(new Date(start))} · {slotTime.format(new Date(start))}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                                <div role="group" aria-label="Duración" className="flex flex-wrap items-center gap-2">
-                                    <span className="w-full text-[14px] text-muted md:w-auto md:text-[12px]">Duración:</span>
-                                    {taskLengths.map((length) => (
-                                        <Button
-                                            key={length}
-                                            size="large"
-                                            variant={length === props.task?.duration_minutes ? 'primary' : 'secondary'}
-                                            disabled={busy || length === props.task?.duration_minutes}
-                                            onClick={() => settle(taskAction, null, { duration_minutes: length })}
-                                        >
-                                            {length < 60 ? `${length} min` : `${length / 60} h`.replace('.5', ',5')}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {!bundlesTask && props.task.status === 'proposed' && props.task.pending_action_id && (
-                            <div className="mt-3">
-                                <ProposalBar
-                                    action={props.task.pending_action_id}
-                                    verb={props.task.kind === 'meeting' ? 'convocar' : 'reservar'}
-                                    done={props.task.kind === 'meeting' ? 'Reunión convocada' : 'En tu calendario'}
-                                />
-                            </div>
-                        )}
-                    </PlanStep>
-                </section>
-            )}
 
             {!sent && (pending || alert.state !== 'judging') && (
                 <AlertCtaBar>
