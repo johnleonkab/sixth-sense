@@ -49,12 +49,12 @@ class HomeFeed
     private function cards(User $user): array
     {
         $cards = [];
-        $notifications = CommsNotification::query()
+        $notifications = $this->visible(CommsNotification::query()
             ->whereBelongsTo($user)
             ->whereNull('dismissed_at')
             ->orderByDesc('id')
             ->limit(40)
-            ->get();
+            ->get());
 
         foreach ($notifications as $notification) {
             $source = $this->pipeline->sourceOf($notification);
@@ -67,6 +67,99 @@ class HomeFeed
         }
 
         return $cards;
+    }
+
+    /**
+     * One row per intent. A draft or a follow-up updates the alert that is
+     * already there; a second action of a different kind keeps its own row.
+     *
+     * @param  Collection<int, CommsNotification>  $notifications
+     * @return Collection<int, CommsNotification>
+     */
+    private function visible(Collection $notifications): Collection
+    {
+        $proposalIds = $notifications->where('subject_type', 'proposal')->pluck('subject_id')->filter()->all();
+        $questionIds = $notifications->where('subject_type', 'question')->pluck('subject_id')->filter()->all();
+        $proposals = $proposalIds === []
+            ? collect()
+            : CommsProposal::query()->whereIn('id', $proposalIds)->get(['id', 'intent_id', 'action_class'])->keyBy('id');
+        $questionIntents = $questionIds === []
+            ? collect()
+            : CommsQuestion::query()->whereIn('id', $questionIds)->pluck('intent_id', 'id');
+        $intentId = function (CommsNotification $notification) use ($proposals, $questionIntents): ?int {
+            $id = match ($notification->subject_type) {
+                'intent' => $notification->subject_id,
+                'proposal' => $proposals->get($notification->subject_id)?->intent_id,
+                'question' => $questionIntents->get($notification->subject_id),
+                default => null,
+            };
+
+            return is_numeric($id) ? (int) $id : null;
+        };
+        $withAction = [];
+
+        foreach ($notifications as $notification) {
+            $id = $intentId($notification);
+
+            if ($id !== null && in_array($notification->kind, ['proposal', 'question'], true)) {
+                $withAction[$id] = true;
+            }
+        }
+
+        $seenSignal = [];
+        $seenProposal = [];
+        $seenQuestion = [];
+        $kept = [];
+
+        foreach ($notifications as $notification) {
+            $id = $intentId($notification);
+
+            if ($id === null) {
+                $kept[] = $notification;
+
+                continue;
+            }
+
+            if ($notification->kind === 'signal') {
+                if (isset($withAction[$id]) || isset($seenSignal[$id])) {
+                    continue;
+                }
+
+                $seenSignal[$id] = true;
+                $kept[] = $notification;
+
+                continue;
+            }
+
+            if ($notification->kind === 'proposal') {
+                $class = $proposals->get($notification->subject_id)?->action_class;
+                $slot = $id.':'.($class instanceof ActionClass ? $class->value : (string) $class);
+
+                if (isset($seenProposal[$slot])) {
+                    continue;
+                }
+
+                $seenProposal[$slot] = true;
+                $kept[] = $notification;
+
+                continue;
+            }
+
+            if ($notification->kind === 'question') {
+                if (isset($seenQuestion[$id])) {
+                    continue;
+                }
+
+                $seenQuestion[$id] = true;
+                $kept[] = $notification;
+
+                continue;
+            }
+
+            $kept[] = $notification;
+        }
+
+        return new Collection($kept);
     }
 
     /**

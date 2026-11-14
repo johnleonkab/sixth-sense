@@ -180,7 +180,7 @@ test('opening a comms alert shows the ask, its messages and the proposal waiting
     $intent = CommsIntent::query()->sole();
     $message = CommsMessage::query()->sole();
     $proposal = app(Propose::class)->submit($user, $intent, $message, 'Lo miro esta tarde.', []);
-    $notification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'intent')->firstOrFail();
+    $notification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->firstOrFail();
 
     $response = $this->actingAs($user)
         ->postJson(route('voice.tools.run', 'review_alert'), ['arguments' => ['alert_id' => -$notification->id], 'timezone' => 'Europe/Madrid'])

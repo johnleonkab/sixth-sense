@@ -9,6 +9,7 @@ use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Gate\QuestionDraft;
+use App\Comms\Notify\Notifier;
 use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
@@ -110,16 +111,13 @@ class ShadowController extends Controller
         return back();
     }
 
-    public function dismiss(Request $request, HomeFeed $feed, CommsNotification $notification): JsonResponse
+    public function dismiss(Request $request, HomeFeed $feed, Notifier $notifier, CommsNotification $notification): JsonResponse
     {
         abort_unless($notification->user_id === $request->user()?->id, 404);
 
-        if ($notification->dismissed_at === null) {
-            $notification->dismissed_at = now();
-            $notification->save();
-        }
+        $notifier->dismissGroup($request->user(), $notification);
 
-        return response()->json(['item' => $feed->card($notification)]);
+        return response()->json(['item' => $feed->card($notification->refresh())]);
     }
 
     public function feedback(Request $request, EventLog $log, ContextWriter $context, HomeFeed $feed, CommsNotification $notification): RedirectResponse

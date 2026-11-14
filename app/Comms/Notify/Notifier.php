@@ -3,10 +3,13 @@
 namespace App\Comms\Notify;
 
 use App\Comms\Calendar\FocusHours;
+use App\Comms\Gate\ActionClass;
 use App\Comms\People\Relation;
 use App\Comms\Pipeline;
 use App\Comms\Watchers\BusinessCalendar;
 use App\Events\CommsNotificationDelivered;
+use App\Events\CommsNotificationUpdated;
+use App\Jobs\SendCommsPush;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
@@ -15,6 +18,7 @@ use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Stores what the system would say. Shadow mode does not push it.
@@ -153,6 +157,12 @@ class Notifier
             $urgency = 'digest';
         }
 
+        $updated = $this->updateOpenAlert($user, $kind, $urgency, $subjectType, $subjectId, $sourceEventIds);
+
+        if ($updated !== null) {
+            return $updated;
+        }
+
         $notification = CommsNotification::query()->updateOrCreate(
             ['user_id' => $user->id, 'key' => $key],
             [
@@ -163,6 +173,164 @@ class Notifier
                 'source_event_ids' => $sourceEventIds,
             ],
         );
+
+        return $this->deliver($notification);
+    }
+
+    /**
+     * Dismisses this alert and any other row that is the same intent on screen.
+     */
+    public function dismissGroup(User $user, CommsNotification $notification): void
+    {
+        if ($notification->dismissed_at !== null) {
+            return;
+        }
+
+        $notification->dismissed_at = now();
+        $notification->save();
+
+        $intentId = $this->intentId($notification->subject_type, $notification->subject_id);
+
+        if ($intentId === null) {
+            return;
+        }
+
+        $class = $this->proposalClass($notification);
+
+        foreach ($this->openAlerts($user, $intentId) as $other) {
+            $sameAlert = $other->kind === 'signal'
+                || ($notification->kind === 'question' && $other->kind === 'question')
+                || ($class !== null && $this->proposalClass($other) === $class);
+
+            if (! $sameAlert) {
+                continue;
+            }
+
+            $other->dismissed_at = $notification->dismissed_at;
+            $other->save();
+        }
+    }
+
+    /**
+     * A follow-up or a draft for an intent that already has an alert updates
+     * that alert. A different action keeps its own.
+     *
+     * @param  list<int>  $sourceEventIds
+     */
+    private function updateOpenAlert(
+        User $user,
+        string $kind,
+        string $urgency,
+        ?string $subjectType,
+        ?int $subjectId,
+        array $sourceEventIds,
+    ): ?CommsNotification {
+        $intentId = $this->intentId($subjectType, $subjectId);
+
+        if ($intentId === null) {
+            return null;
+        }
+
+        $open = $this->openAlerts($user, $intentId);
+
+        if ($kind === 'signal' && $subjectType === 'intent') {
+            $current = $open->first(
+                fn (CommsNotification $notification): bool => in_array($notification->kind, ['signal', 'proposal', 'question'], true),
+            );
+
+            return $current === null ? null : $this->refresh($current, $urgency, $sourceEventIds);
+        }
+
+        if ($kind === 'proposal' && $subjectId !== null) {
+            $class = CommsProposal::query()->find($subjectId)?->action_class;
+            $same = $class === null ? null : $open->first(
+                fn (CommsNotification $notification): bool => $this->proposalClass($notification) === $class,
+            );
+
+            if ($same !== null) {
+                return $this->become($user, $same, $intentId, $kind, $urgency, $subjectType, $subjectId, $sourceEventIds);
+            }
+
+            $signal = $open->first(fn (CommsNotification $notification): bool => $notification->kind === 'signal');
+
+            return $signal === null ? null : $this->become($user, $signal, $intentId, $kind, $urgency, $subjectType, $subjectId, $sourceEventIds);
+        }
+
+        if ($kind === 'question') {
+            $question = $open->first(fn (CommsNotification $notification): bool => $notification->kind === 'question');
+
+            if ($question !== null) {
+                return $this->become($user, $question, $intentId, $kind, $urgency, $subjectType, $subjectId, $sourceEventIds);
+            }
+
+            $signal = $open->first(fn (CommsNotification $notification): bool => $notification->kind === 'signal');
+
+            return $signal === null ? null : $this->become($user, $signal, $intentId, $kind, $urgency, $subjectType, $subjectId, $sourceEventIds);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<int>  $sourceEventIds
+     */
+    private function refresh(CommsNotification $notification, string $urgency, array $sourceEventIds): CommsNotification
+    {
+        $events = $this->mergeEvents($notification, $sourceEventIds);
+        $nextUrgency = $notification->urgency === 'now' || $urgency === 'now' ? 'now' : $urgency;
+        $changed = $notification->source_event_ids !== $events || $notification->urgency !== $nextUrgency;
+        $wasNow = $notification->urgency === 'now';
+        $notification->source_event_ids = $events;
+        $notification->urgency = $nextUrgency;
+        $notification->save();
+
+        if ($changed) {
+            $this->publish($notification, ! $wasNow && $nextUrgency === 'now');
+        }
+
+        return $notification;
+    }
+
+    /**
+     * @param  list<int>  $sourceEventIds
+     */
+    private function become(
+        User $user,
+        CommsNotification $notification,
+        int $intentId,
+        string $kind,
+        string $urgency,
+        ?string $subjectType,
+        ?int $subjectId,
+        array $sourceEventIds,
+    ): CommsNotification {
+        $wasNow = $notification->urgency === 'now';
+        $notification->kind = $kind;
+        $notification->urgency = $urgency;
+        $notification->subject_type = $subjectType;
+        $notification->subject_id = $subjectId;
+        $notification->source_event_ids = $this->mergeEvents($notification, $sourceEventIds);
+        $notification->save();
+        $this->retireSignals($user, $intentId, $notification);
+        $this->publish($notification, ! $wasNow && $urgency === 'now');
+
+        return $notification;
+    }
+
+    private function retireSignals(User $user, int $intentId, CommsNotification $keep): void
+    {
+        foreach ($this->openAlerts($user, $intentId) as $other) {
+            if ($other->id === $keep->id || $other->kind !== 'signal') {
+                continue;
+            }
+
+            $other->dismissed_at = now();
+            $other->save();
+        }
+    }
+
+    private function deliver(CommsNotification $notification): CommsNotification
+    {
         $source = $this->pipeline->sourceOf($notification);
 
         if ($source !== null && $this->pipeline->enabled($source) && $notification->delivered_at === null) {
@@ -172,6 +340,98 @@ class Notifier
         }
 
         return $notification;
+    }
+
+    private function publish(CommsNotification $notification, bool $push): void
+    {
+        $source = $this->pipeline->sourceOf($notification);
+
+        if ($source === null || ! $this->pipeline->enabled($source)) {
+            return;
+        }
+
+        if ($notification->delivered_at === null) {
+            $this->deliver($notification);
+
+            return;
+        }
+
+        if ($push) {
+            SendCommsPush::dispatch($notification);
+        }
+
+        CommsNotificationUpdated::dispatch($notification);
+    }
+
+    /**
+     * @return Collection<int, CommsNotification>
+     */
+    private function openAlerts(User $user, int $intentId): Collection
+    {
+        $proposalIds = CommsProposal::query()->where('intent_id', $intentId)->pluck('id');
+        $questionIds = CommsQuestion::query()->where('intent_id', $intentId)->pluck('id');
+
+        return CommsNotification::query()
+            ->whereBelongsTo($user)
+            ->whereNull('dismissed_at')
+            ->where(function ($query) use ($intentId, $proposalIds, $questionIds): void {
+                $query->where(fn ($sub) => $sub->where('subject_type', 'intent')->where('subject_id', $intentId));
+
+                if ($proposalIds->isNotEmpty()) {
+                    $query->orWhere(fn ($sub) => $sub->where('subject_type', 'proposal')->whereIn('subject_id', $proposalIds->all()));
+                }
+
+                if ($questionIds->isNotEmpty()) {
+                    $query->orWhere(fn ($sub) => $sub->where('subject_type', 'question')->whereIn('subject_id', $questionIds->all()));
+                }
+            })
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    private function intentId(?string $subjectType, ?int $subjectId): ?int
+    {
+        if ($subjectId === null) {
+            return null;
+        }
+
+        $id = match ($subjectType) {
+            'intent' => $subjectId,
+            'proposal' => CommsProposal::query()->whereKey($subjectId)->value('intent_id'),
+            'question' => CommsQuestion::query()->whereKey($subjectId)->value('intent_id'),
+            default => null,
+        };
+
+        return is_numeric($id) ? (int) $id : null;
+    }
+
+    private function proposalClass(CommsNotification $notification): ?ActionClass
+    {
+        if ($notification->subject_type !== 'proposal' || $notification->subject_id === null) {
+            return null;
+        }
+
+        return CommsProposal::query()->find($notification->subject_id)?->action_class;
+    }
+
+    /**
+     * @param  list<int>  $sourceEventIds
+     * @return list<int>
+     */
+    private function mergeEvents(CommsNotification $notification, array $sourceEventIds): array
+    {
+        $ids = [];
+
+        foreach ([...($notification->source_event_ids ?? []), ...$sourceEventIds] as $id) {
+            if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
     }
 
     /**
