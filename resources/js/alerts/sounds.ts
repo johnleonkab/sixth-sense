@@ -44,23 +44,38 @@ function tone(ctx: AudioContext, { frequency, to, delay = 0, duration = 0.4, vol
 }
 
 const sounds: Record<string, (ctx: AudioContext) => void> = {
+    /** "Gota": the prototype's Slack sound. */
+    gota: (ctx) => {
+        tone(ctx, { frequency: 1400, to: 420, duration: 0.22, volume: 0.22 });
+    },
     /** "Campana": the prototype's Gmail sound. */
-    gmail: (ctx) => {
+    campana: (ctx) => {
         tone(ctx, { frequency: 880, duration: 1.3, volume: 0.14 });
         tone(ctx, { frequency: 1320, duration: 0.9, volume: 0.06 });
         tone(ctx, { frequency: 1760, duration: 0.5, volume: 0.03 });
     },
-    /** "Toc toc": two soft wooden knocks, for Slack messages that wait for an answer. */
-    slack: (ctx) => {
-        tone(ctx, { frequency: 392, to: 330, duration: 0.16, volume: 0.2, type: 'triangle' });
-        tone(ctx, { frequency: 523.25, to: 440, delay: 0.16, duration: 0.22, volume: 0.17, type: 'triangle' });
-        tone(ctx, { frequency: 1046.5, delay: 0.17, duration: 0.5, volume: 0.04 });
+    /** "Doble toque": the prototype's Jira sound. */
+    toque: (ctx) => {
+        tone(ctx, { frequency: 660, duration: 0.12, volume: 0.22, type: 'triangle' });
+        tone(ctx, { frequency: 990, delay: 0.13, duration: 0.16, volume: 0.22, type: 'triangle' });
     },
-    /** "Jira": a short rising pair, crisp, for a mention that asks for help. */
-    jira: (ctx) => {
-        tone(ctx, { frequency: 587.33, duration: 0.14, volume: 0.15, type: 'square' });
-        tone(ctx, { frequency: 880, delay: 0.1, duration: 0.35, volume: 0.1, type: 'triangle' });
+    /** "Madera": the prototype's Notion sound. */
+    madera: (ctx) => {
+        tone(ctx, { frequency: 760, duration: 0.09, volume: 0.32 });
+        tone(ctx, { frequency: 1180, duration: 0.05, volume: 0.12 });
     },
+    acorde: (ctx) => {
+        [523, 659, 784].forEach((frequency, index) => tone(ctx, { frequency, delay: index * 0.09, duration: 0.7, volume: 0.1 }));
+    },
+    pulso: (ctx) => {
+        tone(ctx, { frequency: 196, duration: 0.5, volume: 0.22 });
+        tone(ctx, { frequency: 196, delay: 0.28, duration: 0.6, volume: 0.14 });
+    },
+    silencio: () => {},
+    gmail: (ctx) => sounds.campana(ctx),
+    slack: (ctx) => sounds.gota(ctx),
+    jira: (ctx) => sounds.toque(ctx),
+    notion: (ctx) => sounds.madera(ctx),
     /** "Agenda": two soft notes going down, for a task that found no slot. */
     agenda: (ctx) => {
         tone(ctx, { frequency: 880, duration: 0.3, volume: 0.14, type: 'triangle' });

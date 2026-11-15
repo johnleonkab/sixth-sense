@@ -78,7 +78,7 @@ type Options = {
  * becomes important rings, once.
  */
 export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = {}): AlertFeed {
-    const { auth } = usePage().props;
+    const { auth, alertSounds } = usePage().props;
     const [items, setItems] = useState<Alert[]>(() => [...initial].sort(newestFirst));
     const [fresh, setFresh] = useState<Alert[]>([]);
     const [live, setLive] = useState(false);
@@ -113,7 +113,12 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
 
                 // Low urgency waits for the digest: it is listed, but does not interrupt.
                 if (recent && !incoming.quiet) {
-                    ring(incoming.source);
+                    const sound = alertSounds?.[incoming.source]?.sound ?? incoming.source;
+
+                    if (sound !== 'silencio') {
+                        ring(sound);
+                    }
+
                     callbacks.current.onImportant?.(incoming);
                 }
             }
@@ -136,7 +141,7 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
         } catch (error) {
             console.error(error);
         }
-    }, []);
+    }, [alertSounds]);
 
     // What the first sync finds was already there when the page opened: it is not announced again.
     const synced = useRef(false);
@@ -192,8 +197,8 @@ export function useAlertFeed({ initial = [], onArrive, onImportant }: Options = 
         void resync();
 
         return () => {
-            channel.stopListening('.inbox.item.created');
-            channel.stopListening('.inbox.item.updated');
+            channel.stopListening('.inbox.item.created', upsert);
+            channel.stopListening('.inbox.item.updated', upsert);
             connection?.unbind('state_change', onStateChange);
             document.removeEventListener('visibilitychange', onVisible);
             window.removeEventListener('online', onVisible);

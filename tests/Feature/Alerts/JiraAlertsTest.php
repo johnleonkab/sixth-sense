@@ -1,13 +1,13 @@
 <?php
 
 use App\Alerts\AlertFollowUp;
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
+use App\Avisos\Engine;
 use App\Connections\Provider;
 use App\Jobs\CheckAccountForAlerts;
 use App\Models\AlertSetting;
@@ -53,7 +53,7 @@ beforeEach(function () {
 });
 
 test('a mention asking for help becomes an alert waiting for an answer, with a proposal', function () {
-    $listed = app(AlertInbox::class)->check($this->account, AlertSource::Jira);
+    $listed = app(Engine::class)->check($this->account, AlertSource::Jira);
 
     expect($listed)->toHaveCount(1);
 
@@ -64,13 +64,15 @@ test('a mention asking for help becomes an alert waiting for an answer, with a p
         ->and($alert->thread_key)->toBe("{$this->account->id}:CPD-412")
         ->and($alert->title)->toBe('CPD-412 · Ver el total')
         ->and($alert->actor_name)->toBe('Pablo Gil')
-        ->and($alert->state())->toBe('ready')
+        ->and($alert->why)->toBe('Pablo Gil te menciona en CPD-412 · Ver el total.')
+        ->and($alert->proposal)->toBeNull()
+        ->and($alert->state())->toBe('important')
         ->and($alert->external_url)->toBe('https://cm.atlassian.net/browse/CPD-412?focusedCommentId=20')
         ->and($this->account->refresh()->watch_cursor)->toBe('2026-10-13T10:00:00+00:00');
 });
 
 test('answering in jira resolves it', function () {
-    $alert = app(AlertInbox::class)->check($this->account, AlertSource::Jira)[0];
+    $alert = app(Engine::class)->check($this->account, AlertSource::Jira)[0];
     $this->comments[] = jiraMention('21', 'u-me', 'Sí, entra.', '2026-10-13T10:05:00.000+0000', mentionsMe: false);
 
     app(AlertFollowUp::class)->checkReplies($this->user);

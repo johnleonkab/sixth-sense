@@ -1,8 +1,8 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
+use App\Avisos\Engine;
 use App\Comms\Cutover\CandidateHandoff;
 use App\Comms\Events\Source;
 use App\Comms\Ingestion\SlackHistory;
@@ -13,6 +13,7 @@ use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsPerson;
 use App\Models\ConnectedAccount;
+use App\Models\InboxItem;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
@@ -133,7 +134,7 @@ test('slack history also resumes open intent threads that fell out of recent his
         ->and(collect($items)->firstWhere(fn ($item) => $item->ts === '200.5')?->mine)->toBeTrue();
 });
 
-test('when the slack pipeline is on the watcher hands own replies to comms', function () {
+test('the persons own slack message is not an aviso and is not handed to comms', function () {
     Config::set('comms.pipeline.slack', true);
     Http::preventStrayRequests();
     $user = User::factory()->create();
@@ -177,10 +178,9 @@ test('when the slack pipeline is on the watcher hands own replies to comms', fun
         return Http::response(['ok' => true, 'messages' => ['matches' => $matches]]);
     });
 
-    expect(app(AlertInbox::class)->check($account, AlertSource::Slack))->toBe([])
-        ->and(CommsMessage::query()->whereBelongsTo($user)->count())->toBe(1)
-        ->and(CommsMessage::query()->whereBelongsTo($user)->value('direction'))->toBe('out')
-        ->and(CommsMessage::query()->whereBelongsTo($user)->value('text'))->toBe('Lo miro en el hilo');
+    expect(app(Engine::class)->check($account, AlertSource::Slack))->toBe([])
+        ->and(InboxItem::query()->count())->toBe(0)
+        ->and(CommsMessage::query()->whereBelongsTo($user)->count())->toBe(0);
 });
 
 test('candidate handoff marks the users own slack mail as outgoing', function () {

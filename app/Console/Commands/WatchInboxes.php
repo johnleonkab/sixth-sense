@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Alerts\AlertSource;
+use App\Avisos\ForMe;
 use App\Jobs\CheckAccountForAlerts;
 use App\Models\AlertSetting;
 use Illuminate\Console\Attributes\Description;
@@ -10,10 +10,10 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('alerts:watch')]
-#[Description('Queue a check for new messages waiting for an answer in every watched Gmail, Slack and Jira account')]
+#[Description('Queue a check for new avisos in every watched Slack, Gmail, Jira and Notion account')]
 class WatchInboxes extends Command
 {
-    private const SOURCES = [AlertSource::Gmail, AlertSource::Slack, AlertSource::Jira];
+    private const SOURCES = ForMe::SOURCES;
 
     /**
      * Execute the console command.

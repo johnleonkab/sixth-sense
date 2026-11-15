@@ -1,15 +1,11 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
-use App\Alerts\InboxCandidate;
-use App\Alerts\Intents\IntentAssigner;
-use App\Alerts\Intents\IntentClassifier;
-use App\Alerts\Intents\IntentDecision;
 use App\Alerts\Judges\FakeRelevanceJudge;
 use App\Alerts\RelevanceJudge;
 use App\Alerts\Triage;
+use App\Avisos\Engine;
 use App\Events\InboxItemCreated;
 use App\Events\InboxItemUpdated;
 use App\Jobs\AssignIntent;
@@ -76,35 +72,29 @@ test('the first check only remembers where the inbox is, so old mail never alert
     $this->account->update(['watch_cursor' => null]);
     fakeGmailHistory([incoming('m1')]);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+    expect(app(Engine::class)->check($this->account))->toBe([])
         ->and($this->account->refresh()->watch_cursor)->toBe('500');
 
     Event::assertNotDispatched(InboxItemCreated::class);
 });
 
-test('a new email is taken at once and classified in the background', function () {
-    Queue::fake([AssignIntent::class]);
+test('a new email that asks for something becomes an aviso at once', function () {
+    Queue::fake();
     fakeGmailHistory([incoming('m1')]);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
-        ->and($this->user->inboxItems()->count())->toBe(0)
-        ->and($this->account->refresh()->watch_cursor)->toBe('200');
-
-    Queue::assertPushed(AssignIntent::class, fn (AssignIntent $job) => $job->candidate['external_id'] === "{$this->account->id}.m1");
-});
-
-test('an important email becomes an alert waiting for an answer, and its proposal is prepared', function () {
-    fakeGmailHistory([incoming('m1')]);
-
-    $item = app(AlertInbox::class)->check($this->account)[0]->refresh();
+    $item = app(Engine::class)->check($this->account)[0]->refresh();
 
     expect($item->triage)->toBe(Triage::Important)
         ->and($item->status)->toBe(AlertStatus::Pending)
-        ->and($item->why)->toBe('Andrés Vela te pide algo: Contrato: necesito la firma antes del viernes')
+        ->and($item->why)->toBe('Andrés Vela te pide algo: «Contrato: necesito la firma antes del viernes»')
         ->and($item->planning)->toBeFalse()
-        ->and($item->state())->toBe('ready');
+        ->and($item->proposal)->toBeNull()
+        ->and($item->state())->toBe('important')
+        ->and($this->account->refresh()->watch_cursor)->toBe('200');
 
-    Event::assertDispatchedTimes(InboxItemUpdated::class, 1);
+    Event::assertDispatchedTimes(InboxItemCreated::class, 1);
+    Event::assertNotDispatched(InboxItemUpdated::class);
+    Queue::assertNotPushed(AssignIntent::class);
 });
 
 test('noise and the user own mail never become alerts', function () {
@@ -116,66 +106,49 @@ test('noise and the user own mail never become alerts', function () {
         incoming('archived', ['labels' => ['UNREAD']]),
     ]);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+    expect(app(Engine::class)->check($this->account))->toBe([])
         ->and($this->user->inboxItems()->count())->toBe(0);
 });
 
 test('an email that asks for nothing does not become an alert', function () {
     fakeGmailHistory([incoming('m1', ['subject' => 'Gracias por el café', 'body' => 'Un placer verte ayer.'])]);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+    expect(app(Engine::class)->check($this->account))->toBe([])
         ->and($this->user->inboxItems()->count())->toBe(0);
 });
 
 test('the same email is never listed twice', function () {
     fakeGmailHistory([incoming('m1')]);
 
-    app(AlertInbox::class)->check($this->account);
-    app(AlertInbox::class)->check($this->account->refresh());
+    app(Engine::class)->check($this->account);
+    app(Engine::class)->check($this->account->refresh());
 
     expect($this->user->inboxItems()->count())->toBe(1);
     Event::assertDispatchedTimes(InboxItemCreated::class, 1);
 });
 
-test('if the classifier can not answer, the inbox keeps moving and, out of tries, simple rules decide', function () {
-    $this->app->instance(IntentClassifier::class, new class implements IntentClassifier
-    {
-        public function classify(User $user, InboxCandidate $candidate, array $intents, string $context): IntentDecision
-        {
-            throw new RuntimeException('The model is down');
-        }
-    });
-    Queue::fake([AssignIntent::class]);
-    fakeGmailHistory([incoming('m1')]);
+test('an ask that only appears in quoted text stays out', function () {
+    fakeGmailHistory([incoming('m1', [
+        'subject' => 'Re: acta',
+        'body' => "Gracias por el resumen.\n> ¿Puedes firmarlo hoy?",
+    ])]);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+    expect(app(Engine::class)->check($this->account))->toBe([])
+        ->and($this->user->inboxItems()->count())->toBe(0)
         ->and($this->account->refresh()->watch_cursor)->toBe('200');
-
-    $job = Queue::pushed(AssignIntent::class)->sole();
-
-    expect(fn () => $job->handle(app(IntentAssigner::class)))->toThrow(RuntimeException::class)
-        ->and($this->user->inboxItems()->count())->toBe(0);
-
-    $job->failed(new RuntimeException('The model is down'));
-
-    $item = $this->user->inboxItems()->sole();
-
-    expect($item->status)->toBe(AlertStatus::Pending)
-        ->and($item->why)->toBe('Andrés Vela te pide algo: «Contrato: necesito la firma antes del viernes»')
-        ->and($item->relevance)->toBe(50);
 });
 
 test('when gmail forgot the old point in history it starts again from now', function () {
     fakeGmailHistory([], historyStatus: 404);
 
-    expect(app(AlertInbox::class)->check($this->account))->toBe([])
+    expect(app(Engine::class)->check($this->account))->toBe([])
         ->and($this->account->refresh()->watch_cursor)->toBe('500');
 });
 
 test('it only asks gmail for what was added to the inbox since the cursor', function () {
     fakeGmailHistory([]);
 
-    app(AlertInbox::class)->check($this->account);
+    app(Engine::class)->check($this->account);
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), '/users/me/history')
         && $request['startHistoryId'] === '100'
@@ -202,7 +175,7 @@ test('a queued check does nothing once the user switched alerts off', function (
     Http::fake();
     $this->user->alertSettings()->update(['enabled' => false]);
 
-    (new CheckAccountForAlerts($this->account))->handle(app(AlertInbox::class));
+    (new CheckAccountForAlerts($this->account))->handle(app(Engine::class));
 
     Http::assertNothingSent();
 });

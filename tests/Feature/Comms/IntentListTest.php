@@ -1,5 +1,6 @@
 <?php
 
+use App\Alerts\AlertSource;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -11,49 +12,36 @@ use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsIntentParticipant;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsMetric;
-use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
-use App\Models\Comms\CommsProposal;
+use App\Models\InboxItem;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
-test('the home groups an open intent by who it is waiting on', function () {
-    [$user, $self, $marta] = boardPeople();
-    $activity = CarbonImmutable::now()->subMinutes(25)->startOfMinute();
-    $mine = boardIntent($user, $self, $marta, 'Revisar el flujo de prepago', 'responder', 'requester', $activity, 60);
-    $proposal = CommsProposal::factory()->create([
-        'user_id' => $user->id,
-        'intent_id' => $mine->id,
+test('para mí lists the persons pending avisos and leaves another persons out', function () {
+    [$user] = boardPeople();
+    $other = User::factory()->create();
+    InboxItem::factory()->for($user)->create([
+        'source' => AlertSource::Slack,
+        'title' => 'Mensaje directo',
+        'why' => 'Mensaje directo de Marta.',
+        'read_at' => null,
     ]);
-    $notification = CommsNotification::factory()->create([
-        'user_id' => $user->id,
-        'kind' => 'proposal',
-        'urgency' => 'now',
-        'subject_type' => 'proposal',
-        'subject_id' => $proposal->id,
+    InboxItem::factory()->for($other)->create([
+        'source' => AlertSource::Slack,
+        'title' => 'De otra persona',
     ]);
-    boardIntent($user, $self, $marta, 'Enviar el contrato', 'requester', 'responder', now(), 15, 'evt-others', 'T1:C1:2.2');
-    boardIntent($user, $self, $marta, 'La nota vieja', 'responder', 'requester', now()->subDays(10), 5, 'evt-quiet', 'T1:C1:3.2');
 
     $this->actingAs($user)->get(route('home'))
         ->assertInertia(fn ($page) => $page
-            ->where('intents.waiting_on_me.0.what', 'Revisar el flujo de prepago')
-            ->where('intents.waiting_on_me.0.who', 'Marta')
-            ->where('intents.waiting_on_me.0.importance', 'alta')
-            ->where('intents.waiting_on_me.0.source', 'slack')
-            ->where('intents.waiting_on_me.0.source_label', 'Slack')
-            ->where('intents.waiting_on_me.0.source_url', 'https://slack.com/archives/C1/p12')
-            ->where('intents.waiting_on_me.0.activity_at', $activity->toIso8601String())
-            ->where('intents.waiting_on_me.0.messages_count', 1)
-            ->where('intents.waiting_on_me.0.alert_id', -$notification->id)
-            ->where('intents.waiting_on_me.0.proposal_ready', true)
-            ->where('intents.waiting_on_others.0.what', 'Enviar el contrato')
-            ->where('intents.quiet.0.what', 'La nota vieja')
-            ->missing('intents.waiting_on_me.1'));
-
-    expect($mine->key)->toBe('evt-mine');
+            ->where('forMe.pending_count', 1)
+            ->where('forMe.pending_label', '1 pendiente')
+            ->where('forMe.items.0.title', 'Mensaje directo')
+            ->where('forMe.items.0.why', 'Mensaje directo de Marta.')
+            ->where('forMe.items.0.source', 'slack')
+            ->missing('forMe.items.1')
+            ->missing('intents'));
 });
 
 test('closing and reopening an intent is a correction', function () {

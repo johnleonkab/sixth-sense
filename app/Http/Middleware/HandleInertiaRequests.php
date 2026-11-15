@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Avisos\ForMe;
 use App\Services\PostHogService;
 use Closure;
 use Illuminate\Http\Request;
@@ -10,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
-    public function __construct(private PostHogService $posthog) {}
+    public function __construct(private PostHogService $posthog, private ForMe $forMe) {}
 
     /**
      * @param  Closure(Request): Response  $next
@@ -65,6 +66,7 @@ class HandleInertiaRequests extends Middleware
                     'display_scale' => $request->user()->display_size->scale(),
                 ] : null,
             ],
+            'alertSounds' => $request->user() === null ? (object) [] : $this->forMe->sounds($request->user()),
         ];
     }
 }

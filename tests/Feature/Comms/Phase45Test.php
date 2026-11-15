@@ -1,10 +1,10 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
 use App\Alerts\InboxWatcher;
 use App\Alerts\InboxWatchers;
+use App\Avisos\Engine;
 use App\Comms\Cutover\OpenItem;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -42,7 +42,8 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-test('a switched slack account runs the pipeline once and writes no inbox item', function () {
+test('a slack direct message becomes an aviso and does not enter the comms pipeline', function () {
+    Queue::fake([AssignIntent::class]);
     Config::set('comms.pipeline.slack', true);
     $user = User::factory()->create();
     $account = ConnectedAccount::factory()->for($user)->create([
@@ -52,30 +53,17 @@ test('a switched slack account runs the pipeline once and writes no inbox item',
     ]);
     phase45Watch($account, AlertSource::Slack, 'D5', '¿Puedes revisar el contrato?');
 
-    expect(app(AlertInbox::class)->check($account, AlertSource::Slack))->toBe([])
-        ->and(InboxItem::query()->count())->toBe(0)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Slack)->count())->toBe(1)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Slack)->sole()->processed_at)->not->toBeNull();
+    $listed = app(Engine::class)->check($account, AlertSource::Slack);
+
+    expect($listed)->toHaveCount(1)
+        ->and($listed[0]->why)->toBe('Mensaje directo de Marta.')
+        ->and(InboxItem::query()->count())->toBe(1)
+        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->count())->toBe(0);
+
+    Queue::assertNotPushed(AssignIntent::class);
 });
 
-test('a slack account that is not switched still assigns an intent and does not ingest', function () {
-    Queue::fake([AssignIntent::class]);
-    Config::set('comms.pipeline.slack', false);
-    $user = User::factory()->create();
-    $account = ConnectedAccount::factory()->for($user)->create([
-        'provider' => Provider::Slack,
-        'email' => 'me@example.com',
-        'metadata' => ['team_id' => 'T1', 'user_id' => 'U-me'],
-    ]);
-    phase45Watch($account, AlertSource::Slack, 'D5', '¿Puedes revisar el contrato?');
-
-    app(AlertInbox::class)->check($account, AlertSource::Slack);
-
-    Queue::assertPushed(AssignIntent::class, 1);
-    expect(CommsEvent::query()->where('type', EventType::MessageReceived)->count())->toBe(0);
-});
-
-test('a switched gmail account is ingested as one message', function () {
+test('gmail that does not ask for anything is not an aviso and is not ingested', function () {
     Config::set('comms.pipeline.gmail', true);
     $user = User::factory()->create();
     $account = ConnectedAccount::factory()->for($user)->create([
@@ -84,10 +72,9 @@ test('a switched gmail account is ingested as one message', function () {
     ]);
     phase45Watch($account, AlertSource::Gmail, 'msg-1', 'El contrato está listo', ['INBOX']);
 
-    app(AlertInbox::class)->check($account, AlertSource::Gmail);
-
-    expect(InboxItem::query()->count())->toBe(0)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Gmail)->count())->toBe(1);
+    expect(app(Engine::class)->check($account, AlertSource::Gmail))->toBe([])
+        ->and(InboxItem::query()->count())->toBe(0)
+        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->count())->toBe(0);
 });
 
 test('the home feed shows a cut over notification and keeps the other sources', function () {

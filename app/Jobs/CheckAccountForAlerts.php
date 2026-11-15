@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
+use App\Avisos\Engine;
 use App\Models\ConnectedAccount;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,7 +37,7 @@ class CheckAccountForAlerts implements ShouldBeUnique, ShouldQueue
         return "{$this->source->value}:{$this->account->id}";
     }
 
-    public function handle(AlertInbox $inbox): void
+    public function handle(Engine $inbox): void
     {
         $account = $this->account->fresh();
 

@@ -1,6 +1,5 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\AlertStatus;
 use App\Alerts\InboxCandidate;
@@ -144,7 +143,14 @@ test('a question in a channel she owns is triaged quietly and raised when it sta
         });
     });
 
-    expect(app(AlertInbox::class)->check($account, AlertSource::Slack))->toBe([])
+    decide($user, SlackAction::Ignore, 'Pregunta en un canal suyo.');
+    expect(app(IntentAssigner::class)->assign($user, slackMessage(
+        'channel',
+        'Canal #producto',
+        '¿alguien sabe cómo va el despliegue?',
+        "{$account->id}:C1:{$now}.000100",
+        "{$account->id}:C1:{$now}.000100",
+    )))->toBeNull()
         ->and($user->inboxItems()->count())->toBe(0);
 
     $decision = $user->slackTriageDecisions()->sole();
