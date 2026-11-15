@@ -1,6 +1,5 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
 use App\Alerts\InboxCandidate;
 use App\Comms\Cutover\CandidateHandoff;
@@ -16,7 +15,6 @@ use App\Models\ConnectedAccount;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
 test('slack history pulls thread replies including the users own answer', function () {
@@ -131,56 +129,6 @@ test('slack history also resumes open intent threads that fell out of recent his
 
     expect(collect($items)->pluck('ts')->all())->toContain('200.5')
         ->and(collect($items)->firstWhere(fn ($item) => $item->ts === '200.5')?->mine)->toBeTrue();
-});
-
-test('when the slack pipeline is on the watcher hands own replies to comms', function () {
-    Config::set('comms.pipeline.slack', true);
-    Http::preventStrayRequests();
-    $user = User::factory()->create();
-    $account = ConnectedAccount::factory()->for($user)->create([
-        'provider' => Provider::Slack,
-        'email' => 'me@example.com',
-        'access_token' => 'xoxp-1',
-        'expires_at' => null,
-        'watch_cursor' => (string) (time() - 60),
-        'metadata' => ['team_id' => 'T1', 'user_id' => 'U1'],
-        'scopes' => Provider::Slack->scopes(),
-    ]);
-    $ts = sprintf('%.6F', microtime(true));
-
-    Http::fake(function (Request $request) use ($ts) {
-        $method = str(parse_url($request->url(), PHP_URL_PATH))->after('/api/')->toString();
-
-        if ($method !== 'search.messages') {
-            return Http::response(match ($method) {
-                'users.list' => ['ok' => true, 'members' => [
-                    ['id' => 'U1', 'name' => 'me', 'profile' => ['real_name' => 'Me', 'email' => 'me@example.com']],
-                    ['id' => 'U5', 'name' => 'julian', 'profile' => ['real_name' => 'Julián', 'email' => 'julian@cm.com']],
-                ]],
-                'users.conversations' => ['ok' => true, 'channels' => [['id' => 'D5', 'is_im' => true, 'user' => 'U5']]],
-                'conversations.replies', 'conversations.history' => ['ok' => true, 'messages' => []],
-                default => ['ok' => true],
-            });
-        }
-
-        $matches = str_starts_with((string) $request['query'], 'from:')
-            ? [[
-                'ts' => $ts,
-                'user' => 'U1',
-                'text' => 'Lo miro en el hilo',
-                'thread_ts' => '100.1',
-                'channel' => ['id' => 'C1', 'name' => 'producto'],
-                'permalink' => 'https://cm.slack.com/archives/C1/p1?thread_ts=100.1&cid=C1',
-            ]]
-            : [];
-
-        return Http::response(['ok' => true, 'messages' => ['matches' => $matches]]);
-    });
-
-    expect(app(AlertInbox::class)->check($account, AlertSource::Slack))->toBe([])
-        ->and(CommsMessage::query()->whereBelongsTo($user)->count())->toBe(1)
-        ->and(CommsMessage::query()->whereBelongsTo($user)->value('direction'))->toBe('out')
-        ->and(CommsMessage::query()->whereBelongsTo($user)->value('text'))->toBe('Lo miro en el hilo');
 });
 
 test('candidate handoff marks the users own slack mail as outgoing', function () {

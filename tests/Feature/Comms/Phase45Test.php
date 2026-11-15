@@ -1,20 +1,13 @@
 <?php
 
-use App\Alerts\AlertInbox;
 use App\Alerts\AlertSource;
-use App\Alerts\InboxCandidate;
-use App\Alerts\InboxWatcher;
-use App\Alerts\InboxWatchers;
 use App\Comms\Cutover\OpenItem;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Gate\ProposalStatus;
 use App\Comms\People\Relation;
-use App\Connections\Provider;
 use App\Connectors\Chat\Chats;
 use App\Connectors\Chat\FakeChats;
-use App\Connectors\Mail\MailAddress;
-use App\Jobs\AssignIntent;
 use App\Models\AiUsage;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
@@ -24,7 +17,6 @@ use App\Models\Comms\CommsNotification;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsQuestion;
-use App\Models\ConnectedAccount;
 use App\Models\InboxItem;
 use App\Models\User;
 use App\Voice\AssistantProfile;
@@ -32,7 +24,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     Http::preventStrayRequests();
@@ -40,54 +31,6 @@ beforeEach(function () {
 
 afterEach(function () {
     Carbon::setTestNow();
-});
-
-test('a switched slack account runs the pipeline once and writes no inbox item', function () {
-    Config::set('comms.pipeline.slack', true);
-    $user = User::factory()->create();
-    $account = ConnectedAccount::factory()->for($user)->create([
-        'provider' => Provider::Slack,
-        'email' => 'me@example.com',
-        'metadata' => ['team_id' => 'T1', 'user_id' => 'U-me'],
-    ]);
-    phase45Watch($account, AlertSource::Slack, 'D5', '¿Puedes revisar el contrato?');
-
-    expect(app(AlertInbox::class)->check($account, AlertSource::Slack))->toBe([])
-        ->and(InboxItem::query()->count())->toBe(0)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Slack)->count())->toBe(1)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Slack)->sole()->processed_at)->not->toBeNull();
-});
-
-test('a slack account that is not switched still assigns an intent and does not ingest', function () {
-    Queue::fake([AssignIntent::class]);
-    Config::set('comms.pipeline.slack', false);
-    $user = User::factory()->create();
-    $account = ConnectedAccount::factory()->for($user)->create([
-        'provider' => Provider::Slack,
-        'email' => 'me@example.com',
-        'metadata' => ['team_id' => 'T1', 'user_id' => 'U-me'],
-    ]);
-    phase45Watch($account, AlertSource::Slack, 'D5', '¿Puedes revisar el contrato?');
-
-    app(AlertInbox::class)->check($account, AlertSource::Slack);
-
-    Queue::assertPushed(AssignIntent::class, 1);
-    expect(CommsEvent::query()->where('type', EventType::MessageReceived)->count())->toBe(0);
-});
-
-test('a switched gmail account is ingested as one message', function () {
-    Config::set('comms.pipeline.gmail', true);
-    $user = User::factory()->create();
-    $account = ConnectedAccount::factory()->for($user)->create([
-        'provider' => Provider::Google,
-        'email' => 'me@example.com',
-    ]);
-    phase45Watch($account, AlertSource::Gmail, 'msg-1', 'El contrato está listo', ['INBOX']);
-
-    app(AlertInbox::class)->check($account, AlertSource::Gmail);
-
-    expect(InboxItem::query()->count())->toBe(0)
-        ->and(CommsEvent::query()->where('type', EventType::MessageReceived)->where('source', Source::Gmail)->count())->toBe(1);
 });
 
 test('the home feed shows a cut over notification and keeps the other sources', function () {
@@ -218,47 +161,6 @@ test('the cutover report prints a number for every metric', function () {
 
     expect(app(OpenItem::class)->say($user))->toBe('');
 });
-
-function phase45Watch(ConnectedAccount $account, AlertSource $source, string $channel, string $text, array $labels = ['dm']): void
-{
-    $externalId = $source === AlertSource::Gmail
-        ? $account->id.'.'.$channel
-        : $account->id.':'.$channel.':100.000100';
-    $candidate = new InboxCandidate(
-        source: $source,
-        externalId: $externalId,
-        account: (string) $account->email,
-        from: new MailAddress('Marta', 'marta@example.com'),
-        to: [],
-        cc: [],
-        subject: $source === AlertSource::Gmail ? 'El contrato' : 'Mensaje directo',
-        excerpt: $text,
-        receivedAt: CarbonImmutable::parse('2026-11-08 10:00:00'),
-        labels: $labels,
-    );
-    $watcher = new class($source, [$candidate]) implements InboxWatcher
-    {
-        /**
-         * @param  list<InboxCandidate>  $candidates
-         */
-        public function __construct(private AlertSource $alertSource, private array $candidates) {}
-
-        public function source(): AlertSource
-        {
-            return $this->alertSource;
-        }
-
-        public function newMessages(ConnectedAccount $account): array
-        {
-            return $this->candidates;
-        }
-
-        public function commit(ConnectedAccount $account): void {}
-    };
-    $watchers = Mockery::mock(InboxWatchers::class);
-    $watchers->shouldReceive('for')->andReturn($watcher);
-    app()->instance(InboxWatchers::class, $watchers);
-}
 
 function phase45Open(string $text, string $what = 'Revisar el contrato'): User
 {

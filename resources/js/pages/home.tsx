@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { answerIn, bareAnswer, type Answer } from '@/actions/answers';
@@ -15,7 +15,6 @@ import type { CanvasDirective } from '@/canvas/types';
 import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
-import IntentBoard, { type IntentGroups } from '@/intents/intent-board';
 import { echoConnection } from '@/lib/echo';
 import { postJson } from '@/lib/http';
 import { activityFor } from '@/voice/activity';
@@ -95,8 +94,6 @@ type OpenAlert = {
     starts_at: string | null;
 };
 
-const emptyIntents: IntentGroups = { waiting_on_me: [], waiting_on_others: [], quiet: [] };
-
 type OpenComms = {
     proposal_id: number | null;
     question: string | null;
@@ -121,10 +118,9 @@ function commsProposalOnScreen(canvases: { directive: CanvasDirective }[]): { id
     };
 }
 
-export default function Home({ alerts, openAlert = null, openComms = null, intents = emptyIntents }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; intents?: IntentGroups }) {
+export default function Home({ alerts, openAlert = null, openComms = null }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null }) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
-    const [showMine, setShowMine] = useState(false);
     const nextCanvasId = useRef(1);
     const canvasInHistory = useRef(false);
     const wide = useMinWidth(768);
@@ -295,16 +291,10 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
             }
         };
 
-        const onIntents = () => {
-            router.reload({ only: ['intents'], preserveScroll: true, preserveState: true });
-        };
-
         channel.listen('.scene.updated', onScene);
-        channel.listen('.intents.updated', onIntents);
 
         return () => {
             channel.stopListening('.scene.updated', onScene);
-            channel.stopListening('.intents.updated', onIntents);
         };
     }, [auth.user?.id, voice.active, voice.tell]);
 
@@ -391,20 +381,6 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                             onArrive={(alert) => void voice.tell(alertArrivedNote(alert), false)}
                             onTellMe={(alert) => void voice.tell(tellMeNote(alert), true)}
                         />
-                        <button
-                            type="button"
-                            aria-pressed={showMine && canvases.length === 0}
-                            onClick={() => {
-                                const openingMine = canvases.length > 0 || !showMine;
-
-                                setCanvases([]);
-                                canvasInHistory.current = false;
-                                setShowMine(openingMine);
-                            }}
-                            className={`hidden rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink sm:inline ${showMine && canvases.length === 0 ? 'text-ink' : ''}`}
-                        >
-                            Para mí
-                        </button>
                         <Link
                             href="/settings"
                             viewTransition={!wide}
@@ -433,18 +409,11 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                 <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 pt-3 ${canvases.length > 1 ? 'overflow-auto pb-(--dock-room) md:flex md:flex-col md:overflow-hidden md:pb-0' : 'overflow-auto pb-(--dock-room)'}`}>
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
-                        !opening &&
-                        (showMine ? (
-                            <IntentBoard
-                                intents={intents}
-                                only="waiting_on_me"
-                                onOpenAlert={(alertId) => runFromScreen('review_alert', { alert_id: alertId })}
-                            />
-                        ) : (
+                        !opening && (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
                             </p>
-                        ))
+                        )
                     ) : (
                         <CanvasContext value={{ runTool: runFromScreen, tell: (text) => void voice.tell(text, true), actions }}>
                             <div
