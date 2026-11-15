@@ -27,8 +27,6 @@ use App\Alerts\Replies\LlmReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
 use App\Analytics\PostHogProductAnalytics;
 use App\Analytics\ProductAnalytics;
-use App\Avisos\DoubtResolver;
-use App\Avisos\KeepDoubt;
 use App\Comms\Context\FakeRuleWriter;
 use App\Comms\Context\LlmRuleWriter;
 use App\Comms\Context\RuleWriter;
@@ -118,7 +116,6 @@ class AppServiceProvider extends ServiceProvider
             ? new FakeInboundFeed
             : $this->app->make(AccountInboundFeed::class));
         $this->app->bind(PushSender::class, WebPushSender::class);
-        $this->app->bind(DoubtResolver::class, KeepDoubt::class);
 
         $this->app->bind(CalendarReader::class, fn (): CalendarReader => config('connectors.demo')
             ? new FakeCalendarReader

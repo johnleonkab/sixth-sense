@@ -12,7 +12,6 @@ Artisan::command('inspire', function () {
  * Each lock expires shortly after the next run is due, so a run killed
  * mid-way (a deploy, a crash) does not block the command for the default day.
  */
-Schedule::command('alerts:watch')->everyMinute()->withoutOverlapping(5);
 Schedule::command('comms:reconcile')->everyTenMinutes()->withoutOverlapping(20);
 Schedule::command('comms:metrics')->dailyAt('00:20')->withoutOverlapping(60);
 Schedule::command('comms:tick')->everyMinute()->withoutOverlapping(5);

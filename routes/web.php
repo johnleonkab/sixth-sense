@@ -6,10 +6,8 @@ use App\Http\Controllers\AlertReplyController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\GoogleSignInController;
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\AvisosWebhookController;
 use App\Http\Controllers\CanvasEmbedController;
 use App\Http\Controllers\CanvasQueryController;
-use App\Http\Controllers\ForMeController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IntentCorrectionController;
 use App\Http\Controllers\MediaController;
@@ -60,10 +58,6 @@ Route::middleware('guest')->group(function () {
 
 // Public: the landing for visitors, the assistant once signed in.
 Route::get('/', HomeController::class)->name('home');
-
-Route::post('webhooks/{source}', AvisosWebhookController::class)
-    ->middleware('throttle:120,1')
-    ->name('avisos.webhook');
 
 Route::middleware('auth')->group(function () {
     Route::post('voice/sessions', VoiceSessionController::class)
@@ -123,9 +117,6 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/proposals/{proposal}/edit', [ProposalController::class, 'edit'])->whereNumber('proposal')->name('comms.proposals.edit');
     Route::post('comms/proposals/{proposal}/undo', [ProposalController::class, 'undo'])->whereNumber('proposal')->name('comms.proposals.undo');
 
-    Route::post('para-mi/leidos', [ForMeController::class, 'readAll'])->name('for-me.read-all');
-    Route::post('para-mi/{item}/leido', [ForMeController::class, 'read'])->whereNumber('item')->name('for-me.read');
-
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('people', '/settings/context?tab=people');
         Route::put('context/preference', [CommsPeopleController::class, 'updatePreference'])->name('context.preference');
@@ -154,9 +145,6 @@ Route::middleware('auth')->group(function () {
         Route::put('system/keys', [SystemController::class, 'updateKeys'])->middleware('throttle:6,1')->name('system.keys');
         Route::get('system/voices/{voice}/sample', [SystemController::class, 'sample'])->name('system.voice.sample');
         Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
-        Route::put('alerts/{source}/sound', [AlertController::class, 'updateSound'])->name('alerts.sound');
-        Route::post('alerts/gmail/senders', [AlertController::class, 'storeSender'])->name('alerts.senders.store');
-        Route::delete('alerts/gmail/senders/{sender}', [AlertController::class, 'destroySender'])->whereNumber('sender')->name('alerts.senders.destroy');
         Route::post('slack-autonomy/lower', [AlertController::class, 'lowerAutonomy'])->name('slack-autonomy.lower');
         Route::post('slack-autonomy/promote', [AlertController::class, 'promoteAutonomy'])->name('slack-autonomy.promote');
         Route::post('slack-autonomy/{pending}/confirm', [AlertController::class, 'confirmAutonomy'])->whereNumber('pending')->name('slack-autonomy.confirm');

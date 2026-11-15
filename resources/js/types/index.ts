@@ -10,8 +10,6 @@ export type SharedData = {
     auth: {
         user: User | null;
     };
-    /** Sound and read-aloud for each aviso source. */
-    alertSounds: Record<string, { sound: string; read_aloud: boolean }>;
 };
 
 export type Toast = {

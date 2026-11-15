@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { answerIn, bareAnswer, type Answer } from '@/actions/answers';
@@ -15,7 +15,6 @@ import type { CanvasDirective } from '@/canvas/types';
 import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
-import ForMeInbox, { type ForMeInboxData } from '@/pages/for-me-inbox';
 import { echoConnection } from '@/lib/echo';
 import { postJson } from '@/lib/http';
 import { activityFor } from '@/voice/activity';
@@ -95,8 +94,6 @@ type OpenAlert = {
     starts_at: string | null;
 };
 
-const emptyForMe: ForMeInboxData = { pending_count: 0, pending_label: 'Al día', filter: 'all', filters: [], items: [] };
-
 type OpenComms = {
     proposal_id: number | null;
     question: string | null;
@@ -121,10 +118,9 @@ function commsProposalOnScreen(canvases: { directive: CanvasDirective }[]): { id
     };
 }
 
-export default function Home({ alerts, openAlert = null, openComms = null, forMe = emptyForMe }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; forMe?: ForMeInboxData }) {
-    const { auth, alertSounds } = usePage().props;
+export default function Home({ alerts, openAlert = null, openComms = null }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null }) {
+    const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
-    const [showMine, setShowMine] = useState(false);
     const nextCanvasId = useRef(1);
     const canvasInHistory = useRef(false);
     const wide = useMinWidth(768);
@@ -295,16 +291,10 @@ export default function Home({ alerts, openAlert = null, openComms = null, forMe
             }
         };
 
-        const onAviso = () => {
-            router.reload({ only: ['forMe'], preserveScroll: true, preserveState: true });
-        };
-
         channel.listen('.scene.updated', onScene);
-        channel.listen('.inbox.item.created', onAviso);
 
         return () => {
             channel.stopListening('.scene.updated', onScene);
-            channel.stopListening('.inbox.item.created', onAviso);
         };
     }, [auth.user?.id, voice.active, voice.tell]);
 
@@ -388,32 +378,9 @@ export default function Home({ alerts, openAlert = null, openComms = null, forMe
                                     ? runFromScreen('show_calendar', { start_date: (alert.starts_at ?? alert.received_at).slice(0, 10) })
                                     : runFromScreen('review_alert', { alert_id: alert.id })
                             }
-                            onArrive={(alert) => {
-                                void voice.tell(alertArrivedNote(alert), false);
-
-                                const sound = alertSounds[alert.source];
-
-                                if (voice.active && sound?.read_aloud) {
-                                    const who = alert.actor_name ?? 'Alguien';
-                                    void voice.tell(`Aviso de ${alert.source_label}. ${who}. ${alert.why} ¿Lo abro?`, true);
-                                }
-                            }}
+                            onArrive={(alert) => void voice.tell(alertArrivedNote(alert), false)}
                             onTellMe={(alert) => void voice.tell(tellMeNote(alert), true)}
                         />
-                        <button
-                            type="button"
-                            aria-pressed={showMine && canvases.length === 0}
-                            onClick={() => {
-                                const openingMine = canvases.length > 0 || !showMine;
-
-                                setCanvases([]);
-                                canvasInHistory.current = false;
-                                setShowMine(openingMine);
-                            }}
-                            className={`hidden rounded-lg px-2.5 py-1 hover:bg-soft hover:text-ink sm:inline ${showMine && canvases.length === 0 ? 'text-ink' : ''}`}
-                        >
-                            Para mí
-                        </button>
                         <Link
                             href="/settings"
                             viewTransition={!wide}
@@ -442,14 +409,11 @@ export default function Home({ alerts, openAlert = null, openComms = null, forMe
                 <main aria-live="polite" aria-busy={opening !== null} className={`min-h-0 pt-3 ${canvases.length > 1 ? 'overflow-auto pb-(--dock-room) md:flex md:flex-col md:overflow-hidden md:pb-0' : 'overflow-auto pb-(--dock-room)'}`}>
                     {opening && <Opening label={opening} />}
                     {canvases.length === 0 ? (
-                        !opening &&
-                        (showMine ? (
-                            <ForMeInbox inbox={forMe} />
-                        ) : (
+                        !opening && (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}
                             </p>
-                        ))
+                        )
                     ) : (
                         <CanvasContext value={{ runTool: runFromScreen, tell: (text) => void voice.tell(text, true), actions }}>
                             <div

@@ -1,10 +1,8 @@
 <?php
 
-use App\Alerts\AlertSource;
 use App\Comms\Context\ContextHarvest;
 use App\Connections\Provider;
 use App\Connectors\Slack\SlackApi;
-use App\Jobs\CheckAccountForAlerts;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -36,16 +34,6 @@ test('a slack search timeout is retried and then succeeds', function () {
         ->and($response['messages']['matches'])->toBe([]);
     Sleep::assertSleptTimes(1);
     Http::assertSentCount(2);
-});
-
-test('check account for alerts retries transient failures', function () {
-    $job = new CheckAccountForAlerts(
-        ConnectedAccount::factory()->for(User::factory())->make(),
-        AlertSource::Slack,
-    );
-
-    expect($job->tries)->toBe(3)
-        ->and($job->backoff)->toBe([30, 90]);
 });
 
 test('context harvest retries once after a transient deepseek cut', function () {

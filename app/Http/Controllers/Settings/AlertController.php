@@ -7,11 +7,8 @@ use App\Alerts\AlertSource;
 use App\Alerts\Intents\AutonomyLevel;
 use App\Alerts\Intents\SlackAction;
 use App\Alerts\Intents\SlackAutonomy;
-use App\Avisos\AlertSound;
-use App\Avisos\ForMe;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
-use App\Models\ImportantSender;
 use App\Models\PendingAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,31 +25,13 @@ class AlertController extends Controller
     {
         $user = $request->user();
 
-        $settings = $user->alertSettings()->get()->keyBy(fn ($setting): string => $setting->source->value);
-        $senders = $user->importantSenders()->orderBy('email')->get(['id', 'email', 'name']);
-
         return Inertia::render('settings/alerts', [
-            'sounds' => array_map(fn (AlertSound $sound): array => [
-                'key' => $sound->value,
-                'label' => $sound->label(),
-            ], AlertSound::cases()),
             'sources' => array_map(fn (AlertSource $source): array => [
                 'key' => $source->value,
                 'name' => $source->label(),
                 'description' => $source->description(),
                 'enabled' => $user->wantsAlertsFrom($source),
                 'capability' => $source->capability()->label(),
-                'sound' => in_array($source, ForMe::SOURCES, true)
-                    ? ($settings->get($source->value)?->sound ?: $source->defaultSound())
-                    : null,
-                'read_aloud' => (bool) ($settings->get($source->value)?->read_aloud ?? true),
-                'senders' => $source === AlertSource::Gmail
-                    ? $senders->map(fn (ImportantSender $sender): array => [
-                        'id' => $sender->id,
-                        'email' => $sender->email,
-                        'name' => $sender->name,
-                    ])->all()
-                    : [],
                 'accounts' => $user->connectedAccounts()->ofProvider($source->capability()->provider())->oldest()->orderBy('id')->get()
                     ->map(fn (ConnectedAccount $account): array => [
                         'id' => $account->id,
@@ -135,56 +114,6 @@ class AlertController extends Controller
         $enabled = (bool) $request->validate(['enabled' => ['required', 'boolean']])['enabled'];
 
         $request->user()->alertSettings()->updateOrCreate(['source' => $source], ['enabled' => $enabled]);
-
-        return back();
-    }
-
-    /**
-     * The sound of one source, and whether active listening reads it aloud.
-     */
-    public function updateSound(Request $request, AlertSource $source): RedirectResponse
-    {
-        abort_unless(in_array($source, ForMe::SOURCES, true), 404);
-
-        $data = $request->validate([
-            'sound' => ['required', 'in:'.implode(',', AlertSound::values())],
-            'read_aloud' => ['required', 'boolean'],
-        ]);
-
-        $request->user()->alertSettings()->updateOrCreate(
-            ['source' => $source],
-            ['sound' => $data['sound'], 'read_aloud' => $data['read_aloud']],
-        );
-
-        return back();
-    }
-
-    /**
-     * Mark a Gmail sender as important. Their mail becomes an aviso.
-     */
-    public function storeSender(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-            'name' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $request->user()->importantSenders()->updateOrCreate(
-            ['email' => strtolower($data['email'])],
-            ['name' => $data['name'] ?? null],
-        );
-
-        return back();
-    }
-
-    /**
-     * Stop treating a sender as important.
-     */
-    public function destroySender(Request $request, ImportantSender $sender): RedirectResponse
-    {
-        abort_unless($sender->user_id === $request->user()->id, 404);
-
-        $sender->delete();
 
         return back();
     }

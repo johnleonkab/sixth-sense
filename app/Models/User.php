@@ -102,16 +102,6 @@ class User extends Authenticatable
     }
 
     /**
-     * Gmail addresses whose mail is always an aviso.
-     *
-     * @return HasMany<ImportantSender, $this>
-     */
-    public function importantSenders(): HasMany
-    {
-        return $this->hasMany(ImportantSender::class);
-    }
-
-    /**
      * Whether the user wants proactive alerts from this source. Off until they switch it on.
      */
     public function wantsAlertsFrom(AlertSource $source): bool

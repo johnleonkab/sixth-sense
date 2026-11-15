@@ -1,6 +1,5 @@
 <?php
 
-use App\Alerts\AlertSource;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -15,33 +14,18 @@ use App\Models\Comms\CommsMetric;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
-use App\Models\InboxItem;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
-test('para mí lists the persons pending avisos and leaves another persons out', function () {
+test('home runs without a para mí board', function () {
     [$user] = boardPeople();
-    $other = User::factory()->create();
-    InboxItem::factory()->for($user)->create([
-        'source' => AlertSource::Slack,
-        'title' => 'Mensaje directo',
-        'why' => 'Mensaje directo de Marta.',
-        'read_at' => null,
-    ]);
-    InboxItem::factory()->for($other)->create([
-        'source' => AlertSource::Slack,
-        'title' => 'De otra persona',
-    ]);
 
     $this->actingAs($user)->get(route('home'))
+        ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('forMe.pending_count', 1)
-            ->where('forMe.pending_label', '1 pendiente')
-            ->where('forMe.items.0.title', 'Mensaje directo')
-            ->where('forMe.items.0.why', 'Mensaje directo de Marta.')
-            ->where('forMe.items.0.source', 'slack')
-            ->missing('forMe.items.1')
-            ->missing('intents'));
+            ->component('home')
+            ->missing('intents')
+            ->missing('forMe'));
 });
 
 test('closing and reopening an intent is a correction', function () {

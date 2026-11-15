@@ -10,21 +10,16 @@ import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
 type AlertSource = {
-    key: 'gmail' | 'slack' | 'calendar' | 'agenda' | 'jira' | 'questions' | 'notion';
+    key: 'gmail' | 'slack' | 'calendar' | 'agenda' | 'jira' | 'questions';
     name: string;
     description: string;
     enabled: boolean;
     /** Capability an account needs to be watched, e.g. "Leer el correo". */
     capability: string;
-    sound: string | null;
-    read_aloud: boolean;
-    senders: { id: number; email: string; name: string | null }[];
     accounts: { id: number; email: string | null; watched: boolean }[];
 };
 
-type SoundChoice = { key: string; label: string };
-
-function SourceCard({ source, sounds }: { source: AlertSource; sounds: SoundChoice[] }) {
+function SourceCard({ source }: { source: AlertSource }) {
     const watched = source.accounts.filter((account) => account.watched);
     const toggle = (enabled: boolean) => router.put(`/settings/alerts/${source.key}`, { enabled }, { preserveScroll: true });
 
@@ -79,99 +74,6 @@ function SourceCard({ source, sounds }: { source: AlertSource; sounds: SoundChoi
                             </p>
                         )}
                     </>
-                )}
-                {source.sound !== null && (
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <label className="flex items-center gap-2 text-[13px] text-muted">
-                            Sonido
-                            <select
-                                aria-label={`Sonido para ${source.name}`}
-                                value={source.sound}
-                                onChange={(event) =>
-                                    router.put(
-                                        `/settings/alerts/${source.key}/sound`,
-                                        { sound: event.target.value, read_aloud: source.read_aloud },
-                                        { preserveScroll: true },
-                                    )
-                                }
-                                className="rounded-lg border border-line bg-surface px-2 py-1 text-[13px] text-ink"
-                            >
-                                {sounds.map((sound) => (
-                                    <option key={sound.key} value={sound.key}>
-                                        {sound.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="flex items-center gap-2 text-[13px]">
-                            <input
-                                type="checkbox"
-                                checked={source.read_aloud}
-                                onChange={(event) =>
-                                    router.put(
-                                        `/settings/alerts/${source.key}/sound`,
-                                        { sound: source.sound, read_aloud: event.target.checked },
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            />
-                            Leer en voz alta
-                        </label>
-                    </div>
-                )}
-                {source.key === 'gmail' && (
-                    <div className="mt-4">
-                        <p className="mb-2 text-[13px] text-muted">Remitentes importantes</p>
-                        <form
-                            className="flex flex-wrap gap-2"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                const data = new FormData(event.currentTarget);
-                                router.post(
-                                    '/settings/alerts/gmail/senders',
-                                    { email: String(data.get('email') ?? ''), name: String(data.get('name') ?? '') },
-                                    { preserveScroll: true },
-                                );
-                                event.currentTarget.reset();
-                            }}
-                        >
-                            <input
-                                name="email"
-                                type="email"
-                                required
-                                placeholder="cliente@ejemplo.com"
-                                aria-label="Email del remitente"
-                                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px]"
-                            />
-                            <input
-                                name="name"
-                                type="text"
-                                placeholder="Nombre"
-                                aria-label="Nombre del remitente"
-                                className="w-36 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px]"
-                            />
-                            <button type="submit" className="rounded-lg bg-ink px-3 py-1.5 text-[13px] text-bg">
-                                Marcar
-                            </button>
-                        </form>
-                        <ul className="mt-2 flex flex-col gap-1">
-                            {source.senders.map((sender) => (
-                                <li key={sender.id} className="flex items-center justify-between gap-2 text-[13px]">
-                                    <span>
-                                        {sender.name ? `${sender.name} · ` : ''}
-                                        {sender.email}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.delete(`/settings/alerts/gmail/senders/${sender.id}`, { preserveScroll: true })}
-                                        className="text-muted hover:text-ink"
-                                    >
-                                        Quitar
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
                 )}
             </div>
         </section>
@@ -280,13 +182,11 @@ function SlackAutonomySettings({ board, pending }: { board: AutonomyBoard; pendi
 
 export default function Alerts({
     sources,
-    sounds,
     vapidPublicKey,
     slackAutonomy,
     autonomyAction,
 }: {
     sources: AlertSource[];
-    sounds: SoundChoice[];
     vapidPublicKey: string | null;
     slackAutonomy: AutonomyBoard;
     autonomyAction: ActionState | null;
@@ -300,7 +200,7 @@ export default function Alerts({
                 <DeviceAlerts vapidPublicKey={vapidPublicKey} />
                 <SlackAutonomySettings board={slackAutonomy} pending={autonomyAction} />
                 {sources.map((source) => (
-                    <SourceCard key={source.key} source={source} sounds={sounds} />
+                    <SourceCard key={source.key} source={source} />
                 ))}
             </div>
         </SettingsLayout>

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Whether a user wants proactive alerts from a source.
  */
-#[Fillable(['source', 'enabled', 'sound', 'read_aloud'])]
+#[Fillable(['source', 'enabled'])]
 class AlertSetting extends Model
 {
     /** @use HasFactory<AlertSettingFactory> */
@@ -28,7 +28,6 @@ class AlertSetting extends Model
         return [
             'source' => AlertSource::class,
             'enabled' => 'boolean',
-            'read_aloud' => 'boolean',
         ];
     }
 

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Avisos\ForMe;
 use App\Comms\Cutover\HomeFeed;
 use App\Comms\Cutover\OpenItem;
 use App\Jobs\WarmChats;
@@ -19,7 +18,7 @@ class HomeController extends Controller
      * assistant gets the chat workspaces ready, so the first names said in
      * the conversation are already known.
      */
-    public function __invoke(Request $request, HomeFeed $home, OpenItem $open, ForMe $forMe): Response|RedirectResponse
+    public function __invoke(Request $request, HomeFeed $home, OpenItem $open): Response|RedirectResponse
     {
         $user = $request->user();
         $alertId = $request->integer('alert');
@@ -55,7 +54,6 @@ class HomeController extends Controller
             'alerts' => $home->items($user),
             'openAlert' => $openAlert,
             'openComms' => $open->for($user),
-            'forMe' => $forMe->present($user, $request->string('source')->toString() ?: null),
         ]);
     }
 }
