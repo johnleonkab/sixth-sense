@@ -6,7 +6,7 @@ import { Button, buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
-type Tab = 'people' | 'areas' | 'known' | 'rules' | 'pending' | 'channels';
+type Tab = 'people' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent';
 
 type Origin = 'user' | 'correction' | 'observed' | 'inferred';
 
@@ -74,6 +74,19 @@ type Channel = {
     selected: boolean;
 };
 
+type UrgentRule = {
+    kind: 'person' | 'keyword' | 'channel' | 'person_weight';
+    ref: string;
+    sources: string[];
+    active: boolean;
+    label: string;
+};
+
+type KeywordPreview = {
+    count: number;
+    examples: { id: number; text: string }[];
+};
+
 type Inertia = {
     rate: number | null;
     sends: number;
@@ -97,6 +110,7 @@ type ContextProps = {
     pending: Fact[];
     inertia: Inertia;
     channels: Channel[];
+    urgent_rules: UrgentRule[];
 };
 
 const tabs: { value: Tab; label: string }[] = [
@@ -106,6 +120,7 @@ const tabs: { value: Tab; label: string }[] = [
     { value: 'rules', label: 'Reglas' },
     { value: 'pending', label: 'Pendiente de confirmar' },
     { value: 'channels', label: 'Canales de Slack' },
+    { value: 'urgent', label: 'Qué es urgente' },
 ];
 
 const originLabel: Record<Origin, string> = {
@@ -741,6 +756,185 @@ function ChannelsTab({ channels }: { channels: Channel[] }) {
     );
 }
 
+function saveUrgent(rule: { kind: string; ref: string; active: boolean; sources: string[] }) {
+    router.put('/settings/context/urgent', rule, { preserveScroll: true });
+}
+
+function UrgentRuleRow({ rule }: { rule: UrgentRule }) {
+    return (
+        <li className="flex min-h-11 flex-col gap-2 border-t border-line py-3 sm:flex-row sm:items-center">
+            <span className="min-w-0 flex-1 truncate text-[14px]">{rule.label}</span>
+            <span className="flex items-center gap-3">
+                <Switch checked={rule.active} onChange={(active) => saveUrgent({ kind: rule.kind, ref: rule.ref, active, sources: rule.sources })}>
+                    <span className="text-[13px] text-muted">Activo</span>
+                </Switch>
+                <Button variant="tertiary" size="small" destructive onClick={() => router.delete('/settings/context/urgent', { data: { kind: rule.kind, ref: rule.ref }, preserveScroll: true })}>
+                    Quitar
+                </Button>
+            </span>
+        </li>
+    );
+}
+
+function UrgentTab({ people, channels, rules }: { people: Person[]; channels: Channel[]; rules: UrgentRule[] }) {
+    const [personRef, setPersonRef] = useState('');
+    const [channelRef, setChannelRef] = useState('');
+    const [keyword, setKeyword] = useState('');
+    const [preview, setPreview] = useState<KeywordPreview | null>(null);
+    const takenPeople = new Set(rules.filter((rule) => rule.kind === 'person').map((rule) => rule.ref));
+    const takenChannels = new Set(rules.filter((rule) => rule.kind === 'channel').map((rule) => rule.ref));
+    const availablePeople = people.filter((person) => !takenPeople.has(person.ref));
+    const availableChannels = channels.filter((channel) => !takenChannels.has(`slack:${channel.id}`));
+    const keywords = rules.filter((rule) => rule.kind === 'keyword');
+    const personRules = rules.filter((rule) => rule.kind === 'person');
+    const channelRules = rules.filter((rule) => rule.kind === 'channel');
+    const weight = rules.find((rule) => rule.kind === 'person_weight');
+
+    useEffect(() => {
+        const word = keyword.trim();
+
+        if (word === '') {
+            setPreview(null);
+
+            return;
+        }
+
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            fetch(`/settings/context/urgent/preview?keyword=${encodeURIComponent(word)}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal,
+            })
+                .then((response) => (response.ok ? response.json() : null))
+                .then((body: KeywordPreview | null) => {
+                    if (body) {
+                        setPreview(body);
+                    }
+                })
+                .catch(() => undefined);
+        }, 300);
+
+        return () => {
+            window.clearTimeout(timer);
+            controller.abort();
+        };
+    }, [keyword]);
+
+    const addKeyword = (event: FormEvent) => {
+        event.preventDefault();
+        const word = keyword.trim();
+
+        if (word === '') {
+            return;
+        }
+
+        saveUrgent({ kind: 'keyword', ref: word, active: true, sources: [] });
+        setKeyword('');
+    };
+
+    return (
+        <div className="grid gap-4">
+            <Section id="context-urgent" title="Qué es urgente" description="Un mensaje que encaja aquí se trata al momento. El resto espera a que la conversación se calme.">
+                {weight ? (
+                    <ul>
+                        <UrgentRuleRow rule={weight} />
+                    </ul>
+                ) : (
+                    <p className="text-[13.5px] text-muted">La regla por defecto está quitada. Un mensaje directo ya no se adelanta solo por el peso de quien lo envía.</p>
+                )}
+            </Section>
+
+            <Section id="context-urgent-people" title="Personas" description="Lo que escriba esta persona se trata al momento.">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <select aria-label="Persona" value={personRef} onChange={(event) => setPersonRef(event.target.value)} className={`${fieldClass} min-h-11`}>
+                        <option value="">Elige a alguien</option>
+                        {availablePeople.map((person) => (
+                            <option key={person.ref} value={person.ref}>
+                                {person.name}
+                            </option>
+                        ))}
+                    </select>
+                    <Button variant="primary" className="min-h-11" disabled={personRef === ''} onClick={() => saveUrgent({ kind: 'person', ref: personRef, active: true, sources: [] })}>
+                        Añadir
+                    </Button>
+                </div>
+                {personRules.length === 0 ? (
+                    <p className="mt-3 text-[13.5px] text-muted">Nadie está marcado.</p>
+                ) : (
+                    <ul className="mt-2">
+                        {personRules.map((rule) => (
+                            <UrgentRuleRow key={rule.ref} rule={rule} />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+
+            <Section id="context-urgent-keywords" title="Palabras" description="Una palabra entera, sin distinguir mayúsculas ni acentos.">
+                <form onSubmit={addKeyword} className="flex flex-col gap-2 sm:flex-row">
+                    <input aria-label="Palabra" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="prepago" maxLength={80} className={`${fieldClass} min-h-11`} />
+                    <Button variant="primary" className="min-h-11" type="submit" disabled={keyword.trim() === ''}>
+                        Añadir
+                    </Button>
+                </form>
+                {preview && (
+                    <div className="mt-3 text-[13px] text-muted">
+                        <p>
+                            {preview.count === 0
+                                ? 'Ningún mensaje de los últimos 30 días contiene esa palabra.'
+                                : preview.count === 1
+                                  ? 'Encaja en 1 mensaje de los últimos 30 días.'
+                                  : `Encaja en ${preview.count} mensajes de los últimos 30 días.`}
+                        </p>
+                        {preview.examples.length > 0 && (
+                            <ul className="mt-2 grid gap-1">
+                                {preview.examples.map((example) => (
+                                    <li key={example.id} className="truncate text-ink/80">
+                                        {example.text}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
+                {keywords.length === 0 ? (
+                    <p className="mt-3 text-[13.5px] text-muted">No hay palabras.</p>
+                ) : (
+                    <ul className="mt-2">
+                        {keywords.map((rule) => (
+                            <UrgentRuleRow key={rule.ref} rule={rule} />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+
+            <Section id="context-urgent-channels" title="Canales" description="Todo lo que se diga en el canal, aunque no te mencionen.">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <select aria-label="Canal" value={channelRef} onChange={(event) => setChannelRef(event.target.value)} className={`${fieldClass} min-h-11`}>
+                        <option value="">Elige un canal</option>
+                        {availableChannels.map((channel) => (
+                            <option key={channel.id} value={`slack:${channel.id}`}>
+                                #{channel.name}
+                            </option>
+                        ))}
+                    </select>
+                    <Button variant="primary" className="min-h-11" disabled={channelRef === ''} onClick={() => saveUrgent({ kind: 'channel', ref: channelRef, active: true, sources: [] })}>
+                        Añadir
+                    </Button>
+                </div>
+                {channelRules.length === 0 ? (
+                    <p className="mt-3 text-[13.5px] text-muted">No hay canales marcados.</p>
+                ) : (
+                    <ul className="mt-2">
+                        {channelRules.map((rule) => (
+                            <UrgentRuleRow key={rule.ref} rule={rule} />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+        </div>
+    );
+}
+
 export default function Context(props: ContextProps) {
     const { tab, context, run_at: runAt } = props;
     const building = context.status === 'running';
@@ -780,6 +974,7 @@ export default function Context(props: ContextProps) {
             {tab === 'rules' && <RulesTab rules={props.rules} inertia={props.inertia} />}
             {tab === 'pending' && <PendingTab pending={props.pending} />}
             {tab === 'channels' && <ChannelsTab channels={props.channels} />}
+            {tab === 'urgent' && <UrgentTab people={props.people} channels={props.channels} rules={props.urgent_rules} />}
         </SettingsLayout>
     );
 }

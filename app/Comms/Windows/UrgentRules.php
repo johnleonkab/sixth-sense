@@ -10,6 +10,7 @@ use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsUrgentRule;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -20,6 +21,47 @@ use Illuminate\Support\Str;
 class UrgentRules
 {
     public function __construct(private EventLog $log, private PersonRef $people) {}
+
+    /**
+     * Every rule the user has, including inactive ones. A user with none
+     * yet receives the default before the list is returned.
+     *
+     * @return Collection<int, CommsUrgentRule>
+     */
+    public function all(User $user): Collection
+    {
+        $this->seed($user);
+
+        return CommsUrgentRule::query()->whereBelongsTo($user)->orderBy('id')->get();
+    }
+
+    /**
+     * How many messages of the last 30 days contain the keyword, plus three
+     * recent examples, using the same whole-word match as a saved rule.
+     *
+     * @return array{count: int, examples: list<array{id: int, text: string, at: string}>}
+     */
+    public function keywordPreview(User $user, string $keyword): array
+    {
+        $matched = CommsMessage::query()
+            ->whereBelongsTo($user)
+            ->where('occurred_at', '>=', now()->subDays(30))
+            ->whereNull('deleted_at')
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (CommsMessage $message): bool => $this->keyword($message->text, $keyword))
+            ->values();
+
+        return [
+            'count' => $matched->count(),
+            'examples' => $matched->take(3)->map(fn (CommsMessage $message): array => [
+                'id' => $message->id,
+                'text' => $message->text,
+                'at' => $message->occurred_at->toIso8601String(),
+            ])->all(),
+        ];
+    }
 
     public function matches(User $user, CommsMessage $message): bool
     {
