@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/intents/{intent}/done', [SurfaceController::class, 'done'])->whereNumber('intent')->name('comms.intents.done');
     Route::post('comms/intents/{intent}/still-open', [SurfaceController::class, 'stillOpen'])->whereNumber('intent')->name('comms.intents.still-open');
     Route::post('comms/intents/{intent}/importance', [SurfaceController::class, 'importance'])->whereNumber('intent')->name('comms.intents.importance');
+    Route::post('comms/intents/{intent}/confirmations', [SurfaceController::class, 'confirmation'])->whereNumber('intent')->name('comms.intents.confirmations');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('people', '/settings/context?tab=people');

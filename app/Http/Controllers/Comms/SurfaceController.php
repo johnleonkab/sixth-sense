@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Comms;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
+use App\Comms\Surface\Confirmations;
 use App\Comms\Surface\HomeBoard;
 use App\Comms\Surface\IntentCard;
 use App\Http\Controllers\Controller;
@@ -111,6 +112,26 @@ class SurfaceController extends Controller
     public function stillOpen(Request $request, EventLog $log, CommsIntent $intent): JsonResponse
     {
         return $this->intentAction($request, $log, $intent, 'still_open');
+    }
+
+    public function confirmation(Request $request, Confirmations $confirmations, CommsIntent $intent): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'kind' => ['required', 'in:approve,disambiguate,outcome'],
+            'answer' => ['required', 'string'],
+            'proposal_ids' => ['sometimes', 'array'],
+            'proposal_ids.*' => ['integer'],
+            'text' => ['required_if:answer,edit', 'string'],
+            'link_id' => ['sometimes', 'nullable', 'integer'],
+            'field' => ['sometimes', 'nullable', 'string'],
+        ]);
+        $confirmations->answer($request->user(), $intent, $data['kind'], $data['answer'], $data);
+
+        return response()->json([
+            'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
+        ]);
     }
 
     public function importance(Request $request, EventLog $log, CommsIntent $intent): JsonResponse

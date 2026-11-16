@@ -157,6 +157,8 @@ class IntentStateMachine
             'importance' => $this->overrideImportance($intent, $event, (int) ($data['importance'] ?? 0)),
             'still_open' => $this->reopen($intent, $event),
             'confirm_link' => $this->confirmLink($event->user, $intent, $data),
+            'confirm_field' => $this->confirmField($intent, $data),
+            'somewhere_else' => $this->somewhereElse($event->user, $intent, $data),
             'rematch' => $this->rematch($event->user, $intent, $event, $data),
             'relink' => $this->relink($event->user, $intent, $event, $data),
             'restore_link' => $this->restoreLink($event->user, $data),
@@ -646,6 +648,39 @@ class IntentStateMachine
     /**
      * @param  array<string, mixed>  $data
      */
+    private function confirmField(CommsIntent $intent, array $data): void
+    {
+        $field = is_string($data['field'] ?? null) ? $data['field'] : '';
+        $fields = is_array($intent->unclear_fields) ? $intent->unclear_fields : [];
+        $left = array_values(array_filter(
+            $fields,
+            fn (mixed $item): bool => $item !== $field,
+        ));
+        $intent->unclear_fields = $left === [] ? null : $left;
+        $intent->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function somewhereElse(User $user, CommsIntent $intent, array $data): void
+    {
+        $id = $data['link_id'] ?? null;
+
+        if (! is_int($id) && ! (is_string($id) && ctype_digit($id))) {
+            return;
+        }
+
+        CommsConversationLink::query()
+            ->whereBelongsTo($user)
+            ->where('intent_id', $intent->id)
+            ->whereKey((int) $id)
+            ->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     private function relink(User $user, CommsIntent $from, CommsEvent $event, array $data): void
     {
         $targetKey = (string) ($data['target_key'] ?? '');
@@ -738,6 +773,7 @@ class IntentStateMachine
         $intent->settle_reason = null;
         $intent->settled_at = null;
         $intent->settled_event_id = null;
+        $intent->acknowledged_at = null;
         $intent->last_change_event_id = $event->id;
         $intent->last_change_summary = 'Sigue abierto';
         $intent->save();

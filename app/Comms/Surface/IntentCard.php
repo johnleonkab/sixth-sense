@@ -38,6 +38,7 @@ class IntentCard
     public function __construct(
         private EventLog $log,
         private PlanChecklist $plan,
+        private Confirmations $confirmations,
     ) {}
 
     /**
@@ -159,6 +160,7 @@ class IntentCard
                 'unclear' => $unclear,
                 'changed_since' => $changedSince,
                 'plan' => $this->plan->for($intent),
+                'confirmations' => $this->confirmations->for($intent),
                 'actions' => $pending->map(fn (CommsProposal $proposal): array => [
                     'id' => $proposal->id,
                     'action' => $proposal->action_class->value,
@@ -202,6 +204,8 @@ class IntentCard
             dispatch: false,
         );
         $this->apply($event);
+        $event->processed_at = $seen;
+        $event->save();
 
         return $card;
     }
