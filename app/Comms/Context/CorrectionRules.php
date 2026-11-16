@@ -24,6 +24,12 @@ class CorrectionRules
             return;
         }
 
+        if (($data['action'] ?? '') === 'change_list') {
+            $this->rememberChange($event);
+
+            return;
+        }
+
         $intent = CommsIntent::query()->whereBelongsTo($event->user)->where('key', (string) ($data['intent_key'] ?? ''))->with('participants.person')->first();
         $requester = $intent?->participants->firstWhere('role', 'requester')?->person;
 
@@ -59,6 +65,54 @@ class CorrectionRules
             revision: "corrected:{$event->id}",
         );
         $this->remember($event, $intent, (string) ($data['action'] ?? 'correction'), $sentence);
+    }
+
+    private function rememberChange(CommsEvent $event): void
+    {
+        $data = $event->normalized ?? [];
+        $answer = (string) ($data['answer'] ?? '');
+
+        if (! in_array($answer, ['igual', 'no_es_igual', 'deshacer'], true)) {
+            return;
+        }
+
+        if ($this->alreadyRemembered($event)) {
+            return;
+        }
+
+        $intent = CommsIntent::query()
+            ->whereBelongsTo($event->user)
+            ->where('key', (string) ($data['intent_key'] ?? ''))
+            ->with('participants')
+            ->first();
+        $people = $intent === null ? [] : $intent->participants
+            ->pluck('person_id')
+            ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+            ->map(fn (mixed $id): string => 'person:'.(int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $topic = $intent?->topic_subject;
+
+        CommsGoldenLabel::query()->create([
+            'user_id' => $event->user_id,
+            'kind' => 'correction',
+            'label' => $answer,
+            'expected' => ['text' => (string) ($data['quote'] ?? '')],
+            'evidence_event_ids' => [$event->id],
+            'people' => $people,
+            'topics' => is_string($topic) && $topic !== '' ? [$topic] : [],
+            'source_event_id' => $event->id,
+        ]);
+    }
+
+    private function alreadyRemembered(CommsEvent $event): bool
+    {
+        return CommsGoldenLabel::query()
+            ->where('user_id', $event->user_id)
+            ->where('kind', 'correction')
+            ->where('source_event_id', $event->id)
+            ->exists();
     }
 
     private function remember(CommsEvent $event, CommsIntent $intent, string $action, string $sentence): void

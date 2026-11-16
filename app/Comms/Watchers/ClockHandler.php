@@ -6,6 +6,7 @@ use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventType;
 use App\Comms\Gate\ProposalExpiry;
 use App\Comms\Intents\ImportanceCalculator;
+use App\Comms\Nightly\ChangeList;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\Briefing;
 use App\Models\Comms\CommsEvent;
@@ -30,6 +31,7 @@ class ClockHandler
         private ProposalExpiry $expiry,
         private Briefing $briefing,
         private ContextProjector $context,
+        private ChangeList $changes,
     ) {}
 
     public function apply(CommsEvent $event): void
@@ -137,6 +139,8 @@ class ClockHandler
         if ($event->user === null) {
             return;
         }
+
+        $this->changes->publish($event->user, CarbonImmutable::parse($event->occurred_at));
 
         CommsNotification::query()
             ->whereBelongsTo($event->user)
