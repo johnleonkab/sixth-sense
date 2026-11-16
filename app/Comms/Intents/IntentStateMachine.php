@@ -162,6 +162,39 @@ class IntentStateMachine
     }
 
     /**
+     * Null when the operation is a legal transition. Otherwise the rejection
+     * reason judge() would record. Quote, people and deadline are not checked
+     * here.
+     *
+     * @param  array<string, mixed>  $operation
+     */
+    public function canApply(User $user, CommsMessage $message, array $operation): ?string
+    {
+        $op = (string) ($operation['op'] ?? '');
+
+        if (in_array($op, ['open', 'signal', 'noise'], true)) {
+            return null;
+        }
+
+        $result = [
+            'op' => $op,
+            'intent_key' => isset($operation['intent_id']) ? (string) $operation['intent_id'] : null,
+            'settle_reason' => $this->settleReason($operation),
+            'status' => 'rejected',
+            'reason' => 'unknown',
+        ];
+        $judged = match ($op) {
+            'attach' => $this->judgeExisting($user, $result, null),
+            'update', 'acknowledge' => $this->judgeExisting($user, $result, 'open'),
+            'settle' => $this->judgeSettle($user, $message, $result),
+            'reopen' => $this->judgeReopen($user, $message, $result),
+            default => $result,
+        };
+
+        return ($judged['status'] ?? '') === 'accepted' ? null : (string) ($judged['reason'] ?? 'unknown');
+    }
+
+    /**
      * @param  array<string, mixed>  $operation
      * @return array<string, mixed>
      */
@@ -261,7 +294,7 @@ class IntentStateMachine
      */
     private function judgeExisting(User $user, array $result, ?string $state): array
     {
-        $intent = CommsIntent::query()->whereBelongsTo($user)->where('key', (string) $result['intent_key'])->first();
+        $intent = $this->findIntent($user, $result['intent_key'] ?? null);
 
         if ($intent === null) {
             return [...$result, 'reason' => 'intent'];
@@ -284,7 +317,7 @@ class IntentStateMachine
             return [...$result, 'reason' => 'acknowledgement'];
         }
 
-        $intent = CommsIntent::query()->whereBelongsTo($user)->where('key', (string) $result['intent_key'])->first();
+        $intent = $this->findIntent($user, $result['intent_key'] ?? null);
 
         if ($intent === null) {
             return [...$result, 'reason' => 'intent'];
@@ -321,7 +354,7 @@ class IntentStateMachine
      */
     private function judgeReopen(User $user, CommsMessage $message, array $result): array
     {
-        $intent = CommsIntent::query()->whereBelongsTo($user)->where('key', (string) $result['intent_key'])->first();
+        $intent = $this->findIntent($user, $result['intent_key'] ?? null);
 
         if ($intent === null || $intent->state !== 'settled' || $intent->settled_at === null) {
             return [...$result, 'reason' => 'state'];
@@ -734,6 +767,31 @@ class IntentStateMachine
         $current->uncertain = false;
         $current->state_event_id = $event->id;
         $current->save();
+    }
+
+    private function findIntent(User $user, mixed $key): ?CommsIntent
+    {
+        if (! is_string($key) && ! is_int($key)) {
+            return null;
+        }
+
+        $key = (string) $key;
+
+        if ($key === '') {
+            return null;
+        }
+
+        return CommsIntent::query()
+            ->whereBelongsTo($user)
+            ->where(function ($query) use ($key): void {
+                $query->where('key', $key);
+
+                if (ctype_digit($key)) {
+                    $query->orWhere('id', (int) $key);
+                }
+            })
+            ->orderBy('id')
+            ->first();
     }
 
     private function quoteInMessage(string $message, string $quote): bool
