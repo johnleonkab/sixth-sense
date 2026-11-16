@@ -3,6 +3,7 @@
 namespace App\Comms\Events;
 
 use App\Comms\Intents\IntentReplay;
+use App\Comms\Windows\SettleBuffer;
 use App\Models\Comms\CommsEvent;
 use App\Models\User;
 use DateTimeInterface;
@@ -17,6 +18,7 @@ class Replay
         private Projections $projections,
         private MessageProjector $projector,
         private IntentReplay $intents,
+        private SettleBuffer $buffer,
     ) {}
 
     public function run(User $user, ?DateTimeInterface $from = null, ?DateTimeInterface $to = null, bool $rejudge = false): int
@@ -32,6 +34,7 @@ class Replay
 
         foreach ($events as $event) {
             $this->projector->apply($event, audit: false);
+            $this->buffer->replay($event);
             $this->intents->apply($event);
         }
 

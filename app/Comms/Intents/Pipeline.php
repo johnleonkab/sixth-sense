@@ -19,6 +19,7 @@ use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
+use App\Comms\Windows\SettleBuffer;
 use App\Events\IntentsUpdated;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
@@ -52,12 +53,14 @@ class Pipeline
         private ContextProjector $context,
         private CorrectionRules $corrections,
         private ContextRenderer $renderer,
+        private SettleBuffer $buffer,
     ) {}
 
     public function advance(CommsEvent $event): void
     {
         match ($event->type) {
             EventType::MessageReceived, EventType::MessageSent => $this->onMessage($event),
+            EventType::MessageEdited => $this->onEdit($event),
             EventType::UserConfigured => $this->archive->apply($event),
             EventType::ContextCorrected, EventType::ContextObserved, EventType::ContextInferred => $this->context->apply($event),
             EventType::UserCorrected => $this->correct($event),
@@ -66,6 +69,21 @@ class Pipeline
             EventType::UserAnswered => $this->onAnswer($event),
             default => null,
         };
+    }
+
+    private function onEdit(CommsEvent $event): void
+    {
+        if (! config('comms.linking.v2') || $event->user === null) {
+            return;
+        }
+
+        $message = CommsMessage::query()->whereBelongsTo($event->user)->where('event_id', $event->id)->first();
+
+        if ($message === null) {
+            return;
+        }
+
+        $this->buffer->add($message, edited: true, at: $event->occurred_at);
     }
 
     private function onMessage(CommsEvent $event): void
@@ -81,6 +99,11 @@ class Pipeline
         }
 
         $message->load('author.identities');
+
+        if (config('comms.linking.v2')) {
+            $this->buffer->add($message);
+        }
+
         $triage = $this->rules->classify($event->user, $message, $event) ?? $this->askTriage($event, $message);
 
         if ($triage === null) {

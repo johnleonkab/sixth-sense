@@ -69,6 +69,8 @@ return [
 
     'settle' => ['quiet_minutes' => 5, 'quiet_minutes_direct' => 2, 'max_minutes' => 20],
 
+    'edit' => ['reprocess_hours' => 24],
+
     'window' => ['lookback_messages' => 30, 'lookback_hours' => 48],
 
     'agreement' => ['what_similarity' => 0.85],
