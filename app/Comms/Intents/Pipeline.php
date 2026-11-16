@@ -10,6 +10,8 @@ use App\Comms\Context\ContextRequest;
 use App\Comms\Context\CorrectionRules;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
+use App\Comms\Jobs\Consuming;
+use App\Comms\Linking\PipelineV2;
 use App\Comms\Models\ModelAnswerKind;
 use App\Comms\Models\ModelRouter;
 use App\Comms\Notify\Notifier;
@@ -56,6 +58,7 @@ class Pipeline
         private ContextRenderer $renderer,
         private SettleBuffer $buffer,
         private PersonMerge $merges,
+        private PipelineV2 $v2,
     ) {}
 
     public function advance(CommsEvent $event): void
@@ -69,6 +72,7 @@ class Pipeline
             EventType::ClockDue, EventType::ClockStale, EventType::ClockDigest, EventType::ClockLookahead => $this->clock->apply($event),
             EventType::SourceChanged => $this->onSource($event),
             EventType::UserAnswered => $this->onAnswer($event),
+            EventType::WindowSettled => $this->onWindow($event),
             default => null,
         };
     }
@@ -103,7 +107,17 @@ class Pipeline
         $message->load('author.identities');
 
         if (config('comms.linking.v2')) {
-            $this->buffer->add($message);
+            $window = $this->buffer->add($message);
+
+            if (app(Consuming::class)->active && $window?->state === 'settled' && $window->settled_event_id !== null) {
+                $settled = CommsEvent::query()->find($window->settled_event_id);
+
+                if ($settled instanceof CommsEvent) {
+                    $this->v2->process($settled);
+                }
+            }
+
+            return;
         }
 
         $triage = $this->rules->classify($event->user, $message, $event) ?? $this->askTriage($event, $message);
@@ -188,6 +202,15 @@ class Pipeline
         if (collect($results)->contains(fn (array $result): bool => ($result['status'] ?? '') === 'accepted')) {
             IntentsUpdated::dispatch($event->user);
         }
+    }
+
+    private function onWindow(CommsEvent $event): void
+    {
+        if (! config('comms.linking.v2') || $event->user === null) {
+            return;
+        }
+
+        $this->v2->process($event);
     }
 
     private function correct(CommsEvent $event): void

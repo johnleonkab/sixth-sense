@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'message_id', 'intent_id', 'owned_area_id', 'summary', 'importance', 'shown_at'])]
+#[Fillable(['user_id', 'message_id', 'intent_id', 'owned_area_id', 'topic_subject', 'summary', 'importance', 'shown_at'])]
 class CommsSignal extends Model
 {
     /** @use HasFactory<CommsSignalFactory> */

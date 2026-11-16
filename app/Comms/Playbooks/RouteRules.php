@@ -18,6 +18,10 @@ class RouteRules
      */
     public function keys(User $user, CommsIntent $intent, CommsMessage $message): array
     {
+        if ($intent->possible_ask) {
+            return [];
+        }
+
         $keys = [];
         $kind = $intent->flags['kind'] ?? null;
 

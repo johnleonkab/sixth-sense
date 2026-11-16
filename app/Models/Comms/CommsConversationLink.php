@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'intent_id', 'message_id', 'operation', 'confidence', 'uncertain', 'state_event_id'])]
+#[Fillable(['user_id', 'intent_id', 'message_id', 'segment_id', 'operation', 'confidence', 'uncertain', 'alternative', 'state_event_id', 'link_event_id'])]
 class CommsConversationLink extends Model
 {
     /** @use HasFactory<CommsConversationLinkFactory> */
@@ -23,6 +23,7 @@ class CommsConversationLink extends Model
         return [
             'confidence' => 'float',
             'uncertain' => 'boolean',
+            'alternative' => 'array',
         ];
     }
 

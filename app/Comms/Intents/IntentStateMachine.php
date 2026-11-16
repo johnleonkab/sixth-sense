@@ -452,11 +452,16 @@ class IntentStateMachine
             ['user_id' => $user->id, 'key' => (string) $result['intent_key']],
             [
                 'what' => (string) $result['what'],
+                'kind' => is_string($result['kind'] ?? null) ? $result['kind'] : null,
                 'state' => 'open',
                 'settle_reason' => null,
                 'deadline' => $result['deadline'] ?? null,
                 'deadline_text' => $result['deadline_text'] ?? null,
                 'expects' => $result['expects'] ?? null,
+                'steps' => is_array($result['steps'] ?? null) && $result['steps'] !== [] ? $result['steps'] : null,
+                'unclear_fields' => is_array($result['unclear_fields'] ?? null) && $result['unclear_fields'] !== [] ? $result['unclear_fields'] : null,
+                'possible_ask' => (bool) ($result['possible_ask'] ?? false),
+                'topic_subject' => is_string($result['topic_subject'] ?? null) && $result['topic_subject'] !== '' ? $result['topic_subject'] : null,
                 'flags' => $result['flags'] ?? [],
                 'opened_event_id' => $message->event_id,
                 'last_change_summary' => mb_substr((string) ($result['quote'] ?? $result['what']), 0, 280),
@@ -482,7 +487,7 @@ class IntentStateMachine
      */
     private function touch(User $user, CommsMessage $message, array $result, ?CommsEvent $stateEvent): ?CommsIntent
     {
-        $intent = CommsIntent::query()->whereBelongsTo($user)->where('key', (string) ($result['intent_key'] ?? ''))->first();
+        $intent = $this->findIntent($user, $result['intent_key'] ?? null);
 
         if ($intent === null) {
             return null;
@@ -534,14 +539,13 @@ class IntentStateMachine
      */
     private function signal(User $user, CommsMessage $message, array $result): ?CommsIntent
     {
-        $intent = filled($result['intent_key'] ?? null)
-            ? CommsIntent::query()->whereBelongsTo($user)->where('key', (string) $result['intent_key'])->first()
-            : null;
+        $intent = $this->findIntent($user, $result['intent_key'] ?? null);
 
         CommsSignal::query()->create([
             'user_id' => $user->id,
             'message_id' => $message->id,
             'intent_id' => $intent?->id,
+            'topic_subject' => is_string($result['topic_subject'] ?? null) && $result['topic_subject'] !== '' ? $result['topic_subject'] : null,
             'summary' => (string) ($result['summary'] ?? $result['quote'] ?? ''),
             'importance' => (int) ($result['importance'] ?? 0),
         ]);
@@ -590,7 +594,10 @@ class IntentStateMachine
                 'operation' => $result['op'],
                 'confidence' => (float) ($result['confidence'] ?? 0),
                 'uncertain' => (bool) ($result['uncertain'] ?? false),
+                'segment_id' => $result['segment_id'] ?? null,
+                'alternative' => is_array($result['alternative'] ?? null) ? $result['alternative'] : null,
                 'state_event_id' => $stateEvent?->id,
+                'link_event_id' => $result['link_event_id'] ?? null,
             ],
         );
     }

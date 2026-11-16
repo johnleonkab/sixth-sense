@@ -41,6 +41,14 @@ class PersonRef
             return null;
         }
 
+        if ($source === 'person' && ctype_digit($externalId)) {
+            $person = CommsPerson::query()->whereBelongsTo($user)->whereKey((int) $externalId)->first();
+
+            if ($person instanceof CommsPerson) {
+                return $person;
+            }
+        }
+
         return CommsIdentity::query()
             ->whereBelongsTo($user)
             ->where('source', $source)
