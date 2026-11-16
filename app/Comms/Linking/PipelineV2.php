@@ -9,6 +9,7 @@ use App\Comms\Intents\TriageResult;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Surface\SurfaceUpdates;
+use App\Comms\Topics\DossierWriter;
 use App\Comms\Watchers\IntentWatcher;
 use App\Events\IntentsUpdated;
 use App\Models\Comms\CommsConversationLink;
@@ -39,6 +40,7 @@ class PipelineV2
         private IntentWatcher $watchers,
         private Notifier $notifier,
         private PlaybookRunner $playbooks,
+        private DossierWriter $dossiers,
     ) {}
 
     public function process(CommsEvent $event): void
@@ -50,8 +52,32 @@ class PipelineV2
             return;
         }
 
+        /** @var array<string, array{segments: list<CommsSegment>, applied: list<array<string, mixed>>, intent_ids: list<int>}> $touched */
+        $touched = [];
+
         foreach ($this->segmenter->run($window) as $segment) {
-            $this->apply($user, $segment);
+            $bundle = $this->apply($user, $segment);
+
+            if ($bundle === null) {
+                continue;
+            }
+
+            $topic = $bundle['topic'];
+
+            if (! isset($touched[$topic])) {
+                $touched[$topic] = ['segments' => [], 'applied' => [], 'intent_ids' => []];
+            }
+
+            $touched[$topic]['segments'][] = $bundle['segment'];
+            $touched[$topic]['applied'] = [...$touched[$topic]['applied'], ...$bundle['applied']];
+            $touched[$topic]['intent_ids'] = array_values(array_unique([
+                ...$touched[$topic]['intent_ids'],
+                ...$bundle['intent_ids'],
+            ]));
+        }
+
+        foreach ($touched as $topic => $bundle) {
+            $this->dossiers->write($user, (string) $topic, $bundle['segments'], $bundle['applied'], $bundle['intent_ids']);
         }
     }
 
@@ -66,12 +92,15 @@ class PipelineV2
         return CommsWindow::query()->whereBelongsTo($user)->find((int) $id);
     }
 
-    private function apply(User $user, CommsSegment $segment): void
+    /**
+     * @return array{topic: string, segment: CommsSegment, applied: list<array<string, mixed>>, intent_ids: list<int>}|null
+     */
+    private function apply(User $user, CommsSegment $segment): ?array
     {
         $outcome = $this->links->run($segment);
 
         if ($outcome->isNone()) {
-            return;
+            return null;
         }
 
         $reviews = $this->critic->run(
@@ -123,22 +152,37 @@ class PipelineV2
 
         $accepted = false;
         $changed = [];
+        $applied = [];
 
         foreach ($groups as $group) {
             $committed = $this->commit($user, $segment, $outcome, $group, $linkEventId === null ? null : (int) $linkEventId);
             $accepted = $accepted || $committed['accepted'];
             $changed = array_merge($changed, $committed['intent_ids']);
+            $applied = array_merge($applied, $committed['applied']);
         }
 
         if ($accepted) {
             IntentsUpdated::dispatch($user);
             SurfaceUpdates::broadcast($user, ...$changed);
         }
+
+        $topic = $outcome->topicSubject;
+
+        if (! $accepted || ! is_string($topic) || $topic === '') {
+            return null;
+        }
+
+        return [
+            'topic' => $topic,
+            'segment' => $segment,
+            'applied' => $applied,
+            'intent_ids' => $changed,
+        ];
     }
 
     /**
      * @param  array{message: CommsMessage, items: list<array{review: CriticReview, route: RouteDecision, prepared: array<string, mixed>}>}  $group
-     * @return array{accepted: bool, intent_ids: list<int>}
+     * @return array{accepted: bool, intent_ids: list<int>, applied: list<array<string, mixed>>}
      */
     private function commit(User $user, CommsSegment $segment, LinkOutcome $outcome, array $group, ?int $linkEventId): array
     {
@@ -184,7 +228,7 @@ class PipelineV2
         }
 
         if ($results === []) {
-            return ['accepted' => false, 'intent_ids' => []];
+            return ['accepted' => false, 'intent_ids' => [], 'applied' => []];
         }
 
         $cause = CommsEvent::query()->find($message->event_id);
@@ -235,7 +279,34 @@ class PipelineV2
             $this->playbooks->afterApplied($user, $applied);
         }
 
-        return ['accepted' => $accepted, 'intent_ids' => $ids];
+        return ['accepted' => $accepted, 'intent_ids' => $ids, 'applied' => $this->lines($results)];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $results
+     * @return list<array<string, mixed>>
+     */
+    private function lines(array $results): array
+    {
+        $lines = [];
+
+        foreach ($results as $result) {
+            if (($result['status'] ?? '') !== 'accepted') {
+                continue;
+            }
+
+            $line = ['op' => is_string($result['op'] ?? null) && $result['op'] !== '' ? $result['op'] : 'update'];
+
+            foreach (['what', 'summary', 'deadline'] as $field) {
+                if (is_string($result[$field] ?? null) && $result[$field] !== '') {
+                    $line[$field] = $result[$field];
+                }
+            }
+
+            $lines[] = $line;
+        }
+
+        return $lines;
     }
 
     /**
