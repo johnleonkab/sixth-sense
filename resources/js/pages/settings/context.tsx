@@ -6,7 +6,7 @@ import { Button, buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
-type Tab = 'people' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent';
+type Tab = 'people' | 'topics' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent';
 
 type Origin = 'user' | 'correction' | 'observed' | 'inferred';
 
@@ -101,12 +101,26 @@ type MergeProposal = {
     into: string;
 };
 
+type TopicNickname = { id: number; alias: string };
+
+type Topic = {
+    subject: string;
+    name: string;
+    summary: string;
+    state: string;
+    people: string[];
+    channels: string[];
+    nicknames: TopicNickname[];
+    proposed: boolean;
+};
+
 type ContextProps = {
     tab: Tab;
     context: WorkContext;
     run_at: string;
     knowledge: KnowledgeSource[];
     people: Person[];
+    topics: Topic[];
     merge_proposals: MergeProposal[];
     areas: Area[];
     preference: Preference;
@@ -124,6 +138,7 @@ type ContextProps = {
 
 const tabs: { value: Tab; label: string }[] = [
     { value: 'people', label: 'Personas' },
+    { value: 'topics', label: 'Temas' },
     { value: 'areas', label: 'Áreas y horario' },
     { value: 'known', label: 'Lo que sé' },
     { value: 'rules', label: 'Reglas' },
@@ -718,6 +733,149 @@ function PendingTab({ pending }: Pick<ContextProps, 'pending'>) {
     );
 }
 
+function TopicRow({ topic, others }: { topic: Topic; others: Topic[] }) {
+    const [name, setName] = useState(topic.name);
+    const [alias, setAlias] = useState('');
+    const [into, setInto] = useState('');
+
+    return (
+        <li className="grid gap-3 border-b border-line py-4 last:border-b-0">
+            <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[15px] font-medium tracking-[-0.01em]">{topic.name}</h3>
+                {topic.proposed && <span className="rounded-full bg-soft px-2 py-[2px] text-[11px] font-medium text-ink/80">Propuesto</span>}
+            </div>
+            {topic.summary !== '' && <p className="max-w-[560px] text-[13.5px] leading-[1.5]">{topic.summary}</p>}
+            <dl className="grid gap-1 text-[13px] text-muted">
+                {topic.state !== '' && (
+                    <div>
+                        <dt className="inline">Estado: </dt>
+                        <dd className="inline text-ink">{topic.state}</dd>
+                    </div>
+                )}
+                {topic.people.length > 0 && (
+                    <div>
+                        <dt className="inline">Personas: </dt>
+                        <dd className="inline text-ink">{topic.people.join(', ')}</dd>
+                    </div>
+                )}
+                {topic.channels.length > 0 && (
+                    <div>
+                        <dt className="inline">Canales: </dt>
+                        <dd className="inline text-ink">{topic.channels.join(', ')}</dd>
+                    </div>
+                )}
+            </dl>
+            <div>
+                <p className="text-[12px] text-muted">Apodos</p>
+                {topic.nicknames.length === 0 ? (
+                    <p className="mt-1 text-[13px] text-muted">Ninguno todavía.</p>
+                ) : (
+                    <ul className="mt-1 flex flex-wrap gap-1.5">
+                        {topic.nicknames.map((nickname) => (
+                            <li key={nickname.id}>
+                                <button
+                                    type="button"
+                                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-soft px-2.5 text-[12.5px] text-ink"
+                                    onClick={() =>
+                                        router.delete('/settings/context/topics/nicknames', {
+                                            data: { subject: topic.subject, fact: nickname.id },
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                >
+                                    {nickname.alias}
+                                    <span className="text-muted">Quitar</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <form
+                    className="mt-2 flex flex-col gap-2 sm:flex-row"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const next = alias.trim();
+
+                        if (next === '') {
+                            return;
+                        }
+
+                        router.post('/settings/context/topics/nicknames', { subject: topic.subject, alias: next }, { preserveScroll: true, onSuccess: () => setAlias('') });
+                    }}
+                >
+                    <input aria-label={`Apodo de ${topic.name}`} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} placeholder="Otro nombre" className={`${fieldClass} min-h-11 sm:max-w-xs`} />
+                    <Button type="submit" variant="secondary" disabled={alias.trim() === ''}>
+                        Añadir
+                    </Button>
+                </form>
+            </div>
+            <form
+                className="flex flex-col gap-2 sm:flex-row"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    const next = name.trim();
+
+                    if (next === '') {
+                        return;
+                    }
+
+                    router.put('/settings/context/topics', { subject: topic.subject, name: next }, { preserveScroll: true });
+                }}
+            >
+                <input aria-label={`Nombre de ${topic.name}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} className={`${fieldClass} min-h-11 sm:max-w-sm`} />
+                <Button type="submit" variant="secondary" disabled={name.trim() === '' || name.trim() === topic.name}>
+                    Renombrar
+                </Button>
+            </form>
+            {others.length > 0 && (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <select aria-label={`Unir ${topic.name} con`} value={into} onChange={(event) => setInto(event.target.value)} className={`${fieldClass} min-h-11 sm:max-w-sm`}>
+                        <option value="">Unirlo a…</option>
+                        {others.map((other) => (
+                            <option key={other.subject} value={other.subject}>
+                                {other.name}
+                            </option>
+                        ))}
+                    </select>
+                    <Button
+                        variant="secondary"
+                        disabled={into === ''}
+                        onClick={() => router.post('/settings/context/topics/merge', { from: topic.subject, into }, { preserveScroll: true })}
+                    >
+                        Unir
+                    </Button>
+                </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+                {topic.proposed && (
+                    <Button variant="primary" onClick={() => router.post('/settings/context/topics/confirm', { subject: topic.subject }, { preserveScroll: true })}>
+                        Confirmar
+                    </Button>
+                )}
+                <Button variant="tertiary" destructive onClick={() => router.delete('/settings/context/topics', { data: { subject: topic.subject }, preserveScroll: true })}>
+                    Descartar
+                </Button>
+            </div>
+        </li>
+    );
+}
+
+function TopicsTab({ topics }: { topics: Topic[] }) {
+    return (
+        <Section id="context-topics" title="Temas" description="Los asuntos que vuelven. Confirma los que reconozcas, corrige el nombre o descártalos.">
+            {topics.length === 0 ? (
+                <p className="text-[13.5px] text-muted">Todavía no hay temas. Aparecen al leer el historial.</p>
+            ) : (
+                <ul>
+                    {topics.map((topic) => (
+                        <TopicRow key={topic.subject} topic={topic} others={topics.filter((other) => other.subject !== topic.subject)} />
+                    ))}
+                </ul>
+            )}
+        </Section>
+    );
+}
+
 function ChannelsTab({ channels }: { channels: Channel[] }) {
     const [query, setQuery] = useState('');
     const [activeOnly, setActiveOnly] = useState(false);
@@ -1000,6 +1158,7 @@ export default function Context(props: ContextProps) {
             </nav>
 
             {tab === 'people' && <PeopleTab people={props.people} relations={props.relations} merge_proposals={props.merge_proposals ?? []} />}
+            {tab === 'topics' && <TopicsTab topics={props.topics ?? []} />}
             {tab === 'areas' && <AreasTab areas={props.areas} preference={props.preference} kinds={props.kinds} timezones={props.timezones} tones={props.tones} />}
             {tab === 'known' && <KnownTab known={props.known} context={context} runAt={runAt} knowledge={props.knowledge} />}
             {tab === 'rules' && <RulesTab rules={props.rules} inertia={props.inertia} />}
