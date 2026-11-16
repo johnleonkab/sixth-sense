@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'user_id',
     'key',
     'what',
+    'topic_subject',
     'state',
     'settle_reason',
     'deadline',
