@@ -79,6 +79,9 @@ return [
 
     'backfill' => ['days' => 30, 'eval_split_day' => 21, 'label_reply_days' => 3, 'ask_pattern_min' => 20, 'topic_batch_chars' => 60_000],
 
+    // Null keeps reports in storage/comms/evals. Tests point this at a throwaway directory.
+    'evaluation' => ['directory' => null],
+
     'reconcile' => ['time' => '03:00', 'auto' => ['confirm_link', 'relink_uncertain', 'settle_quoted']],
 
     'embeddings' => [
