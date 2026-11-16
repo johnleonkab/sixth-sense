@@ -2,6 +2,7 @@
 
 namespace App\Comms\Backfill;
 
+use App\Comms\Topics\TopicBuilder;
 use App\Models\User;
 
 /**
@@ -14,7 +15,7 @@ class Passes
      */
     public const ORDER = ['identity', 'labels', 'topics', 'patterns', 'sweep'];
 
-    public function __construct(private IdentityPass $identity, private LabelMiner $labels) {}
+    public function __construct(private IdentityPass $identity, private LabelMiner $labels, private TopicBuilder $topics) {}
 
     /**
      * @return list<string>|null Null when the request names a pass that does not exist.
@@ -55,6 +56,10 @@ class Passes
 
         if ($pass === 'labels') {
             return $this->labels->run($user);
+        }
+
+        if ($pass === 'topics') {
+            return $this->topics->run($user);
         }
 
         return [];

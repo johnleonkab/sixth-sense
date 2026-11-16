@@ -77,7 +77,7 @@ return [
 
     'examples' => ['max' => 5],
 
-    'backfill' => ['days' => 30, 'eval_split_day' => 21, 'label_reply_days' => 3, 'ask_pattern_min' => 20],
+    'backfill' => ['days' => 30, 'eval_split_day' => 21, 'label_reply_days' => 3, 'ask_pattern_min' => 20, 'topic_batch_chars' => 60_000],
 
     'reconcile' => ['time' => '03:00', 'auto' => ['confirm_link', 'relink_uncertain', 'settle_quoted']],
 

@@ -173,6 +173,7 @@ class ContextProjector
                 (float) ($operation['confidence'] ?? 1),
                 is_array($operation['refs'] ?? null) ? $operation['refs'] : [],
                 (bool) ($operation['sensitive'] ?? false),
+                is_string($operation['status'] ?? null) ? $operation['status'] : null,
             );
         }
     }
@@ -194,6 +195,7 @@ class ContextProjector
         float $confidence = 1,
         array $refs = [],
         bool $sensitive = false,
+        ?string $requested = null,
     ): void {
         $user = $event->user;
 
@@ -247,7 +249,7 @@ class ContextProjector
 
         if ($active !== null && $active->origin->rank() > $origin->rank() && $active->value_hash !== $hash) {
             $status = 'proposed';
-        } elseif ($active !== null && $active->value_hash !== $hash && in_array($attribute, self::SINGLE, true)) {
+        } elseif ($requested !== 'proposed' && $active !== null && $active->value_hash !== $hash && in_array($attribute, self::SINGLE, true)) {
             $active->status = 'superseded';
             $active->save();
         } elseif ($active !== null && $active->value_hash === $hash) {
@@ -257,6 +259,28 @@ class ContextProjector
             $this->projectPerson($user, $active);
 
             return;
+        }
+
+        if ($requested === 'proposed') {
+            $existing = CommsContextFact::query()
+                ->whereBelongsTo($user)
+                ->where('subject', $subject)
+                ->where('attribute', $attribute)
+                ->where('value_hash', $hash)
+                ->where('status', 'proposed')
+                ->first();
+
+            if ($existing !== null) {
+                $existing->confirmed_at = $event->occurred_at;
+                $existing->confidence = max($existing->confidence, $confidence);
+                $existing->save();
+
+                return;
+            }
+
+            if ($status === 'active') {
+                $status = 'proposed';
+            }
         }
 
         if ($status === 'active') {
