@@ -106,7 +106,7 @@ return [
     | answer as a hint. The floor is the minimum that still counts.
     */
 
-    'escalate_on_confidence' => ['triage', 'route', 'watcher_check', 'match'],
+    'escalate_on_confidence' => ['triage', 'route', 'watcher_check'],
 
     'confidence_floor' => 0.6,
 
