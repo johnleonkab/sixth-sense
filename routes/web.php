@@ -29,6 +29,7 @@ use App\Http\Controllers\Settings\GithubRepositoryController;
 use App\Http\Controllers\Settings\ImpactController;
 use App\Http\Controllers\Settings\JiraRulesController;
 use App\Http\Controllers\Settings\McpServerController;
+use App\Http\Controllers\Settings\NightChangesController;
 use App\Http\Controllers\Settings\SenseWorkspaceController;
 use App\Http\Controllers\Settings\SystemController;
 use App\Http\Controllers\Settings\WingmanController;
@@ -141,6 +142,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('context/topics/nicknames', [CommsTopicsController::class, 'destroyNickname'])->name('context.topics.nicknames.destroy');
         Route::post('context/topics/merge', [CommsTopicsController::class, 'merge'])->name('context.topics.merge');
         Route::delete('context/topics', [CommsTopicsController::class, 'destroy'])->name('context.topics.destroy');
+        Route::put('context/changes', [NightChangesController::class, 'update'])->name('context.changes.update');
+        Route::post('context/changes/{change}/answer', [NightChangesController::class, 'answer'])->whereNumber('change')->name('context.changes.answer');
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');

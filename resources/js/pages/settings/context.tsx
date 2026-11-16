@@ -6,7 +6,7 @@ import { Button, buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
-type Tab = 'people' | 'topics' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent';
+type Tab = 'people' | 'topics' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent' | 'changes';
 
 type Origin = 'user' | 'correction' | 'observed' | 'inferred';
 
@@ -114,6 +114,19 @@ type Topic = {
     proposed: boolean;
 };
 
+type NightLine = {
+    id: number;
+    op: string;
+    quote: string | null;
+    why: string | null;
+    disposition: string;
+    answers: string[];
+};
+
+type NightClass = { key: string; label: string; on: boolean };
+
+type NightChanges = { lines: NightLine[]; classes: NightClass[] };
+
 type ContextProps = {
     tab: Tab;
     context: WorkContext;
@@ -134,6 +147,7 @@ type ContextProps = {
     inertia: Inertia;
     channels: Channel[];
     urgent_rules: UrgentRule[];
+    night_changes: NightChanges;
 };
 
 const tabs: { value: Tab; label: string }[] = [
@@ -145,6 +159,7 @@ const tabs: { value: Tab; label: string }[] = [
     { value: 'pending', label: 'Pendiente de confirmar' },
     { value: 'channels', label: 'Canales de Slack' },
     { value: 'urgent', label: 'Qué es urgente' },
+    { value: 'changes', label: 'Cambios de la noche' },
 ];
 
 const originLabel: Record<Origin, string> = {
@@ -876,6 +891,61 @@ function TopicsTab({ topics }: { topics: Topic[] }) {
     );
 }
 
+function ChangesTab({ night }: { night: NightChanges }) {
+    const [classes, setClasses] = useState<Record<string, boolean>>(() => Object.fromEntries(night.classes.map((item) => [item.key, item.on])));
+
+    return (
+        <div className="flex flex-col gap-8">
+            <Section
+                id="context-night-changes"
+                title="Cambios de la noche"
+                description="Lo que la noche cambió o dejó como propuesta. Cada línea lleva la cita en la que se apoya."
+            >
+                {night.lines.length === 0 ? (
+                    <p className="text-[13.5px] text-muted">Esta noche no hay cambios.</p>
+                ) : (
+                    <ul>
+                        {night.lines.map((line) => (
+                            <li key={line.id} className="border-t border-line py-4">
+                                <p className="text-[14.5px] text-ink">{line.quote}</p>
+                                {line.why && <p className="mt-1 text-[13px] text-muted">{line.why}</p>}
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {line.answers.map((answer) => (
+                                        <Button
+                                            key={answer}
+                                            variant="secondary"
+                                            onClick={() => router.post(`/settings/context/changes/${line.id}/answer`, { answer }, { preserveScroll: true })}
+                                        >
+                                            {answer}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Section>
+
+            <Section id="context-night-classes" title="Aplicar solo" description="Enciende una clase para que la próxima noche la aplique sin preguntar.">
+                <ul>
+                    {night.classes.map((item) => (
+                        <li key={item.key} className="border-t border-line py-3">
+                            <Switch checked={classes[item.key] ?? false} onChange={(on) => setClasses((current) => ({ ...current, [item.key]: on }))}>
+                                <span className="text-[14px] text-ink">{item.label}</span>
+                            </Switch>
+                        </li>
+                    ))}
+                </ul>
+                <div className="mt-4">
+                    <Button variant="primary" onClick={() => router.put('/settings/context/changes', { classes }, { preserveScroll: true })}>
+                        Guardar
+                    </Button>
+                </div>
+            </Section>
+        </div>
+    );
+}
+
 function ChannelsTab({ channels }: { channels: Channel[] }) {
     const [query, setQuery] = useState('');
     const [activeOnly, setActiveOnly] = useState(false);
@@ -1165,6 +1235,7 @@ export default function Context(props: ContextProps) {
             {tab === 'pending' && <PendingTab pending={props.pending} />}
             {tab === 'channels' && <ChannelsTab channels={props.channels} />}
             {tab === 'urgent' && <UrgentTab people={props.people} channels={props.channels} rules={props.urgent_rules} />}
+            {tab === 'changes' && <ChangesTab night={props.night_changes ?? { lines: [], classes: [] }} />}
         </SettingsLayout>
     );
 }

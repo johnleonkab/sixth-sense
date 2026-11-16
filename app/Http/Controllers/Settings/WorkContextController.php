@@ -11,6 +11,7 @@ use App\Comms\Context\InertiaReview;
 use App\Comms\Events\Source;
 use App\Comms\Intents\Archive;
 use App\Comms\Intents\PersonRef;
+use App\Comms\Nightly\NightChanges;
 use App\Comms\Topics\TopicReview;
 use App\Comms\Windows\UrgentRules;
 use App\Connectors\Chat\Chats;
@@ -38,7 +39,7 @@ use Throwable;
  */
 class WorkContextController extends Controller
 {
-    private const array TABS = ['people', 'topics', 'areas', 'known', 'rules', 'pending', 'channels', 'urgent'];
+    private const array TABS = ['people', 'topics', 'areas', 'known', 'rules', 'pending', 'channels', 'urgent', 'changes'];
 
     public function index(Request $request, KnowledgeBase $knowledge, ContextEngine $engine, InertiaReview $inertia, Chats $chats): Response
     {
@@ -79,6 +80,7 @@ class WorkContextController extends Controller
             'channels' => $channels,
             'urgent_rules' => $tab === 'urgent' ? $this->listedUrgent($user, $channels) : [],
             'topics' => $tab === 'topics' ? app(TopicReview::class)->list($user) : [],
+            'night_changes' => $tab === 'changes' ? app(NightChanges::class)->screen($user) : ['lines' => [], 'classes' => []],
         ]);
     }
 

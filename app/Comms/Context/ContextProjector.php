@@ -37,6 +37,7 @@ class ContextProjector
         'locale',
         'profile',
         'note',
+        'apply_alone',
         'state',
         'hot',
         'moved',

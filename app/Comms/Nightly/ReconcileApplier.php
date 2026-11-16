@@ -2,6 +2,7 @@
 
 namespace App\Comms\Nightly;
 
+use App\Comms\Context\ContextEngine;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -37,6 +38,7 @@ class ReconcileApplier
         private EventLog $log,
         private Checks $checks,
         private ModelRouter $router,
+        private ContextEngine $context,
     ) {}
 
     public function apply(User $user, ?CarbonImmutable $day = null): int
@@ -162,20 +164,45 @@ class ReconcileApplier
         return true;
     }
 
-    private function applyOne(User $user, CarbonImmutable $day, CommsReconcileChange $change): bool
+    /**
+     * Classes the person switched to "aplicar solo". With no saved choice,
+     * the night keeps its default list.
+     *
+     * @return list<string>
+     */
+    private function auto(User $user): array
     {
-        $auto = config('comms.reconcile.auto');
+        $facts = $this->context->listing($user, ['active'], ['policy'], ['apply_alone'], 20);
 
-        if (! is_array($auto)) {
-            return false;
+        if ($facts === []) {
+            $configured = config('comms.reconcile.auto');
+
+            return is_array($configured) ? array_values(array_filter($configured, is_string(...))) : [];
         }
 
+        $on = [];
+
+        foreach ($facts as $fact) {
+            $class = $fact['value']['class'] ?? null;
+
+            if (is_string($class) && ($fact['value']['on'] ?? false) === true) {
+                $on[] = $class;
+            }
+        }
+
+        return $on;
+    }
+
+    private function applyOne(User $user, CarbonImmutable $day, CommsReconcileChange $change): bool
+    {
+        $auto = $this->auto($user);
         $payload = is_array($change->payload) ? $change->payload : [];
 
         return match ($change->op) {
             'confirm_link' => in_array('confirm_link', $auto, true) && $this->confirm($user, $change, $payload),
             'relink' => in_array('relink_uncertain', $auto, true) && $this->relink($user, $change, $payload, uncertainOnly: true),
             'settle' => in_array('settle_quoted', $auto, true) && $this->settle($user, $day, $change, $payload),
+            'merge' => in_array('merge', $auto, true) && $this->accept($change),
             default => false,
         };
     }
