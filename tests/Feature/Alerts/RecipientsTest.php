@@ -5,6 +5,7 @@ use App\Alerts\Actions\ClassifiedAction;
 use App\Alerts\Actions\FakeActionClassifier;
 use App\Alerts\AlertFollowUp;
 use App\Alerts\AlertSource;
+use App\Alerts\AlertStatus;
 use App\Alerts\Recipients\RecipientScope;
 use App\Alerts\Replies\FakeReplyPlanner;
 use App\Alerts\Replies\ReplyPlanner;
@@ -89,6 +90,9 @@ test('internal data to someone outside asks for one more yes; inside the circle 
 
     // Edited so nothing internal is left, it goes without asking.
     $this->actingAs($this->user)->postJson(route('alerts.reply', $alert), ['text' => 'Va en marcha, te cuento el jueves.'])->assertOk();
+
+    // Sending resolves the alert; the confirmed case starts from it pending again.
+    $alert->refresh()->update(['status' => AlertStatus::Pending, 'resolution' => null, 'resolved_at' => null]);
     $this->actingAs($this->user)->postJson(route('alerts.reply', $alert), ['confirm_internal' => true])->assertOk();
 
     expect($this->chats->sent)->toHaveCount(2);

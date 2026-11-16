@@ -101,6 +101,8 @@ test('a reaction is proposed instead of an ok, and becomes the emoji in its thre
     $this->chats->sent = [];
     $this->chats->mayReact = false;
     PendingAction::query()->delete();
+    // Sending resolved the alert; the second case starts from it pending again.
+    $this->alert->refresh()->update(['status' => AlertStatus::Pending, 'resolution' => null, 'resolved_at' => null]);
 
     $this->actingAs($this->user)->postJson(route('alerts.reply', $this->alert))->assertOk()->assertJsonPath('actions.0.type', 'chat.send');
 

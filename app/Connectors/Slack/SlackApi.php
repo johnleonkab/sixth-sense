@@ -68,7 +68,9 @@ class SlackApi
             ->acceptJson()
             ->connectTimeout(5)
             ->timeout(20)
-            ->retry([1000, 3000], 0, fn (Throwable $exception): bool => $exception instanceof ConnectionException);
+            // Retries only lost connections. A failed response comes back as it
+            // is, so a 429 reaches the wait below instead of throwing.
+            ->retry([1000, 3000], 0, fn (Throwable $exception): bool => $exception instanceof ConnectionException, throw: false);
         $parameters = array_filter($parameters, fn (mixed $value): bool => $value !== null);
 
         for ($attempt = 1; ; $attempt++) {
