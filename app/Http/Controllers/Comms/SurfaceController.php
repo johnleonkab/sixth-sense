@@ -6,6 +6,7 @@ use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Surface\Confirmations;
+use App\Comms\Surface\FocusedUtterance;
 use App\Comms\Surface\HomeBoard;
 use App\Comms\Surface\IntentCard;
 use App\Http\Controllers\Controller;
@@ -131,6 +132,28 @@ class SurfaceController extends Controller
         $confirmations->answer($request->user(), $intent, $data['kind'], $data['answer'], $data);
 
         return response()->json([
+            'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
+        ]);
+    }
+
+    public function voice(Request $request, FocusedUtterance $voice, CommsIntent $intent): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'transcript' => ['required', 'string'],
+            'proposal_ids' => ['sometimes', 'array'],
+            'proposal_ids.*' => ['integer'],
+        ]);
+        $heard = $voice->hear(
+            $request->user(),
+            $intent,
+            $data['transcript'],
+            array_map(intval(...), $data['proposal_ids'] ?? []),
+        );
+
+        return response()->json([
+            'heard' => $heard,
             'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
         ]);
     }
