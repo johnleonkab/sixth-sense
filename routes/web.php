@@ -129,6 +129,9 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/intents/{intent}/still-open', [SurfaceController::class, 'stillOpen'])->whereNumber('intent')->name('comms.intents.still-open');
     Route::post('comms/intents/{intent}/importance', [SurfaceController::class, 'importance'])->whereNumber('intent')->name('comms.intents.importance');
     Route::post('comms/intents/{intent}/confirmations', [SurfaceController::class, 'confirmation'])->whereNumber('intent')->name('comms.intents.confirmations');
+    Route::post('comms/intents/{intent}/delegate', [SurfaceController::class, 'delegate'])->whereNumber('intent')->name('comms.intents.delegate');
+    Route::post('comms/intents/{intent}/snooze', [SurfaceController::class, 'snooze'])->whereNumber('intent')->name('comms.intents.snooze');
+    Route::post('comms/intents/{intent}/always', [SurfaceController::class, 'always'])->whereNumber('intent')->name('comms.intents.always');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('people', '/settings/context?tab=people');

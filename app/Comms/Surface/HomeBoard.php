@@ -197,9 +197,13 @@ class HomeBoard
      */
     private static function proposalCounts(User $user, ProposalStatus $status): array
     {
-        return self::grouped(
-            CommsProposal::query()->whereBelongsTo($user)->whereNotNull('intent_id')->where('status', $status),
-        );
+        $query = CommsProposal::query()->whereBelongsTo($user)->whereNotNull('intent_id')->where('status', $status);
+
+        if ($status === ProposalStatus::Pending) {
+            $query->whereNull('payload->delegate');
+        }
+
+        return self::grouped($query);
     }
 
     /**

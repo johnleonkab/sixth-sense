@@ -246,7 +246,32 @@ class Confirmations
     {
         $proposals = $this->proposals($intent, $input['proposal_ids'] ?? []);
 
-        if ($answer === 'guide' || $proposals === []) {
+        if ($answer === 'guide') {
+            $text = trim((string) ($input['text'] ?? ''));
+
+            if ($text === '') {
+                return;
+            }
+
+            $this->log->append(
+                user: $intent->user,
+                type: EventType::UserGuided,
+                source: Source::User,
+                externalId: 'guide:'.$intent->key.':'.Str::uuid(),
+                payload: null,
+                normalized: [
+                    'intent_key' => $intent->key,
+                    'text' => $text,
+                    'proposal_ids' => array_map(fn (CommsProposal $proposal): int => $proposal->id, $proposals),
+                ],
+                causation: null,
+                occurredAt: now(),
+            );
+
+            return;
+        }
+
+        if ($proposals === []) {
             return;
         }
 

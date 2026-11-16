@@ -6,10 +6,13 @@ use App\Comms\Context\ContextProjector;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
+use App\Comms\Gate\ActionClass;
+use App\Comms\Gate\PolicyOutcome;
 use App\Comms\People\Relation;
 use App\Comms\Windows\UrgentRules;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsOwnedArea;
+use App\Models\Comms\CommsPolicy;
 use App\Models\Comms\CommsPreference;
 use App\Models\Comms\CommsScope;
 use App\Models\User;
@@ -61,6 +64,7 @@ class Archive
             'preference' => $this->preference($event->user, $data),
             'urgent_rule' => $this->rules->apply($event->user, $data),
             'scope' => $this->scope($event->user, $data),
+            'policy' => $this->policy($event->user, $data),
             default => null,
         };
     }
@@ -137,6 +141,28 @@ class Archive
         CommsScope::query()->updateOrCreate(
             ['user_id' => $user->id],
             ['slack_channel_ids' => $ids],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function policy(User $user, array $data): void
+    {
+        $class = ActionClass::tryFrom((string) ($data['action_class'] ?? ''));
+        $conditions = is_array($data['context'] ?? null) ? $data['context'] : [];
+
+        if ($class === null) {
+            return;
+        }
+
+        CommsPolicy::query()->updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'action_class' => $class,
+                'conditions' => $conditions,
+            ],
+            ['outcome' => PolicyOutcome::Allow],
         );
     }
 

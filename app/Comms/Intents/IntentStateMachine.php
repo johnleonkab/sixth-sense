@@ -7,6 +7,7 @@ use App\Comms\Gate\ProposalStatus;
 use App\Comms\Gate\UncertainSource;
 use App\Comms\Linking\Quote;
 use App\Comms\Models\Embeddings;
+use App\Comms\Surface\IntentActions;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
@@ -163,6 +164,7 @@ class IntentStateMachine
             'confirm_link' => $this->confirmLink($event->user, $intent, $data),
             'confirm_field' => $this->confirmField($intent, $data),
             'somewhere_else' => $this->somewhereElse($event->user, $intent, $data),
+            'delegate' => $this->delegate($event->user, $intent, $data),
             'rematch' => $this->rematch($event->user, $intent, $event, $data),
             'relink' => $this->relink($event->user, $intent, $event, $data),
             'restore_link' => $this->restoreLink($event->user, $data),
@@ -700,6 +702,27 @@ class IntentStateMachine
         if ($message !== null) {
             $this->redraft($user, $message, null);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function delegate(User $user, CommsIntent $intent, array $data): void
+    {
+        $id = $data['person_id'] ?? null;
+
+        if (! is_int($id) && ! (is_string($id) && ctype_digit($id))) {
+            return;
+        }
+
+        $person = CommsPerson::query()->whereBelongsTo($user)->find((int) $id);
+
+        if (! $person instanceof CommsPerson || $person->display_name === null) {
+            return;
+        }
+
+        $this->syncRole($user, $intent, 'responder', [$this->people->key($person)]);
+        app(IntentActions::class)->proposeTo($intent, $person);
     }
 
     private function redraft(User $user, CommsMessage $message, ?CommsIntent $intent): void

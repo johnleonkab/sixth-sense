@@ -20,6 +20,7 @@ use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
+use App\Comms\Surface\IntentActions;
 use App\Comms\Surface\IntentCard;
 use App\Comms\Surface\SurfaceUpdates;
 use App\Comms\Watchers\ClockHandler;
@@ -77,6 +78,8 @@ class Pipeline
             EventType::UserAnswered => $this->onAnswer($event),
             EventType::WindowSettled => $this->onWindow($event),
             EventType::UserViewed => $this->cards->apply($event),
+            EventType::UserGuided => app(IntentActions::class)->guide($event),
+            EventType::UserSnoozed => app(IntentActions::class)->snooze($event),
             default => null,
         };
     }

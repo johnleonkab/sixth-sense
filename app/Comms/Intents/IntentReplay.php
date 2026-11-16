@@ -10,6 +10,7 @@ use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
+use App\Comms\Surface\IntentActions;
 use App\Comms\Surface\IntentCard;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
@@ -50,6 +51,8 @@ class IntentReplay
             EventType::UserAnswered => $this->answered($event),
             EventType::ModelDecided => $this->playbooks->replayDecision($event),
             EventType::UserViewed => $this->cards->apply($event),
+            EventType::UserGuided => app(IntentActions::class)->guide($event),
+            EventType::UserSnoozed => app(IntentActions::class)->snooze($event),
             EventType::ReconcileDecided => $this->machine->correct($event),
             default => null,
         };

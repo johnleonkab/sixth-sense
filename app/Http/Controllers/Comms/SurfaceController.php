@@ -11,6 +11,7 @@ use App\Comms\Surface\IntentCard;
 use App\Http\Controllers\Controller;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsIntent;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -132,6 +133,73 @@ class SurfaceController extends Controller
         return response()->json([
             'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
         ]);
+    }
+
+    public function delegate(Request $request, EventLog $log, CommsIntent $intent): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'person_id' => ['required', 'integer'],
+        ]);
+        $this->correct($log, $request, $intent, 'delegate', ['person_id' => (int) $data['person_id']]);
+
+        return response()->json([
+            'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
+        ]);
+    }
+
+    public function snooze(Request $request, EventLog $log, CommsIntent $intent): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'until' => ['required', 'date'],
+        ]);
+        $log->append(
+            user: $request->user(),
+            type: EventType::UserSnoozed,
+            source: Source::User,
+            externalId: 'snooze:'.$intent->key.':'.Str::uuid(),
+            payload: null,
+            normalized: [
+                'intent_key' => $intent->key,
+                'until' => CarbonImmutable::parse($data['until'])->toIso8601String(),
+            ],
+            causation: null,
+            occurredAt: now(),
+        );
+
+        return response()->json([
+            'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
+        ]);
+    }
+
+    public function always(Request $request, EventLog $log, CommsIntent $intent): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'action_class' => ['required', 'string'],
+            'context' => ['sometimes', 'array'],
+        ]);
+        $log->append(
+            user: $request->user(),
+            type: EventType::UserConfigured,
+            source: Source::User,
+            externalId: 'policy:'.$data['action_class'].':'.Str::uuid(),
+            payload: null,
+            normalized: [
+                'kind' => 'policy',
+                'action_class' => $data['action_class'],
+                'context' => $data['context'] ?? [],
+                'outcome' => 'allow',
+            ],
+            causation: null,
+            occurredAt: now(),
+        );
+
+        return response()->json(['ok' => true]);
     }
 
     public function importance(Request $request, EventLog $log, CommsIntent $intent): JsonResponse

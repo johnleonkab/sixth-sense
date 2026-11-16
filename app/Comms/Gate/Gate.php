@@ -88,7 +88,7 @@ class Gate
             return $this->deny($user, $proposal, $reason, $notify);
         }
 
-        $outcome = $this->policy($user, $proposal->action_class);
+        $outcome = $this->policy($user, $proposal);
         $proposal->policy_outcome = $outcome;
 
         if ($outcome === PolicyOutcome::Deny) {
@@ -301,7 +301,7 @@ class Gate
         return is_array($proposal->uncertain_source_message_ids) && $proposal->uncertain_source_message_ids !== [];
     }
 
-    private function policy(User $user, ActionClass $class): PolicyOutcome
+    private function policy(User $user, CommsProposal $proposal): PolicyOutcome
     {
         $rules = CommsPolicy::query()->whereBelongsTo($user)->orderBy('id')->get();
 
@@ -318,19 +318,46 @@ class Gate
             return PolicyOutcome::Ask;
         }
 
+        $blanket = null;
+
         foreach ($rules as $rule) {
-            if ($rule->action_class !== $class) {
+            if ($rule->action_class !== $proposal->action_class) {
                 continue;
             }
 
             $conditions = $rule->conditions;
 
             if ($conditions === [] || $conditions === null) {
+                $blanket ??= $rule->outcome;
+
+                continue;
+            }
+
+            if ($this->contextMatches($proposal, $conditions)) {
                 return $rule->outcome;
             }
         }
 
-        return PolicyOutcome::Ask;
+        return $blanket ?? PolicyOutcome::Ask;
+    }
+
+    /**
+     * @param  array<string, mixed>  $conditions
+     */
+    private function contextMatches(CommsProposal $proposal, array $conditions): bool
+    {
+        $haystack = [
+            ...(is_array($proposal->target) ? $proposal->target : []),
+            ...(is_array($proposal->payload) ? $proposal->payload : []),
+        ];
+
+        foreach ($conditions as $key => $value) {
+            if (! is_string($key) || ($haystack[$key] ?? null) != $value) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function notify(User $user, CommsProposal $proposal, string $urgency): void
