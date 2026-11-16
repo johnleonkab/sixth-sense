@@ -21,6 +21,7 @@ use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
 use App\Comms\Surface\IntentCard;
+use App\Comms\Surface\SurfaceUpdates;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
 use App\Comms\Windows\SettleBuffer;
@@ -177,6 +178,8 @@ class Pipeline
             ->where('message_id', $message->id)
             ->update(['state_event_id' => $applied->id]);
 
+        $changed = [];
+
         foreach ($results as $result) {
             if (($result['status'] ?? '') !== 'accepted' || ! is_string($result['intent_key'] ?? null)) {
                 continue;
@@ -197,6 +200,7 @@ class Pipeline
             $intent->save();
             $this->watchers->sync($event->user, $intent);
             $this->watchers->check($event->user, $intent);
+            $changed[] = $intent->id;
         }
 
         $this->notifier->onState($event->user, $applied);
@@ -204,6 +208,7 @@ class Pipeline
 
         if (collect($results)->contains(fn (array $result): bool => ($result['status'] ?? '') === 'accepted')) {
             IntentsUpdated::dispatch($event->user);
+            SurfaceUpdates::broadcast($event->user, ...$changed);
         }
     }
 
@@ -221,6 +226,28 @@ class Pipeline
         $this->merges->apply($event);
         $this->machine->correct($event);
         $this->corrections->learn($event);
+
+        if ($event->user === null) {
+            return;
+        }
+
+        $ids = [];
+
+        foreach (['intent_key', 'target_key'] as $field) {
+            $key = (string) ($event->normalized[$field] ?? '');
+
+            if ($key === '') {
+                continue;
+            }
+
+            $intent = CommsIntent::query()->whereBelongsTo($event->user)->where('key', $key)->first();
+
+            if ($intent !== null) {
+                $ids[] = $intent->id;
+            }
+        }
+
+        SurfaceUpdates::broadcast($event->user, ...$ids);
     }
 
     private function onSource(CommsEvent $event): void

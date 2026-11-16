@@ -8,6 +8,7 @@ use App\Comms\Intents\IntentStateMachine;
 use App\Comms\Intents\TriageResult;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\PlaybookRunner;
+use App\Comms\Surface\SurfaceUpdates;
 use App\Comms\Watchers\IntentWatcher;
 use App\Events\IntentsUpdated;
 use App\Models\Comms\CommsConversationLink;
@@ -121,22 +122,25 @@ class PipelineV2
         }
 
         $accepted = false;
+        $changed = [];
 
         foreach ($groups as $group) {
-            if ($this->commit($user, $segment, $outcome, $group, $linkEventId === null ? null : (int) $linkEventId)) {
-                $accepted = true;
-            }
+            $committed = $this->commit($user, $segment, $outcome, $group, $linkEventId === null ? null : (int) $linkEventId);
+            $accepted = $accepted || $committed['accepted'];
+            $changed = array_merge($changed, $committed['intent_ids']);
         }
 
         if ($accepted) {
             IntentsUpdated::dispatch($user);
+            SurfaceUpdates::broadcast($user, ...$changed);
         }
     }
 
     /**
      * @param  array{message: CommsMessage, items: list<array{review: CriticReview, route: RouteDecision, prepared: array<string, mixed>}>}  $group
+     * @return array{accepted: bool, intent_ids: list<int>}
      */
-    private function commit(User $user, CommsSegment $segment, LinkOutcome $outcome, array $group, ?int $linkEventId): bool
+    private function commit(User $user, CommsSegment $segment, LinkOutcome $outcome, array $group, ?int $linkEventId): array
     {
         $message = $group['message'];
         $judged = $this->machine->decide(
@@ -180,7 +184,7 @@ class PipelineV2
         }
 
         if ($results === []) {
-            return false;
+            return ['accepted' => false, 'intent_ids' => []];
         }
 
         $cause = CommsEvent::query()->find($message->event_id);
@@ -199,6 +203,8 @@ class PipelineV2
             ->whereBelongsTo($user)
             ->where('message_id', $message->id)
             ->update(['state_event_id' => $applied->id]);
+
+        $ids = [];
 
         foreach ($results as $result) {
             if (($result['status'] ?? '') !== 'accepted' || ! is_string($result['intent_key'] ?? null)) {
@@ -220,6 +226,7 @@ class PipelineV2
             $intent->save();
             $this->watchers->sync($user, $intent);
             $this->watchers->check($user, $intent);
+            $ids[] = $intent->id;
         }
 
         $this->notifier->onState($user, $applied);
@@ -228,7 +235,7 @@ class PipelineV2
             $this->playbooks->afterApplied($user, $applied);
         }
 
-        return $accepted;
+        return ['accepted' => $accepted, 'intent_ids' => $ids];
     }
 
     /**

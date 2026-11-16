@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\GoogleSignInController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CanvasEmbedController;
 use App\Http\Controllers\CanvasQueryController;
+use App\Http\Controllers\Comms\SurfaceController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IntentCorrectionController;
 use App\Http\Controllers\MediaController;
@@ -117,6 +118,15 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/proposals/{proposal}/reject', [ProposalController::class, 'reject'])->whereNumber('proposal')->name('comms.proposals.reject');
     Route::post('comms/proposals/{proposal}/edit', [ProposalController::class, 'edit'])->whereNumber('proposal')->name('comms.proposals.edit');
     Route::post('comms/proposals/{proposal}/undo', [ProposalController::class, 'undo'])->whereNumber('proposal')->name('comms.proposals.undo');
+    Route::get('comms/home', [SurfaceController::class, 'home'])->name('comms.home');
+    Route::get('comms/intents/{intent}', [SurfaceController::class, 'intent'])->whereNumber('intent')->name('comms.intents.show');
+    Route::get('comms/topics/{subject}', [SurfaceController::class, 'topic'])->where('subject', '.*')->name('comms.topics.show');
+    Route::post('comms/links/{link}/confirm', [SurfaceController::class, 'confirm'])->whereNumber('link')->name('comms.links.confirm');
+    Route::post('comms/links/{link}/move', [SurfaceController::class, 'move'])->whereNumber('link')->name('comms.links.move');
+    Route::post('comms/intents/{intent}/not-for-me', [SurfaceController::class, 'notForMe'])->whereNumber('intent')->name('comms.intents.not-for-me');
+    Route::post('comms/intents/{intent}/done', [SurfaceController::class, 'done'])->whereNumber('intent')->name('comms.intents.done');
+    Route::post('comms/intents/{intent}/still-open', [SurfaceController::class, 'stillOpen'])->whereNumber('intent')->name('comms.intents.still-open');
+    Route::post('comms/intents/{intent}/importance', [SurfaceController::class, 'importance'])->whereNumber('intent')->name('comms.intents.importance');
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::redirect('people', '/settings/context?tab=people');

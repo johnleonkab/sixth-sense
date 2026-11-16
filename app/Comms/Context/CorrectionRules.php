@@ -34,6 +34,8 @@ class CorrectionRules
         $what = Str::limit((string) $intent->what, 80);
         [$layer, $sentence] = match ($data['action'] ?? '') {
             'close' => ['match', "Con {$name}, «{$what}» no era algo pendiente: lo cerró ella a mano."],
+            'not_for_me' => ['match', "Con {$name}, «{$what}» no era para ella."],
+            'done' => ['match', "Con {$name}, «{$what}» ya estaba hecho: lo marcó ella como hecho."],
             'still_open' => ['match', "Con {$name}, una respuesta así no cerraba «{$what}»: seguía abierto."],
             'rematch', 'merge' => ['match', "Con {$name}, un mensaje sobre «{$what}» iba con otro pendiente: lo corrigió ella."],
             'split' => ['match', "Con {$name}, «{$what}» eran dos pendientes distintos."],

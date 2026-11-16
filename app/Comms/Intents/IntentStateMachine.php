@@ -152,8 +152,11 @@ class IntentStateMachine
 
         match ($data['action'] ?? '') {
             'close' => $this->close($intent, $event, 'drop'),
+            'not_for_me' => $this->close($intent, $event, 'drop'),
+            'done' => $this->close($intent, $event, 'decision'),
             'importance' => $this->overrideImportance($intent, $event, (int) ($data['importance'] ?? 0)),
             'still_open' => $this->reopen($intent, $event),
+            'confirm_link' => $this->confirmLink($event->user, $intent, $data),
             'rematch' => $this->rematch($event->user, $intent, $event, $data),
             'merge' => $this->merge($event->user, $intent, $event, $data),
             'split' => $this->split($event->user, $intent, $event, $data),
@@ -600,6 +603,31 @@ class IntentStateMachine
                 'link_event_id' => $result['link_event_id'] ?? null,
             ],
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function confirmLink(User $user, CommsIntent $intent, array $data): void
+    {
+        $linkId = $data['link_id'] ?? null;
+
+        if (! is_int($linkId) && ! (is_string($linkId) && ctype_digit($linkId))) {
+            return;
+        }
+
+        $link = CommsConversationLink::query()
+            ->whereBelongsTo($user)
+            ->where('intent_id', $intent->id)
+            ->whereKey((int) $linkId)
+            ->first();
+
+        if ($link === null) {
+            return;
+        }
+
+        $link->uncertain = false;
+        $link->save();
     }
 
     private function close(CommsIntent $intent, CommsEvent $event, string $reason): void
