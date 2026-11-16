@@ -20,7 +20,11 @@ use Illuminate\Support\Facades\Cache;
  */
 class SettleBuffer
 {
-    public function __construct(private EventLog $log, private UrgentRules $rules) {}
+    public function __construct(
+        private EventLog $log,
+        private UrgentRules $rules,
+        private WindowAssembler $assembler,
+    ) {}
 
     /**
      * Put a message in the open window for its conversation. An edit of a
@@ -134,12 +138,12 @@ class SettleBuffer
             return [$holding, false];
         }
 
-        [$group, $kind] = $this->group($message);
+        $group = ConversationGroup::of($message);
 
         $window = CommsWindow::query()
             ->where('user_id', $message->user_id)
             ->where('source', $message->source->value)
-            ->where('group_ref', $group)
+            ->where('group_ref', $group->ref)
             ->where('state', 'open')
             ->orderBy('id')
             ->first();
@@ -148,8 +152,8 @@ class SettleBuffer
             $window = CommsWindow::query()->create([
                 'user_id' => $message->user_id,
                 'source' => $message->source->value,
-                'group_ref' => $group,
-                'kind' => $kind,
+                'group_ref' => $group->ref,
+                'kind' => $group->kind,
                 'message_ids' => [$message->id],
                 'opened_at' => $message->occurred_at,
                 'last_message_at' => $message->occurred_at,
@@ -209,13 +213,13 @@ class SettleBuffer
             return null;
         }
 
-        [$group, $kind] = $this->group($message);
+        $group = ConversationGroup::of($message);
 
         $window = CommsWindow::query()->create([
             'user_id' => $message->user_id,
             'source' => $message->source->value,
-            'group_ref' => $group,
-            'kind' => $kind,
+            'group_ref' => $group->ref,
+            'kind' => $group->kind,
             'message_ids' => [$message->id],
             'opened_at' => $at,
             'last_message_at' => $at,
@@ -302,52 +306,13 @@ class SettleBuffer
      */
     private function lookback(CommsWindow $window): array
     {
-        $hours = (int) config('comms.window.lookback_hours');
-        $limit = (int) config('comms.window.lookback_messages');
-        $ids = array_values($window->message_ids ?? []);
-
-        return CommsMessage::query()
-            ->where('user_id', $window->user_id)
-            ->where('source', $window->source)
-            ->where('occurred_at', '>=', $window->opened_at->subHours($hours))
-            ->where('occurred_at', '<', $window->opened_at)
-            ->whereNull('deleted_at')
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(function (CommsMessage $message) use ($window, $ids): bool {
-                if (in_array($message->id, $ids, true)) {
-                    return false;
-                }
-
-                [$group] = $this->group($message);
-
-                return $group === $window->group_ref;
-            })
-            ->take($limit)
-            ->sortBy(fn (CommsMessage $message): array => [$message->occurred_at->getTimestamp(), $message->id])
-            ->pluck('id')
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array{0: string, 1: string}
-     */
-    private function group(CommsMessage $message): array
-    {
-        $thread = $message->thread_ref;
-        $own = strrpos($message->external_id, ':');
-        $own = $own === false ? $message->external_id : substr($message->external_id, $own + 1);
-        $threaded = is_string($thread) && $thread !== '' && $thread !== $own && $thread !== $message->channel_ref;
-
-        if ($threaded) {
-            return [$thread, 'thread'];
-        }
-
-        $channel = (string) $message->channel_ref;
-
-        return [$channel, str_starts_with($channel, 'D') ? 'dm' : 'channel'];
+        return array_values(array_map(
+            fn (AssembledMessage $row): int => $row->message->id,
+            array_filter(
+                $this->assembler->for($window)->messages,
+                fn (AssembledMessage $row): bool => ! $row->new,
+            ),
+        ));
     }
 
     private function holding(CommsMessage $message): ?CommsWindow
