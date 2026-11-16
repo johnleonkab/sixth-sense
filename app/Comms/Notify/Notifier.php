@@ -33,7 +33,7 @@ class Notifier
 
     public function onState(User $user, CommsEvent $event): void
     {
-        if (($event->causation?->normalized['backfill'] ?? false) === true) {
+        if (app(Silenced::class)->active || ($event->causation?->normalized['backfill'] ?? false) === true) {
             return;
         }
 
@@ -70,6 +70,10 @@ class Notifier
 
     public function question(User $user, CommsQuestion $question, CommsEvent $event, string $urgency): void
     {
+        if (app(Silenced::class)->active) {
+            return;
+        }
+
         $this->store($user, 'question', $urgency, 'question', $question->id, 'n:'.$event->id, [$event->id]);
     }
 
