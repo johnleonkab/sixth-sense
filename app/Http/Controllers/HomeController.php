@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Comms\Cutover\HomeFeed;
 use App\Comms\Cutover\OpenItem;
 use App\Comms\Intents\IntentBoard;
+use App\Comms\Surface\HomeBoard;
 use App\Jobs\WarmChats;
 use App\Models\InboxItem;
 use Illuminate\Http\RedirectResponse;
@@ -56,6 +57,8 @@ class HomeController extends Controller
             'openAlert' => $openAlert,
             'openComms' => $open->for($user),
             'intents' => $intents->for($user),
+            'surfaceV2' => (bool) config('comms.linking.surface_v2'),
+            'surface' => config('comms.linking.surface_v2') ? HomeBoard::for($user) : null,
         ]);
     }
 }

@@ -35,7 +35,9 @@ test('an empty home has zero counters and no lists', function () {
         'waiting_on_others' => [],
         'done_today' => [],
     ])->and($board['possible_asks'])->toBe(0)
+        ->and($board['possible'])->toBe([])
         ->and($board['uncertain_links'])->toBe(0)
+        ->and($board['uncertain'])->toBe([])
         ->and($board['stale'])->toBe([])
         ->and($board['topics'])->toBe([]);
 });
@@ -172,7 +174,11 @@ test('the home groups intents by who has the ball and keeps each fact to one que
             'done_today' => 1,
         ])
         ->and($board['possible_asks'])->toBe(1)
+        ->and($board['possible'][0]['what'])->toBe('Quizá un café')
         ->and($board['uncertain_links'])->toBe(1)
+        ->and($board['uncertain'][0]['intent_id'])->toBe($responder->id)
+        ->and($board['uncertain'][0]['what'])->toBe('Responder a Ana')
+        ->and($board['uncertain'][0]['alternative'])->toBeNull()
         ->and(collect($board['stale'])->pluck('what')->all())->toBe(['Preparar la demo'])
         ->and($board['stale'][0]['key'])->toBe($stale->key)
         ->and($topics['workstream:prepago']['intent_ids'])->toBe([$approve->id, $responder->id])

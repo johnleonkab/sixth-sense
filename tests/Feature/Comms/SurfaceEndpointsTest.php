@@ -19,6 +19,28 @@ afterEach(function () {
     config(['comms.linking.surface_v2' => false]);
 });
 
+test('the home page keeps Para mí until the surface flag is on', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('surfaceV2', false)
+            ->where('surface', null)
+            ->has('intents'));
+
+    config(['comms.linking.surface_v2' => true]);
+
+    $this->actingAs($user)->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('surfaceV2', true)
+            ->where('surface.counters.needs_you', 0)
+            ->where('surface.possible', [])
+            ->where('surface.uncertain', [])
+            ->has('intents'));
+});
+
 test('a guest is sent to login', function () {
     $this->get(route('comms.home'))->assertRedirect(route('login'));
 });

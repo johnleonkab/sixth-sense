@@ -16,6 +16,8 @@ import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
 import IntentBoard, { type IntentGroups } from '@/intents/intent-board';
+import HomeBoard from '@/intents/home-board';
+import type { HomePayload } from '@/intents/types';
 import { echoConnection } from '@/lib/echo';
 import { postJson } from '@/lib/http';
 import { activityFor } from '@/voice/activity';
@@ -121,7 +123,21 @@ function commsProposalOnScreen(canvases: { directive: CanvasDirective }[]): { id
     };
 }
 
-export default function Home({ alerts, openAlert = null, openComms = null, intents = emptyIntents }: { alerts: Alert[]; openAlert?: OpenAlert | null; openComms?: OpenComms | null; intents?: IntentGroups }) {
+export default function Home({
+    alerts,
+    openAlert = null,
+    openComms = null,
+    intents = emptyIntents,
+    surfaceV2 = false,
+    surface = null,
+}: {
+    alerts: Alert[];
+    openAlert?: OpenAlert | null;
+    openComms?: OpenComms | null;
+    intents?: IntentGroups;
+    surfaceV2?: boolean;
+    surface?: HomePayload | null;
+}) {
     const { auth } = usePage().props;
     const [canvases, setCanvases] = useState<{ id: number; directive: CanvasDirective }[]>([]);
     const [showMine, setShowMine] = useState(false);
@@ -435,11 +451,15 @@ export default function Home({ alerts, openAlert = null, openComms = null, inten
                     {canvases.length === 0 ? (
                         !opening &&
                         (showMine ? (
-                            <IntentBoard
-                                intents={intents}
-                                only="waiting_on_me"
-                                onOpenAlert={(alertId) => runFromScreen('review_alert', { alert_id: alertId })}
-                            />
+                            surfaceV2 && surface ? (
+                                <HomeBoard initial={surface} />
+                            ) : (
+                                <IntentBoard
+                                    intents={intents}
+                                    only="waiting_on_me"
+                                    onOpenAlert={(alertId) => runFromScreen('review_alert', { alert_id: alertId })}
+                                />
+                            )
                         ) : (
                             <p className="grid h-full place-items-center text-[15px] text-faint">
                                 {voice.active ? '' : 'Aquí aparecerá lo que necesites ver.'}

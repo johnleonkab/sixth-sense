@@ -28,7 +28,9 @@ class HomeBoard
      *     counters: array{needs_you: int, system_working: int, waiting_on_others: int, done_today: int},
      *     lists: array{needs_you: list<array<string, mixed>>, system_working: list<array<string, mixed>>, waiting_on_others: list<array<string, mixed>>, done_today: list<array<string, mixed>>},
      *     possible_asks: int,
+     *     possible: list<array<string, mixed>>,
      *     uncertain_links: int,
+     *     uncertain: list<array{id: int, intent_id: int, what: mixed, alternative: ?string}>,
      *     stale: list<array<string, mixed>>,
      *     topics: list<array{subject: ?string, intent_ids: list<int>}>
      * }
@@ -51,7 +53,9 @@ class HomeBoard
                 'done_today' => [],
             ],
             'possible_asks' => 0,
+            'possible' => [],
             'uncertain_links' => 0,
+            'uncertain' => [],
             'stale' => [],
             'topics' => [],
         ];
@@ -79,7 +83,17 @@ class HomeBoard
         $watchers = self::grouped(
             CommsWatcher::query()->whereBelongsTo($user)->where('state', 'active'),
         );
-        $uncertain = CommsConversationLink::query()->whereBelongsTo($user)->where('uncertain', true)->count();
+        $uncertainLinks = CommsConversationLink::query()
+            ->where('comms_conversation_links.user_id', $user->id)
+            ->where('uncertain', true)
+            ->join('comms_intents', 'comms_intents.id', '=', 'comms_conversation_links.intent_id')
+            ->orderBy('comms_conversation_links.id')
+            ->get([
+                'comms_conversation_links.id',
+                'comms_conversation_links.intent_id',
+                'comms_conversation_links.alternative',
+                'comms_intents.what',
+            ]);
         $lists = [
             BallGroup::NeedsYou->value => [],
             BallGroup::SystemWorking->value => [],
@@ -87,6 +101,7 @@ class HomeBoard
             BallGroup::DoneToday->value => [],
         ];
         $stale = [];
+        $possibleRows = [];
         $possible = 0;
         $visible = [];
 
@@ -127,6 +142,7 @@ class HomeBoard
 
             if ($group === BallGroup::PossibleAsk) {
                 $possible++;
+                $possibleRows[] = $row;
 
                 continue;
             }
@@ -158,7 +174,19 @@ class HomeBoard
                 'done_today' => $lists[BallGroup::DoneToday->value],
             ],
             'possible_asks' => $possible,
-            'uncertain_links' => $uncertain,
+            'possible' => self::sort($possibleRows),
+            'uncertain_links' => $uncertainLinks->count(),
+            'uncertain' => $uncertainLinks->map(function (CommsConversationLink $link): array {
+                $alternative = $link->alternative;
+                $first = is_array($alternative) ? ($alternative[0] ?? null) : null;
+
+                return [
+                    'id' => $link->id,
+                    'intent_id' => $link->intent_id,
+                    'what' => $link->getAttribute('what'),
+                    'alternative' => is_string($first) ? $first : null,
+                ];
+            })->all(),
             'stale' => self::sort($stale),
             'topics' => self::topics($visible),
         ];
