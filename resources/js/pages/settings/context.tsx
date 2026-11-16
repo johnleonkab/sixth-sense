@@ -6,7 +6,7 @@ import { Button, buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
-type Tab = 'people' | 'areas' | 'known' | 'rules' | 'pending';
+type Tab = 'people' | 'areas' | 'known' | 'rules' | 'pending' | 'channels';
 
 type Origin = 'user' | 'correction' | 'observed' | 'inferred';
 
@@ -65,6 +65,15 @@ type Area = { id: number; kind: string; ref: string; name: string; keywords: str
 type Preference = { timezone: string; locale: string; work_start: string; work_end: string; work_days: number[] };
 type Option = { value: string; label: string; weight?: number };
 
+type Channel = {
+    id: string;
+    name: string;
+    members: number;
+    messages: number;
+    included: boolean;
+    selected: boolean;
+};
+
 type Inertia = {
     rate: number | null;
     sends: number;
@@ -87,6 +96,7 @@ type ContextProps = {
     rules: Rule[];
     pending: Fact[];
     inertia: Inertia;
+    channels: Channel[];
 };
 
 const tabs: { value: Tab; label: string }[] = [
@@ -95,6 +105,7 @@ const tabs: { value: Tab; label: string }[] = [
     { value: 'known', label: 'Lo que sé' },
     { value: 'rules', label: 'Reglas' },
     { value: 'pending', label: 'Pendiente de confirmar' },
+    { value: 'channels', label: 'Canales de Slack' },
 ];
 
 const originLabel: Record<Origin, string> = {
@@ -661,6 +672,75 @@ function PendingTab({ pending }: Pick<ContextProps, 'pending'>) {
     );
 }
 
+function ChannelsTab({ channels }: { channels: Channel[] }) {
+    const [query, setQuery] = useState('');
+    const [activeOnly, setActiveOnly] = useState(false);
+    const [selected, setSelected] = useState(() => channels.filter((channel) => channel.selected).map((channel) => channel.id));
+    const needle = query.trim().toLowerCase();
+    const shown = channels.filter((channel) => {
+        if (activeOnly && channel.messages === 0) {
+            return false;
+        }
+
+        return needle === '' || channel.name.toLowerCase().includes(needle);
+    });
+
+    const toggle = (id: string) => setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+
+    return (
+        <Section
+            id="context-channels"
+            title="Canales de Slack"
+            description="Marca los canales que quieres seguir enteros, aunque nadie te mencione. Los que ya usas se leen igual."
+        >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                    aria-label="Buscar canal"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Buscar canal"
+                    className={fieldClass}
+                />
+                <label className="inline-flex min-h-11 shrink-0 items-center gap-2 text-[13px] text-muted">
+                    <input type="checkbox" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} className="size-4 accent-[var(--accent)]" />
+                    Solo los que tienen actividad
+                </label>
+            </div>
+            {shown.length === 0 ? (
+                <p className="mt-4 text-[13.5px] text-muted">{channels.length === 0 ? 'No veo canales en tu Slack.' : 'Ningún canal coincide.'}</p>
+            ) : (
+                <ul className="mt-2">
+                    {shown.map((channel) => (
+                        <li key={channel.id} className="border-t border-line">
+                            <label className="flex min-h-11 items-start gap-3 py-3">
+                                <input
+                                    type="checkbox"
+                                    checked={selected.includes(channel.id)}
+                                    onChange={() => toggle(channel.id)}
+                                    aria-label={channel.name}
+                                    className="mt-1 size-4 shrink-0 accent-[var(--accent)]"
+                                />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[14px]">#{channel.name}</span>
+                                    <span className="block text-[12px] text-muted">
+                                        {channel.members === 1 ? '1 miembro' : `${channel.members} miembros`}
+                                        {' · '}
+                                        {channel.messages === 1 ? '1 mensaje en 30 días' : `${channel.messages} mensajes en 30 días`}
+                                    </span>
+                                </span>
+                                {channel.included && <span className="shrink-0 rounded-full bg-soft px-2 py-0.5 text-[11px] font-medium text-ink/80">Ya incluido</span>}
+                            </label>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <Button variant="primary" className="mt-4" onClick={() => router.put('/settings/context/channels', { slack_channel_ids: selected }, { preserveScroll: true })}>
+                Guardar
+            </Button>
+        </Section>
+    );
+}
+
 export default function Context(props: ContextProps) {
     const { tab, context, run_at: runAt } = props;
     const building = context.status === 'running';
@@ -699,6 +779,7 @@ export default function Context(props: ContextProps) {
             {tab === 'known' && <KnownTab known={props.known} context={context} runAt={runAt} knowledge={props.knowledge} />}
             {tab === 'rules' && <RulesTab rules={props.rules} inertia={props.inertia} />}
             {tab === 'pending' && <PendingTab pending={props.pending} />}
+            {tab === 'channels' && <ChannelsTab channels={props.channels} />}
         </SettingsLayout>
     );
 }

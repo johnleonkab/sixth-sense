@@ -11,6 +11,7 @@ use App\Comms\Windows\UrgentRules;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPreference;
+use App\Models\Comms\CommsScope;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -59,6 +60,7 @@ class Archive
             'area' => $this->area($event->user, $data),
             'preference' => $this->preference($event->user, $data),
             'urgent_rule' => $this->rules->apply($event->user, $data),
+            'scope' => $this->scope($event->user, $data),
             default => null,
         };
     }
@@ -123,6 +125,22 @@ class Archive
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     */
+    private function scope(User $user, array $data): void
+    {
+        $ids = array_values(array_filter(
+            $data['slack_channel_ids'] ?? [],
+            fn (mixed $id): bool => is_string($id) && $id !== '',
+        ));
+
+        CommsScope::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['slack_channel_ids' => $ids],
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $normalized
      */
     private function externalId(array $normalized): string
@@ -133,6 +151,7 @@ class Archive
             'person' => 'person:'.($normalized['person_ref'] ?? ''),
             'area' => 'area:'.($normalized['area_kind'] ?? 'product').':'.($normalized['ref'] ?? ''),
             'urgent_rule' => 'urgent:'.($normalized['op'] ?? 'set').':'.($rule['kind'] ?? '').':'.($rule['ref'] ?? ''),
+            'scope' => 'scope',
             default => 'preference',
         };
     }

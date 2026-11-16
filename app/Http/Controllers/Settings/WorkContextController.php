@@ -8,8 +8,14 @@ use App\Comms\Context\ContextHarvest;
 use App\Comms\Context\ContextWriter;
 use App\Comms\Context\FactOrigin;
 use App\Comms\Context\InertiaReview;
+use App\Comms\Events\Source;
+use App\Comms\Intents\Archive;
+use App\Connectors\Chat\Chats;
 use App\Http\Controllers\Controller;
 use App\Knowledge\KnowledgeBase;
+use App\Models\Comms\CommsMessage;
+use App\Models\Comms\CommsScope;
+use App\Models\User;
 use App\Models\WorkContext;
 use App\Services\PostHogService;
 use App\WorkContext\WorkContextStatus;
@@ -19,6 +25,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * The one Contexto section: people, areas and hours, what sixth-sense knows,
@@ -26,9 +33,9 @@ use Inertia\Response;
  */
 class WorkContextController extends Controller
 {
-    private const array TABS = ['people', 'areas', 'known', 'rules', 'pending'];
+    private const array TABS = ['people', 'areas', 'known', 'rules', 'pending', 'channels'];
 
-    public function index(Request $request, KnowledgeBase $knowledge, ContextEngine $engine, InertiaReview $inertia): Response
+    public function index(Request $request, KnowledgeBase $knowledge, ContextEngine $engine, InertiaReview $inertia, Chats $chats): Response
     {
         $user = $request->user();
         $context = $user->workContext ?? new WorkContext;
@@ -63,7 +70,26 @@ class WorkContextController extends Controller
             ], $engine->listing($user, ['active'], null, ['rule'])),
             'pending' => $engine->listing($user, ['proposed']),
             'inertia' => $inertia->for($user),
+            'channels' => $tab === 'channels' ? $this->listedChannels($user, $chats) : [],
         ]);
+    }
+
+    /**
+     * Extra Slack channels to follow in full. The list replaces the previous one.
+     */
+    public function channels(Request $request, Archive $archive): RedirectResponse
+    {
+        $ids = $request->validate([
+            'slack_channel_ids' => ['present', 'array'],
+            'slack_channel_ids.*' => ['string', 'max:64'],
+        ])['slack_channel_ids'];
+
+        $archive->record($request->user(), [
+            'kind' => 'scope',
+            'slack_channel_ids' => array_values($ids),
+        ]);
+
+        return back();
     }
 
     public function reject(Request $request, ContextWriter $context, int $fact): RedirectResponse
@@ -109,6 +135,47 @@ class WorkContextController extends Controller
         ]]);
 
         return back();
+    }
+
+    /**
+     * Channels the account belongs to, with how much arrived in the last 30
+     * days and whether the user already posts there.
+     *
+     * @return list<array{id: string, name: string, members: int, messages: int, included: bool, selected: bool}>
+     */
+    private function listedChannels(User $user, Chats $chats): array
+    {
+        try {
+            $listed = $chats->channels($user);
+        } catch (Throwable $exception) {
+            report($exception);
+            $listed = [];
+        }
+
+        $since = now()->subDays(30);
+        $counts = CommsMessage::query()
+            ->whereBelongsTo($user)
+            ->where('source', Source::Slack)
+            ->where('occurred_at', '>=', $since)
+            ->whereNull('deleted_at')
+            ->selectRaw("channel_ref, count(*) as total, sum(case when direction = 'out' then 1 else 0 end) as posted")
+            ->groupBy('channel_ref')
+            ->get()
+            ->keyBy(fn (CommsMessage $row): string => (string) $row->getRawOriginal('channel_ref'));
+        $selected = CommsScope::query()->whereBelongsTo($user)->first()->slack_channel_ids ?? [];
+
+        return array_map(function (array $channel) use ($counts, $selected): array {
+            $row = $counts->get($channel['id']);
+
+            return [
+                'id' => $channel['id'],
+                'name' => $channel['name'],
+                'members' => $channel['members'],
+                'messages' => (int) ($row?->getRawOriginal('total') ?? 0),
+                'included' => (int) ($row?->getRawOriginal('posted') ?? 0) > 0,
+                'selected' => in_array($channel['id'], $selected, true),
+            ];
+        }, $listed);
     }
 
     /**

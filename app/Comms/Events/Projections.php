@@ -18,6 +18,7 @@ use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
 use App\Models\Comms\CommsQuestion;
 use App\Models\Comms\CommsReconcileChange;
+use App\Models\Comms\CommsScope;
 use App\Models\Comms\CommsSegment;
 use App\Models\Comms\CommsSignal;
 use App\Models\Comms\CommsTopicAlias;
@@ -49,6 +50,7 @@ class Projections
         CommsTopicAlias::query()->whereBelongsTo($user)->delete();
         CommsTopicSearch::query()->whereBelongsTo($user)->delete();
         CommsUrgentRule::query()->whereBelongsTo($user)->delete();
+        CommsScope::query()->whereBelongsTo($user)->delete();
         CommsReconcileChange::query()->whereBelongsTo($user)->delete();
         CommsIntentParticipant::query()->whereBelongsTo($user)->delete();
         CommsIntent::query()->whereBelongsTo($user)->delete();
@@ -121,6 +123,10 @@ class Projections
                     'topic_subject' => $alias->topic_subject,
                     'alias' => $alias->alias,
                     'alias_normalized' => $alias->alias_normalized,
+                ])->all(),
+            'scopes' => CommsScope::query()->whereBelongsTo($user)->orderBy('id')->get()
+                ->map(fn (CommsScope $scope): array => [
+                    'slack_channel_ids' => $scope->slack_channel_ids,
                 ])->all(),
             'urgent_rules' => CommsUrgentRule::query()->whereBelongsTo($user)->orderBy('id')->get()
                 ->map(fn (CommsUrgentRule $rule): array => [

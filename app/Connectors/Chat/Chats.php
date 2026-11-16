@@ -27,6 +27,14 @@ interface Chats
     public function conversations(User $user, string $query, ?string $kind = null, int $limit = 10): array;
 
     /**
+     * Channels the user belongs to, for the settings list. Direct messages
+     * are left out. Cached for ten minutes by the Slack connector.
+     *
+     * @return list<array{id: string, name: string, members: int, kind: string}>
+     */
+    public function channels(User $user): array;
+
+    /**
      * The people and conversations the user has dealt with most in the last
      * weeks, most active first, so a name they say can be recognised. Only
      * what is already known: it never calls the workspace, and is empty until

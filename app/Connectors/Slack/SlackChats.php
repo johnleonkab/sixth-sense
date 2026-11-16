@@ -36,6 +36,9 @@ class SlackChats implements Chats
 
     private const CONVERSATIONS_MAX_AGE = 3600;
 
+    /** The settings list asks Slack again after ten minutes. */
+    private const CHANNELS_MAX_AGE = 600;
+
     /** warm() refreshes what is older than this. */
     private const WARM_AFTER = 3600;
 
@@ -81,6 +84,34 @@ class SlackChats implements Chats
         }
 
         return array_slice(self::ranked($found), 0, $limit);
+    }
+
+    public function channels(User $user): array
+    {
+        $channels = [];
+
+        foreach ($user->accountsWith(Capability::SlackRead) as $account) {
+            foreach ($this->rawConversations($account, self::CHANNELS_MAX_AGE) as $channel) {
+                if (($channel['is_im'] ?? false) || ($channel['is_mpim'] ?? false)) {
+                    continue;
+                }
+
+                $id = (string) ($channel['id'] ?? '');
+
+                if ($id === '') {
+                    continue;
+                }
+
+                $channels[] = [
+                    'id' => $id,
+                    'name' => (string) ($channel['name'] ?? $id),
+                    'members' => (int) ($channel['num_members'] ?? 0),
+                    'kind' => ($channel['is_private'] ?? false) ? 'private' : 'channel',
+                ];
+            }
+        }
+
+        return $channels;
     }
 
     public function familiar(User $user, int $people = 25, int $conversations = 20): array

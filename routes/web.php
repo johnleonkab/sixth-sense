@@ -152,6 +152,7 @@ Route::middleware('auth')->group(function () {
         Route::put('alerts/{source}', [AlertController::class, 'update'])->name('alerts.update');
         Route::get('context', [WorkContextController::class, 'index'])->name('context.index');
         Route::put('context', [WorkContextController::class, 'update'])->name('context.update');
+        Route::put('context/channels', [WorkContextController::class, 'channels'])->name('context.channels');
         Route::post('context/build', [WorkContextController::class, 'build'])
             ->middleware('throttle:5,10')
             ->name('context.build');

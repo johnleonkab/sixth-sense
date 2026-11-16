@@ -34,6 +34,14 @@ class FakeChats implements Chats
         )), 0, $limit);
     }
 
+    public function channels(User $user): array
+    {
+        return [
+            ['id' => 'C01', 'name' => 'producto', 'members' => 8, 'kind' => 'channel'],
+            ['id' => 'C02', 'name' => 'pagos', 'members' => 4, 'kind' => 'channel'],
+        ];
+    }
+
     public function familiar(User $user, int $people = 25, int $conversations = 20): array
     {
         return [
