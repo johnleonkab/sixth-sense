@@ -50,6 +50,7 @@ class IntentReplay
             EventType::UserAnswered => $this->answered($event),
             EventType::ModelDecided => $this->playbooks->replayDecision($event),
             EventType::UserViewed => $this->cards->apply($event),
+            EventType::ReconcileDecided => $this->machine->correct($event),
             default => null,
         };
     }

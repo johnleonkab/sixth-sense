@@ -158,6 +158,9 @@ class IntentStateMachine
             'still_open' => $this->reopen($intent, $event),
             'confirm_link' => $this->confirmLink($event->user, $intent, $data),
             'rematch' => $this->rematch($event->user, $intent, $event, $data),
+            'relink' => $this->relink($event->user, $intent, $event, $data),
+            'restore_link' => $this->restoreLink($event->user, $data),
+            'settle' => $this->close($intent, $event, $this->settleReason($data) ?? 'decision'),
             'merge' => $this->merge($event->user, $intent, $event, $data),
             'split' => $this->split($event->user, $intent, $event, $data),
             default => null,
@@ -610,24 +613,103 @@ class IntentStateMachine
      */
     private function confirmLink(User $user, CommsIntent $intent, array $data): void
     {
+        $ids = [];
+
+        foreach (is_array($data['link_ids'] ?? null) ? $data['link_ids'] : [] as $id) {
+            if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+                $ids[] = (int) $id;
+            }
+        }
+
         $linkId = $data['link_id'] ?? null;
 
-        if (! is_int($linkId) && ! (is_string($linkId) && ctype_digit($linkId))) {
+        if ($ids === [] && (is_int($linkId) || (is_string($linkId) && ctype_digit($linkId)))) {
+            $ids[] = (int) $linkId;
+        }
+
+        foreach ($ids as $id) {
+            $link = CommsConversationLink::query()
+                ->whereBelongsTo($user)
+                ->where('intent_id', $intent->id)
+                ->whereKey($id)
+                ->first();
+
+            if ($link === null) {
+                continue;
+            }
+
+            $link->uncertain = false;
+            $link->save();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function relink(User $user, CommsIntent $from, CommsEvent $event, array $data): void
+    {
+        $targetKey = (string) ($data['target_key'] ?? '');
+        $target = $targetKey === '' ? null : $this->intent($user, $targetKey);
+
+        if ($target === null && is_string($data['create_key'] ?? null) && $data['create_key'] !== '') {
+            $target = CommsIntent::query()->firstOrCreate(
+                ['user_id' => $user->id, 'key' => $data['create_key']],
+                [
+                    'what' => mb_substr((string) ($data['what'] ?? $from->what), 0, 280),
+                    'topic_subject' => $from->topic_subject,
+                    'state' => 'open',
+                    'flags' => [],
+                    'importance' => 0,
+                    'opened_event_id' => $event->id,
+                    'last_change_event_id' => $event->id,
+                    'last_change_summary' => 'Separada',
+                    'last_activity_at' => $event->occurred_at,
+                ],
+            );
+        }
+
+        if ($target === null || $target->id === $from->id) {
             return;
         }
 
-        $link = CommsConversationLink::query()
-            ->whereBelongsTo($user)
-            ->where('intent_id', $intent->id)
-            ->whereKey((int) $linkId)
-            ->first();
+        foreach ($data['messages'] ?? [] as $ref) {
+            if (! is_array($ref)) {
+                continue;
+            }
 
-        if ($link === null) {
-            return;
+            $message = $this->message($user, $ref['source'] ?? null, $ref['external_id'] ?? null);
+
+            if ($message !== null) {
+                $this->give($user, $from, $target, $message, $event);
+            }
         }
 
-        $link->uncertain = false;
-        $link->save();
+        $from->last_change_event_id = $event->id;
+        $from->last_change_summary = 'Mensaje movido';
+        $from->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function restoreLink(User $user, array $data): void
+    {
+        foreach ($data['links'] ?? [] as $row) {
+            if (! is_array($row) || ! isset($row['id'], $row['intent_id'])) {
+                continue;
+            }
+
+            $link = CommsConversationLink::query()->whereBelongsTo($user)->whereKey((int) $row['id'])->first();
+            $intent = CommsIntent::query()->whereBelongsTo($user)->whereKey((int) $row['intent_id'])->first();
+
+            if ($link === null || $intent === null) {
+                continue;
+            }
+
+            $link->intent_id = $intent->id;
+            $link->uncertain = (bool) ($row['uncertain'] ?? false);
+            $link->save();
+        }
     }
 
     private function close(CommsIntent $intent, CommsEvent $event, string $reason): void
