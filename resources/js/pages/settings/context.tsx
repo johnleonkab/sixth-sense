@@ -93,12 +93,21 @@ type Inertia = {
     sample: { id: number; actor: string | null; title: string | null; text: string; at: string }[];
 };
 
+type MergeProposal = {
+    question: string;
+    evidence: string;
+    names: string[];
+    from: string;
+    into: string;
+};
+
 type ContextProps = {
     tab: Tab;
     context: WorkContext;
     run_at: string;
     knowledge: KnowledgeSource[];
     people: Person[];
+    merge_proposals: MergeProposal[];
     areas: Area[];
     preference: Preference;
     relations: Option[];
@@ -300,19 +309,41 @@ function PersonRow({ person, relations }: { person: Person; relations: Option[] 
     );
 }
 
-function PeopleTab({ people, relations }: Pick<ContextProps, 'people' | 'relations'>) {
+function PeopleTab({ people, relations, merge_proposals }: Pick<ContextProps, 'people' | 'relations' | 'merge_proposals'>) {
     return (
-        <Section id="context-people" title="Personas" description="Quién importa y por qué. Junto a cada valor, de dónde viene. Lo que dices tú gana.">
-            {people.length === 0 ? (
-                <p className="text-[14px] text-muted">Todavía no hay nadie. Aparecerán cuando lleguen mensajes.</p>
-            ) : (
-                <ul>
-                    {people.map((person) => (
-                        <PersonRow key={person.id} person={person} relations={relations} />
-                    ))}
-                </ul>
+        <>
+            {merge_proposals.length > 0 && (
+                <Section id="context-people-merge" title="¿Son la misma persona?" description="Confírmalo una vez. El nombre, por sí solo, no las une.">
+                    <ul>
+                        {merge_proposals.map((merge) => (
+                            <li key={`${merge.from}:${merge.into}`} className="grid items-center gap-2 border-t border-line py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                                <span className="min-w-0">
+                                    <span className="block truncate text-[14px]">{merge.names.join(' y ')}</span>
+                                    <span className="block text-[12px] text-muted">{merge.evidence}</span>
+                                </span>
+                                <Button
+                                    type="button"
+                                    onClick={() => router.post('/settings/context/people/merge', { from: merge.from, into: merge.into }, { preserveScroll: true })}
+                                >
+                                    Sí, son la misma
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </Section>
             )}
-        </Section>
+            <Section id="context-people" title="Personas" description="Quién importa y por qué. Junto a cada valor, de dónde viene. Lo que dices tú gana.">
+                {people.length === 0 ? (
+                    <p className="text-[14px] text-muted">Todavía no hay nadie. Aparecerán cuando lleguen mensajes.</p>
+                ) : (
+                    <ul>
+                        {people.map((person) => (
+                            <PersonRow key={person.id} person={person} relations={relations} />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+        </>
     );
 }
 
@@ -968,7 +999,7 @@ export default function Context(props: ContextProps) {
                 ))}
             </nav>
 
-            {tab === 'people' && <PeopleTab people={props.people} relations={props.relations} />}
+            {tab === 'people' && <PeopleTab people={props.people} relations={props.relations} merge_proposals={props.merge_proposals ?? []} />}
             {tab === 'areas' && <AreasTab areas={props.areas} preference={props.preference} kinds={props.kinds} timezones={props.timezones} tones={props.tones} />}
             {tab === 'known' && <KnownTab known={props.known} context={context} runAt={runAt} knowledge={props.knowledge} />}
             {tab === 'rules' && <RulesTab rules={props.rules} inertia={props.inertia} />}

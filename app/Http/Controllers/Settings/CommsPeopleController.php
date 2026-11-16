@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Comms\Backfill\IdentityPass;
 use App\Comms\Context\ContextEngine;
 use App\Comms\Intents\Archive;
 use App\Comms\Intents\PersonRef;
+use App\Comms\People\PersonMerge;
 use App\Comms\People\Relation;
 use App\Http\Controllers\Controller;
 use App\Models\Comms\CommsOwnedArea;
@@ -34,8 +36,10 @@ class CommsPeopleController extends Controller
         $people = new PersonRef;
 
         return [
+            'merge_proposals' => app(IdentityPass::class)->proposals($user),
             'people' => CommsPerson::query()
                 ->whereBelongsTo($user)
+                ->whereNull('merged_into_id')
                 ->where('relation', '!=', Relation::Self)
                 ->with('identities')
                 ->orderBy('display_name')
@@ -112,6 +116,23 @@ class CommsPeopleController extends Controller
 
         $archive->record($request->user(), $normalized);
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Guardado.']);
+
+        return back();
+    }
+
+    public function merge(Request $request, PersonMerge $merges, IdentityPass $identity): RedirectResponse
+    {
+        $data = $request->validate([
+            'from' => ['required', 'string'],
+            'into' => ['required', 'string'],
+        ]);
+        $proposal = collect($identity->proposals($request->user()))->first(
+            fn (array $proposal): bool => $proposal['from'] === $data['from'] && $proposal['into'] === $data['into'],
+        );
+        abort_unless(is_array($proposal), 404);
+
+        $merges->confirm($request->user(), $data['from'], $data['into'], $proposal['evidence']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Unidas en una persona.']);
 
         return back();
     }

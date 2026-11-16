@@ -123,6 +123,7 @@ Route::middleware('auth')->group(function () {
         Route::post('context/areas', [CommsPeopleController::class, 'storeArea'])->name('context.areas.store');
         Route::delete('context/areas/{area}', [CommsPeopleController::class, 'destroyArea'])->whereNumber('area')->name('context.areas.destroy');
         Route::put('context/people/{person}', [CommsPeopleController::class, 'update'])->whereNumber('person')->name('context.people.update');
+        Route::post('context/people/merge', [CommsPeopleController::class, 'merge'])->name('context.people.merge');
         Route::redirect('/', '/settings/connections')->name('index');
         Route::redirect('display', '/settings/system');
         Route::get('system', [SystemController::class, 'index'])->name('system.index');

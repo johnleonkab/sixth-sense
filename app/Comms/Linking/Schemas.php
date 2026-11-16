@@ -4,7 +4,7 @@ namespace App\Comms\Linking;
 
 /**
  * The output schema of every agent in the linking pipeline
- * (agent-definitions 3.1 to 3.6), in the format `ModelRouter::ask()` takes.
+ * (agent-definitions 3.1 to 3.7), in the format `ModelRouter::ask()` takes.
  * A change to a schema is a change to its prompt: bump the prompt version.
  */
 final class Schemas
@@ -220,6 +220,31 @@ final class Schemas
                         'channels' => self::strings(),
                         'state' => ['type' => 'string'],
                         'example_message_ids' => self::strings(),
+                    ],
+                ]],
+            ],
+        ];
+    }
+
+    /**
+     * Task `identity_resolve`.
+     *
+     * @return array<string, mixed>
+     */
+    public static function identity(): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['pairs'],
+            'properties' => [
+                'pairs' => ['type' => 'array', 'items' => [
+                    'type' => 'object',
+                    'required' => ['a', 'b', 'verdict', 'evidence'],
+                    'properties' => [
+                        'a' => ['type' => 'string'],
+                        'b' => ['type' => 'string'],
+                        'verdict' => ['type' => 'string', 'enum' => ['same', 'different', 'cannot_tell']],
+                        'evidence' => ['type' => 'string'],
                     ],
                 ]],
             ],

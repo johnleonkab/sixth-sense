@@ -13,6 +13,7 @@ use App\Comms\Events\EventType;
 use App\Comms\Models\ModelAnswerKind;
 use App\Comms\Models\ModelRouter;
 use App\Comms\Notify\Notifier;
+use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
@@ -54,6 +55,7 @@ class Pipeline
         private CorrectionRules $corrections,
         private ContextRenderer $renderer,
         private SettleBuffer $buffer,
+        private PersonMerge $merges,
     ) {}
 
     public function advance(CommsEvent $event): void
@@ -190,6 +192,7 @@ class Pipeline
 
     private function correct(CommsEvent $event): void
     {
+        $this->merges->apply($event);
         $this->machine->correct($event);
         $this->corrections->learn($event);
     }

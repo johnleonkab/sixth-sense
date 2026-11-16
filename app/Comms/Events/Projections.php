@@ -58,6 +58,7 @@ class Projections
         CommsPreference::query()->whereBelongsTo($user)->delete();
         CommsMessage::query()->whereBelongsTo($user)->delete();
         CommsIdentity::query()->whereBelongsTo($user)->delete();
+        CommsPerson::query()->whereBelongsTo($user)->whereNotNull('merged_into_id')->delete();
         CommsPerson::query()->whereBelongsTo($user)->delete();
     }
 
