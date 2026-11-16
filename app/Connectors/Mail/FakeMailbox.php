@@ -15,13 +15,16 @@ class FakeMailbox implements Mailbox
     /** @var list<MailSearch> */
     public array $searches = [];
 
+    /** @var list<MailMessage> */
+    public array $extra = [];
+
     public function search(User $user, MailSearch $search): MailSearchResult
     {
         $this->searches[] = $search;
 
         $found = [];
 
-        foreach ($this->messages() as $message) {
+        foreach ([...$this->messages(), ...$this->extra] as $message) {
             if (! $this->matches($message, $search)) {
                 continue;
             }

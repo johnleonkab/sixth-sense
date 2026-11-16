@@ -43,6 +43,21 @@ class PipelineV2
         private DossierWriter $dossiers,
     ) {}
 
+    /**
+     * Run linking once more for a segment whose history was just fetched.
+     */
+    public function retry(CommsSegment $segment): void
+    {
+        $segment->loadMissing('user');
+        $user = $segment->user;
+
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $this->apply($user, $segment);
+    }
+
     public function process(CommsEvent $event): void
     {
         $user = $event->user;

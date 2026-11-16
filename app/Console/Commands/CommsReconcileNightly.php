@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Comms\Nightly\HistoryFetch;
 use App\Comms\Nightly\ReconcileApplier;
 use App\Comms\Nightly\Reconciler;
 use App\Models\User;
@@ -14,7 +15,7 @@ use Illuminate\Console\Command;
 #[Description('Re-read each topic touched that day, store the changes, and apply the automatic ones when the reconciler is on')]
 class CommsReconcileNightly extends Command
 {
-    public function handle(Reconciler $reconciler, ReconcileApplier $applier): int
+    public function handle(Reconciler $reconciler, ReconcileApplier $applier, HistoryFetch $history): int
     {
         $users = filled($this->argument('user'))
             ? User::query()->whereKey($this->argument('user'))->orderBy('id')->get()
@@ -32,7 +33,8 @@ class CommsReconcileNightly extends Command
         foreach ($users as $user) {
             $stored = $reconciler->run($user, $day);
             $applied = $applier->apply($user, $day);
-            $this->components->info("{$user->id}: {$stored} changes, {$applied} applied.");
+            $fetched = $history->run($user, $day);
+            $this->components->info("{$user->id}: {$stored} changes, {$applied} applied, {$fetched} fetched.");
         }
 
         return self::SUCCESS;

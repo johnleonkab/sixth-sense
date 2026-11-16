@@ -14,6 +14,12 @@ class FakeChats implements Chats
     /** @var list<OutgoingChatMessage> */
     public array $sent = [];
 
+    /** @var list<ChatSearch> */
+    public array $searches = [];
+
+    /** @var list<ChatMessage> */
+    public array $history = [];
+
     public function people(User $user, string $query, int $limit = 10): array
     {
         $query = ltrim($query, '@');
@@ -87,9 +93,18 @@ class FakeChats implements Chats
 
     public function search(User $user, ChatSearch $search): array
     {
-        return array_slice(array_values(array_reverse(array_filter($this->allMessages(), fn (ChatMessage $message): bool => ($search->text === null || self::contains($message->text, $search->text))
-            && ($search->from === null || self::contains($message->authorName, $search->from))
-            && ($search->in === null || self::contains($message->conversationLabel, $search->in))))), 0, $search->limit);
+        $this->searches[] = $search;
+
+        $messages = array_values(array_filter(
+            [...$this->allMessages(), ...$this->history],
+            fn (ChatMessage $message): bool => ($search->text === null || self::contains($message->text, $search->text))
+                && ($search->from === null || self::contains($message->authorName, $search->from))
+                && ($search->in === null || self::contains($message->conversationLabel, $search->in))
+                && ($search->after === null || $message->sentAt->greaterThanOrEqualTo($search->after))
+                && ($search->before === null || $message->sentAt->lessThanOrEqualTo($search->before)),
+        ));
+
+        return array_slice(array_reverse($messages), 0, $search->limit);
     }
 
     public function file(User $user, string $fileRef): ?ChatFile
