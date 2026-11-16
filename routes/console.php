@@ -14,6 +14,7 @@ Artisan::command('inspire', function () {
  */
 Schedule::command('alerts:watch')->everyMinute()->withoutOverlapping(5);
 Schedule::command('comms:reconcile')->everyTenMinutes()->withoutOverlapping(20);
+Schedule::command('comms:reconcile-nightly')->dailyAt(config('comms.reconcile.time'))->timezone(config('agenda.timezone'))->withoutOverlapping(180);
 Schedule::command('comms:metrics')->dailyAt('00:20')->withoutOverlapping(60);
 Schedule::command('comms:labels')->dailyAt('02:10')->withoutOverlapping(60);
 Schedule::command('comms:ask-patterns')->monthlyOn(1, '04:10')->withoutOverlapping(180);
