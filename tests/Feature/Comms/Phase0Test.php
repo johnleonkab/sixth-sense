@@ -232,6 +232,79 @@ test('a message over its token budget records a no-draft marker', function () {
         ->and($answer->kind)->toBe(ModelAnswerKind::NoDraft);
 });
 
+test('the same input returns the stored decision without a second provider call', function () {
+    Http::preventStrayRequests();
+
+    $fake = scripted([
+        new ModelCompletion(['label' => 'intent'], 'small-model'),
+        new ModelCompletion(['label' => 'other'], 'small-model'),
+    ]);
+    $user = User::factory()->create();
+    $router = app(ModelRouter::class);
+
+    $first = $router->ask($user, 'triage', 'A message arrived.', labelSchema(), []);
+    $second = $router->ask($user, 'triage', 'A message arrived.', labelSchema(), []);
+
+    expect($fake->calls)->toHaveCount(1)
+        ->and($second->output)->toEqual($first->output)
+        ->and($second->event->id)->toBe($first->event->id)
+        ->and($first->event->external_id)->toBe('triage:'.sha1((string) json_encode([[], 1, null, sha1('A message arrived.')])))
+        ->and(CommsEvent::query()->where('type', EventType::ModelDecided)->count())->toBe(1);
+});
+
+test('a different input calls the provider again', function () {
+    Http::preventStrayRequests();
+
+    $fake = scripted([
+        new ModelCompletion(['label' => 'intent'], 'small-model'),
+        new ModelCompletion(['label' => 'noise'], 'small-model'),
+    ]);
+    $user = User::factory()->create();
+    $router = app(ModelRouter::class);
+
+    $router->ask($user, 'triage', 'A message arrived.', labelSchema(), []);
+    $second = $router->ask($user, 'triage', 'A different message.', labelSchema(), []);
+
+    expect($fake->calls)->toHaveCount(2)
+        ->and($second->output['label'])->toBe('noise');
+});
+
+test('three runs store three decisions with distinct keys and run indexes', function () {
+    Http::preventStrayRequests();
+
+    config(['comms.tasks.triage.runs' => 3]);
+
+    $fake = scripted([
+        new ModelCompletion(['label' => 'one'], 'small-model'),
+        new ModelCompletion(['label' => 'two'], 'small-model'),
+        new ModelCompletion(['label' => 'three'], 'small-model'),
+    ]);
+    $user = User::factory()->create();
+
+    $answers = app(ModelRouter::class)->runs(
+        $user,
+        'triage',
+        'A message arrived.',
+        labelSchema(),
+        [],
+        42,
+        fn (int $runIndex): string => 'A message arrived.',
+    );
+
+    $events = CommsEvent::query()->where('type', EventType::ModelDecided)->orderBy('id')->get();
+    $usages = AiUsage::query()->where('status', 'ok')->orderBy('id')->get();
+
+    expect($answers)->toHaveCount(3)
+        ->and($fake->calls)->toHaveCount(3)
+        ->and($events)->toHaveCount(3)
+        ->and($events->pluck('external_id')->unique())->toHaveCount(3)
+        ->and($answers[0]->output['label'])->toBe('one')
+        ->and($answers[1]->output['label'])->toBe('two')
+        ->and($answers[2]->output['label'])->toBe('three')
+        ->and($usages->pluck('run_index')->all())->toBe([0, 1, 2])
+        ->and($usages->pluck('window_id')->all())->toBe([42, 42, 42]);
+});
+
 test('a sensitive call stores the decision and omits the model output from the usage log', function () {
     Http::preventStrayRequests();
 

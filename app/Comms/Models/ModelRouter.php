@@ -8,6 +8,7 @@ use App\Comms\Events\Source;
 use App\Models\AiUsage;
 use App\Models\Comms\CommsEvent;
 use App\Models\User;
+use Closure;
 use InvalidArgumentException;
 use Throwable;
 
@@ -30,7 +31,7 @@ class ModelRouter
      * @param  array<string, mixed>  $schema
      * @param  list<int>  $eventIds
      */
-    public function ask(User $user, string $task, string $input, array $schema, array $eventIds = [], bool $sensitive = false, int $runTokens = 0): ModelAnswer
+    public function ask(User $user, string $task, string $input, array $schema, array $eventIds = [], bool $sensitive = false, int $runTokens = 0, ?int $runIndex = null, ?int $windowId = null): ModelAnswer
     {
         $definition = config("comms.tasks.{$task}");
 
@@ -40,9 +41,19 @@ class ModelRouter
 
         $version = (int) $definition['prompt'];
         $provider = (string) $definition['provider'];
+        $key = $this->decisionKey($task, $eventIds, $version, $runIndex, $input);
+        $stored = $this->storedDecision($user, $key);
+
+        if ($stored !== null) {
+            $output = $stored->normalized['output'] ?? null;
+
+            if (is_array($output)) {
+                return ModelAnswer::accepted($output, $stored);
+            }
+        }
 
         if ($this->budget->exhausted($user, $eventIds, $runTokens)) {
-            return $this->marker($user, $task, $provider, $version, $eventIds, EventType::NoDraft, 'budget', 'budget');
+            return $this->marker($user, $task, $provider, $version, $eventIds, EventType::NoDraft, 'budget', 'budget', $runIndex, $windowId);
         }
 
         $system = $this->prompt($task, $version);
@@ -59,12 +70,12 @@ class ModelRouter
             try {
                 $completion = $this->attempt($provider, $fallback, $tier, $system, $prompt, $schema);
             } catch (Throwable $exception) {
-                $this->record($user, $task, $tier, $provider, $version, $eventIds, null, 'unavailable', $exception->getMessage(), 0, 0, 0, null);
+                $this->record($user, $task, $tier, $provider, $version, $eventIds, null, 'unavailable', $exception->getMessage(), 0, 0, 0, null, 'unsent', $runIndex, $windowId);
 
                 [$tier, $retried, $hint] = $this->afterFailure($tier, $retried, $hint, ['error' => $exception->getMessage()]);
 
                 if ($tier === null) {
-                    return $this->marker($user, $task, $provider, $version, $eventIds, EventType::Question, 'schema', null);
+                    return $this->marker($user, $task, $provider, $version, $eventIds, EventType::Question, 'schema', null, $runIndex, $windowId);
                 }
 
                 continue;
@@ -87,13 +98,15 @@ class ModelRouter
                 $completion->latencyMs,
                 $completion->cost,
                 $completion->model,
+                $runIndex,
+                $windowId,
             );
 
             if (! $valid) {
                 [$tier, $retried, $hint] = $this->afterFailure($tier, $retried, $hint, $completion->body);
 
                 if ($tier === null) {
-                    return $this->marker($user, $task, $provider, $version, $eventIds, EventType::Question, 'schema', null);
+                    return $this->marker($user, $task, $provider, $version, $eventIds, EventType::Question, 'schema', null, $runIndex, $windowId);
                 }
 
                 continue;
@@ -111,7 +124,7 @@ class ModelRouter
                 user: $user,
                 type: EventType::ModelDecided,
                 source: Source::Model,
-                externalId: null,
+                externalId: $key,
                 payload: null,
                 normalized: [
                     'task' => $task,
@@ -126,6 +139,62 @@ class ModelRouter
 
             return ModelAnswer::accepted($completion->body, $event);
         }
+    }
+
+    /**
+     * One stored decision per run. The closure builds that run's input, so a
+     * caller can shuffle candidates without changing the rest of the prompt.
+     *
+     * @param  string  $input  Stable text the caller closes over. Each run sends what the closure returns.
+     * @param  array<string, mixed>  $schema
+     * @param  list<int>  $eventIds
+     * @param  Closure(int): string  $inputForRun
+     * @return list<ModelAnswer>
+     */
+    public function runs(User $user, string $task, string $input, array $schema, array $eventIds, ?int $windowId, Closure $inputForRun): array
+    {
+        $definition = config("comms.tasks.{$task}");
+
+        if (! is_array($definition)) {
+            throw new InvalidArgumentException("Unknown communications task [{$task}].");
+        }
+
+        $count = (int) ($definition['runs'] ?? 1);
+        $answers = [];
+
+        for ($runIndex = 0; $runIndex < max(1, $count); $runIndex++) {
+            $answers[] = $this->ask(
+                user: $user,
+                task: $task,
+                input: $inputForRun($runIndex),
+                schema: $schema,
+                eventIds: $eventIds,
+                windowId: $windowId,
+                runIndex: $runIndex,
+            );
+        }
+
+        return $answers;
+    }
+
+    /**
+     * @param  list<int>  $eventIds
+     */
+    private function decisionKey(string $task, array $eventIds, int $version, ?int $runIndex, string $input): string
+    {
+        $encoded = json_encode([$eventIds, $version, $runIndex, sha1($input)], JSON_THROW_ON_ERROR);
+
+        return $task.':'.sha1($encoded);
+    }
+
+    private function storedDecision(User $user, string $key): ?CommsEvent
+    {
+        return CommsEvent::query()
+            ->whereBelongsTo($user)
+            ->where('type', EventType::ModelDecided)
+            ->where('source', Source::Model)
+            ->where('external_id', $key)
+            ->first();
     }
 
     /**
@@ -224,6 +293,8 @@ class ModelRouter
         int $latencyMs,
         ?float $cost,
         string $model = 'unsent',
+        ?int $runIndex = null,
+        ?int $windowId = null,
     ): void {
         AiUsage::query()->create([
             'user_id' => $user->id,
@@ -240,16 +311,18 @@ class ModelRouter
             'prompt_version' => $version,
             'event_ids' => $eventIds,
             'output' => $output,
+            'run_index' => $runIndex,
+            'window_id' => $windowId,
         ]);
     }
 
     /**
      * @param  list<int>  $eventIds
      */
-    private function marker(User $user, string $task, string $provider, int $version, array $eventIds, EventType $type, string $reason, ?string $usageStatus): ModelAnswer
+    private function marker(User $user, string $task, string $provider, int $version, array $eventIds, EventType $type, string $reason, ?string $usageStatus, ?int $runIndex = null, ?int $windowId = null): ModelAnswer
     {
         if ($usageStatus !== null) {
-            $this->record($user, $task, (string) config("comms.tasks.{$task}.tier"), $provider, $version, $eventIds, null, $usageStatus, null, 0, 0, 0, null);
+            $this->record($user, $task, (string) config("comms.tasks.{$task}.tier"), $provider, $version, $eventIds, null, $usageStatus, null, 0, 0, 0, null, 'unsent', $runIndex, $windowId);
         }
 
         $event = $this->log->append(

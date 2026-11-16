@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * One call to a model: what for, which one, what it took and cost.
  */
-#[Fillable(['user_id', 'task', 'provider', 'model', 'status', 'input_tokens', 'cached_tokens', 'output_tokens', 'reasoning_tokens', 'latency_ms', 'cost', 'error', 'tier', 'prompt_version', 'event_ids', 'output'])]
+#[Fillable(['user_id', 'task', 'provider', 'model', 'status', 'input_tokens', 'cached_tokens', 'output_tokens', 'reasoning_tokens', 'latency_ms', 'cost', 'error', 'tier', 'prompt_version', 'event_ids', 'output', 'window_id', 'run_index'])]
 class AiUsage extends Model
 {
     public const UPDATED_AT = null;
@@ -26,6 +26,8 @@ class AiUsage extends Model
             'created_at' => 'immutable_datetime',
             'event_ids' => 'array',
             'output' => 'array',
+            'window_id' => 'integer',
+            'run_index' => 'integer',
         ];
     }
 
