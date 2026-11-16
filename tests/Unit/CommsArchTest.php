@@ -12,3 +12,7 @@ arch('ingestion never reaches the gate or a write tool')
 arch('playbooks only propose, they never call a write tool')
     ->expect('App\Comms\Playbooks')
     ->not->toUse('App\Comms\Gate\WriteTools');
+
+arch('linking, topics and the nightly pass never reach the gate, actions, or voice tools')
+    ->expect(['App\Comms\Linking', 'App\Comms\Topics', 'App\Comms\Nightly'])
+    ->not->toUse(['App\Comms\Gate', 'App\Actions', 'App\Voice\Tools']);
