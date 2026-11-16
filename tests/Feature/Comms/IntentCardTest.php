@@ -169,7 +169,10 @@ test('an unclear field is asked in place of the value and evidence keeps every c
             'responders' => '¿Quién debería hacerlo?',
             'deadline' => '¿Para cuándo?',
         ])
-        ->and($card['open']['plan'])->toBe([['id' => 's1', 'what' => 'Leer el contrato', 'after' => []]])
+        ->and($card['open']['plan'][0]['steps'][0]['id'])->toBe('s1')
+        ->and($card['open']['plan'][0]['steps'][0]['text'])->toBe('Leer el contrato')
+        ->and(collect($card['open']['plan'][0]['steps'])->where('status', 'needs_approval'))->toHaveCount(2)
+        ->and(collect($card['open']['plan'][0]['steps'])->where('status', 'skipped'))->toHaveCount(1)
         ->and($card['open']['actions'])->toHaveCount(2)
         ->and($card['open']['evidence']['quote'])->toBe('¿Puedes revisar el contrato?')
         ->and($card['open']['evidence']['message_count'])->toBe(2)

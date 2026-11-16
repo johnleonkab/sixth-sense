@@ -35,7 +35,10 @@ class IntentCard
         'deadline' => '¿Para cuándo?',
     ];
 
-    public function __construct(private EventLog $log) {}
+    public function __construct(
+        private EventLog $log,
+        private PlanChecklist $plan,
+    ) {}
 
     /**
      * @return array{collapsed: array<string, mixed>, open: array<string, mixed>}|null
@@ -155,7 +158,7 @@ class IntentCard
                 'deadline' => isset($unclear['deadline']) ? null : $intent->deadline?->toDateString(),
                 'unclear' => $unclear,
                 'changed_since' => $changedSince,
-                'plan' => $intent->steps ?? [],
+                'plan' => $this->plan->for($intent),
                 'actions' => $pending->map(fn (CommsProposal $proposal): array => [
                     'id' => $proposal->id,
                     'action' => $proposal->action_class->value,
