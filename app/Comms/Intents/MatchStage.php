@@ -72,6 +72,7 @@ class MatchStage
             'En kind va uno de estos, o null: question si le preguntan algo que se responde con información; review_comment si es un comentario en una revisión que espera respuesta; choice si tiene que elegir entre opciones; prepare si le piden hacer o preparar un trabajo (revisar un PR, escribir un documento, preparar una presentación).',
             'Si el mensaje sigue un DM o canal que ya tiene intents abiertos con la misma persona, usa attach o update cuando sea detalle o seguimiento del mismo pedido. Abre uno nuevo solo cuando el pedido es claramente distinto. No pongas a la misma persona en responders y possible_responders.',
             $this->context->block($user, new ContextRequest(Audience::Match, about: $author?->display_name)),
+            ...(($message->flags['cc_only'] ?? false) === true ? ['cc_only: true'] : []),
             '<source id="evt:'.$event->id.'" kind="'.$kind.'" author="'.$authorKey.'">',
             $message->text,
             '</source>',

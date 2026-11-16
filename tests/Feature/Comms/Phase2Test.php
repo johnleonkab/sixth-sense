@@ -18,6 +18,7 @@ use App\Connections\Provider;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsIntentParticipant;
+use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPerson;
 use App\Models\Comms\CommsPreference;
@@ -311,21 +312,49 @@ test('someone else taking a group ask settles it', function () {
         ->and($intent->settle_reason)->toBe('taken_by_other');
 });
 
-test('a copied email and a newsletter open nothing and call no model', function () {
+test('a cc-only email with an ask reaches matching with the flag set', function () {
     $user = phase2User();
-    $copied = phase2Script([]);
-    phase2Say($user, 'g-cc', 'Novedades del trimestre', new Party('news@example.com', 'news@example.com', 'News'), phase2At('2026-11-02'), extra: [
+    $ask = '¿Puedes revisar el flujo de prepago antes del viernes?';
+    $fake = phase2Script([
+        phase2Match([phase2Open('Revisar el flujo de prepago', $ask, requesters: ['gmail:marta@example.com'])]),
+    ]);
+
+    phase2Say($user, 'g-cc', $ask, new Party('marta@example.com', 'marta@example.com', 'Marta'), phase2At('2026-11-02'), extra: [
         'cc' => [['email' => 'me@example.com']],
     ], source: Source::Gmail, channel: 'INBOX', thread: 'cc-1');
 
+    $message = CommsMessage::query()->whereBelongsTo($user)->sole();
+
+    expect($message->flags['cc_only'])->toBeTrue()
+        ->and($fake->calls)->toHaveCount(1)
+        ->and($fake->calls[0]['input'])->toContain('cc_only: true');
+});
+
+test('a newsletter is still dropped by rule and calls no model', function () {
+    $user = phase2User();
     $newsletter = phase2Script([]);
+
     phase2Say($user, 'g-news', 'La edición de noviembre', new Party('news@example.com', 'news@example.com', 'News'), phase2At('2026-11-03'), extra: [
         'headers' => ['List-Unsubscribe' => '<mailto:bye@news.test>'],
     ], source: Source::Gmail, channel: 'INBOX', thread: 'news-1');
 
     expect(CommsIntent::query()->count())->toBe(0)
-        ->and($copied->calls)->toBe([])
         ->and($newsletter->calls)->toBe([]);
+});
+
+test('a model triage answer of noise still reaches matching', function () {
+    $user = phase2User();
+    $ask = '¿Puedes revisar el flujo de prepago?';
+    $fake = phase2Script([
+        ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
+        phase2Match([phase2Open('Revisar el flujo de prepago', $ask)]),
+    ]);
+
+    phase2Say($user, 's-noise', $ask, phase2Marta(), phase2At('2026-11-02'));
+
+    expect(CommsIntent::query()->count())->toBe(1)
+        ->and($fake->calls)->toHaveCount(2)
+        ->and(CommsMessage::query()->whereBelongsTo($user)->sole()->flags['noise'])->toBeFalse();
 });
 
 test('a sensitive message is flagged and the intent keeps the flag', function () {

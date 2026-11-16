@@ -127,7 +127,10 @@ test('an urgent ask reaches the open screen at once, saying who asks and what', 
 
 test('a past message is sent again as a new message and the original is left alone', function () {
     $user = probeUser();
-    probeScript(array_fill(0, 3, ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9]));
+    probeScript(array_merge(...array_fill(0, 3, [
+        ['label' => 'noise', 'urgent' => false, 'sensitive' => false, 'confidence' => 0.9],
+        ['operations' => [['op' => 'noise', 'quote' => '', 'confidence' => 0.9]], 'confidence' => 0.9],
+    ])));
 
     $original = app(Ingestor::class)->ingest($user, new SlackInbound(
         teamId: 'T1',

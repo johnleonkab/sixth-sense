@@ -15,6 +15,6 @@ final readonly class TriageResult
 
     public function stops(): bool
     {
-        return in_array($this->label, ['noise', 'cc_only', 'delivery'], true);
+        return in_array($this->label, ['noise', 'delivery'], true);
     }
 }

@@ -89,11 +89,11 @@ class Pipeline
 
         $this->flag($event, $message, $triage);
 
-        if ($triage->stops()) {
-            if ($triage->label === 'cc_only') {
-                $this->playbooks->copied($event->user, $message, $event);
-            }
+        if ($triage->label === 'cc_only') {
+            $this->playbooks->copied($event->user, $message, $event);
+        }
 
+        if ($triage->stops()) {
             return;
         }
 
@@ -216,10 +216,17 @@ class Pipeline
             return null;
         }
 
+        // The model may only add flags. A noise label never drops a person.
+        $label = (string) ($answer->output['label'] ?? 'possible_intent');
+
+        if (! in_array($label, ['possible_intent', 'possible_signal'], true)) {
+            $label = 'possible_intent';
+        }
+
         return new TriageResult(
-            (string) $answer->output['label'],
-            (bool) $answer->output['urgent'],
-            (bool) $answer->output['sensitive'],
+            $label,
+            (bool) ($answer->output['urgent'] ?? false),
+            (bool) ($answer->output['sensitive'] ?? false),
         );
     }
 

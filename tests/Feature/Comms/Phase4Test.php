@@ -347,11 +347,17 @@ function phase4Chats(): FakeChats
 function phase4Noise(): void
 {
     $fake = new FakeCompleter;
-    $fake->script = [new ModelCompletion([
-        'label' => 'noise',
-        'urgent' => false,
-        'sensitive' => false,
-        'confidence' => 0.9,
-    ], 'scripted')];
+    $fake->script = [
+        new ModelCompletion([
+            'label' => 'noise',
+            'urgent' => false,
+            'sensitive' => false,
+            'confidence' => 0.9,
+        ], 'scripted'),
+        new ModelCompletion([
+            'operations' => [['op' => 'noise', 'quote' => '', 'confidence' => 0.9]],
+            'confidence' => 0.9,
+        ], 'scripted'),
+    ];
     app()->instance(CompletesTasks::class, $fake);
 }

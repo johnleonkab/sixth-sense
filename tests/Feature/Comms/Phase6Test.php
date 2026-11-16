@@ -115,7 +115,10 @@ test('a meeting with nothing open stays quiet', function () {
 test('a transcript opens commitments and records a contradiction', function () {
     $user = phase6User();
 
-    phase6Script([phase6Noise()]);
+    phase6Script([
+        phase6Noise(),
+        phase6Match([['op' => 'noise', 'quote' => 'El tope queda en 10.', 'confidence' => 0.9]]),
+    ]);
     phase6Say(
         $user,
         'g-after',

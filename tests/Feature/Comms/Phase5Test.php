@@ -354,8 +354,11 @@ test('jira notion and github comments and changes enter the log', function () {
     $user = phase5User();
     phase5Script([
         phase5Noise(),
+        phase5Match([['op' => 'noise', 'quote' => 'Un comentario', 'confidence' => 0.9]]),
         phase5Noise(),
+        phase5Match([['op' => 'noise', 'quote' => 'Un comentario en la página', 'confidence' => 0.9]]),
         phase5Noise(),
+        phase5Match([['op' => 'noise', 'quote' => 'Un comentario en el pull', 'confidence' => 0.9]]),
     ]);
     $ingestor = app(SourceIngestor::class);
     $author = new Party('dev-1', 'dev@example.com', 'Diego');
