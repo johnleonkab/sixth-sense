@@ -15,9 +15,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('knowledge_documents', function (Blueprint $table) {
-            $table->dropFullText(['title', 'content']);
-        });
+        $indexed = Schema::getConnection()->getDriverName() !== 'sqlite';
+
+        if ($indexed) {
+            Schema::table('knowledge_documents', function (Blueprint $table) {
+                $table->dropFullText(['title', 'content']);
+            });
+        }
 
         Schema::table('knowledge_documents', function (Blueprint $table) {
             $table->dropColumn('content');
@@ -28,26 +32,34 @@ return new class extends Migration
             $table->timestamp('last_viewed_at')->nullable()->after('views');
         });
 
-        Schema::table('knowledge_documents', function (Blueprint $table) {
-            $table->fullText(['title', 'terms'])->language('spanish');
-        });
+        if ($indexed) {
+            Schema::table('knowledge_documents', function (Blueprint $table) {
+                $table->fullText(['title', 'terms'])->language('spanish');
+            });
+        }
 
         DB::table('knowledge_documents')->update(['indexed_at' => null]);
     }
 
     public function down(): void
     {
-        Schema::table('knowledge_documents', function (Blueprint $table) {
-            $table->dropFullText(['title', 'terms']);
-        });
+        $indexed = Schema::getConnection()->getDriverName() !== 'sqlite';
+
+        if ($indexed) {
+            Schema::table('knowledge_documents', function (Blueprint $table) {
+                $table->dropFullText(['title', 'terms']);
+            });
+        }
 
         Schema::table('knowledge_documents', function (Blueprint $table) {
             $table->dropColumn(['terms', 'summary', 'summarized_version', 'views', 'last_viewed_at']);
             $table->longText('content')->nullable();
         });
 
-        Schema::table('knowledge_documents', function (Blueprint $table) {
-            $table->fullText(['title', 'content'])->language('spanish');
-        });
+        if ($indexed) {
+            Schema::table('knowledge_documents', function (Blueprint $table) {
+                $table->fullText(['title', 'content'])->language('spanish');
+            });
+        }
     }
 };

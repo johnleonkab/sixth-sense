@@ -211,7 +211,7 @@ El prototipo visual de referencia está en `docs/prototype.html`. Es la fuente d
 |---|---|
 | Backend | Laravel (última versión estable), PHP 8.3+ |
 | Frontend | Inertia + React + TypeScript, Vite, Tailwind |
-| Base de datos | **MySQL 8** en producción (Laravel Forge). En local y tests aún PostgreSQL (`compose.yaml`, `phpunit.xml`). Todo el código y las migraciones deben funcionar en MySQL: nada exclusivo de Postgres (`jsonb`, `tsvector`, `ilike`, `pg_trgm`, funciones `plpgsql`); el SQL específico va detrás de `getDriverName()`, como en `KnowledgeBase::matching`. |
+| Base de datos | **MySQL 8** en producción (Laravel Forge). En local `database/database.sqlite` y en tests SQLite en memoria (`phpunit.xml`). Todo el código y las migraciones deben funcionar en MySQL: nada exclusivo de Postgres (`jsonb`, `tsvector`, `ilike`, `pg_trgm`, funciones `plpgsql`); el SQL específico va detrás de `getDriverName()`, como en `KnowledgeBase::matching`. |
 | Colas y caché | Redis + Laravel Horizon |
 | Tiempo real | Laravel Reverb (WebSockets) + Laravel Echo en el cliente |
 | IA (cerebro) | **DeepSeek y Gemini**, con drivers propios en `app/Ai` (`TextModel`, `Drivers/OpenAiCompatibleDriver`, `Drivers/GeminiDriver`) y llamadas a herramientas. **No se usa `prism-php/prism` ni Anthropic** (coste). No añadir Prism ni otro SDK de IA. Embeddings: API de Gemini. |

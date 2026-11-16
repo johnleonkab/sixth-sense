@@ -29,7 +29,11 @@ return new class extends Migration
 
             $table->unique(['user_id', 'source', 'ref']);
             $table->index(['user_id', 'source', 'indexed_at']);
-            $table->fullText(['title', 'content'])->language('spanish');
+
+            // SQLite (local and tests) has no full-text index; search falls back to LIKE.
+            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+                $table->fullText(['title', 'content'])->language('spanish');
+            }
         });
     }
 

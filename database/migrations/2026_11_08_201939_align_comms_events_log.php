@@ -63,6 +63,41 @@ return new class extends Migration
      */
     private function allowProcessedAt(): void
     {
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            DB::unprepared('DROP TRIGGER IF EXISTS events_no_update');
+            DB::unprepared('DROP TRIGGER IF EXISTS events_no_delete');
+            DB::unprepared(<<<'SQL'
+                CREATE TRIGGER events_no_update
+                BEFORE UPDATE ON comms_events
+                FOR EACH ROW
+                WHEN NEW.id IS NOT OLD.id
+                    OR NEW.user_id IS NOT OLD.user_id
+                    OR NEW.type IS NOT OLD.type
+                    OR NEW.source IS NOT OLD.source
+                    OR NEW.external_id IS NOT OLD.external_id
+                    OR NEW.revision IS NOT OLD.revision
+                    OR NEW.sensitive IS NOT OLD.sensitive
+                    OR NEW.payload IS NOT OLD.payload
+                    OR NEW.normalized IS NOT OLD.normalized
+                    OR NEW.causation_id IS NOT OLD.causation_id
+                    OR NEW.occurred_at IS NOT OLD.occurred_at
+                    OR NEW.recorded_at IS NOT OLD.recorded_at
+                BEGIN
+                    SELECT RAISE(ABORT, 'The event log is append-only.');
+                END
+            SQL);
+            DB::unprepared(<<<'SQL'
+                CREATE TRIGGER events_no_delete
+                BEFORE DELETE ON comms_events
+                FOR EACH ROW
+                BEGIN
+                    SELECT RAISE(ABORT, 'The event log is append-only.');
+                END
+            SQL);
+
+            return;
+        }
+
         if (Schema::getConnection()->getDriverName() === 'mysql') {
             DB::unprepared('DROP TRIGGER IF EXISTS events_no_update');
             DB::unprepared(<<<'SQL'

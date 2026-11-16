@@ -45,7 +45,7 @@ there without losing the current production behaviour on the way.
 | Context store | `comms_context_facts`, `ContextEngine::pack`, projector, precedence | Same. Ask patterns as `rule`/`person` facts `origin=observed` | **Keep** |
 | Model router | `ModelRouter::ask`, DeepSeek/Gemini via `app/Ai`, one provider for every task, decision keys without `run_index` | Tasks `segment`, `link`, `match` v2, `critic`, `dossier_write`, `reconcile`; provider per task (section 1.1); key includes `run_index` | **Extend** |
 | Embeddings | None. The `embed` task asks a model for a one-sentence summary, and similarity is `similar_text` on strings (`IntentStateMachine`, `ContextEngine`) | Real vectors from the Gemini embeddings API, cached in `comms_embeddings`; used by the retriever, the duplicate check and the agreement check on `what` | **New** |
-| Database | Local and tests on Postgres (`phpunit.xml`); production on Forge is **MySQL**. `KnowledgeBase` already branches per driver | Everything must run on MySQL. No Postgres-only feature | **Constraint** |
+| Database | Production on Forge is **MySQL**; local and tests on SQLite (decided 2026-11-15). `KnowledgeBase` already branches per driver | Everything must run on MySQL. No Postgres-only feature | **Constraint** |
 | Backfill | `comms:backfill` (14 days, ingest only) | 30 days + passes B1–B5 + built-in evaluation (D6) | **Extend** |
 | Nightly reconciler, history fetch, weekly eval | None | N1–N3 (D8) | **New** |
 | Golden set | Fixtures in `tests/Fixtures/Comms` (2 files) and phase tests | Fixed sequences + B4 weak labels + corrections, replayed weekly | **New** |
@@ -78,7 +78,7 @@ Taken by the user on 2026-11-15, on top of the proposal's section 1:
 | # | Decision | Consequence in this plan |
 |---|---|---|
 | Q1 | **Only DeepSeek and Gemini.** No Anthropic. | Model allocation in 1.1. No new driver for text; one new HTTP call for Gemini embeddings. |
-| Q2 | **MySQL in production (Forge).** `pg_trgm` and every Postgres-only feature are out. | Search uses Laravel `fullText` indexes and `whereFullText`, which work on both drivers. Nicknames use an alias table. Tests also run on MySQL (section 8). |
+| Q2 | **MySQL in production (Forge).** `pg_trgm` and every Postgres-only feature are out. | Search uses Laravel `fullText` indexes and `whereFullText`, which work on both drivers. Nicknames use an alias table. Tests run on SQLite; a MySQL check run covers the MySQL branches (section 8). |
 | Q3 | **The user configures scope and urgency in the GUI.** | Slack extra channels and urgent rules are per-user settings with their own screens (section 7a). Nothing is hard-coded in config beyond defaults. |
 | Q4 | Per-window token budget | Measured in M5. Until then `budget.per_window_tokens = 150 000`, logged, not enforced. |
 | Q5 | The old matcher does not run alongside v2 | One brain. The switch is a rebuild from the log (section 9). |
@@ -125,7 +125,7 @@ production.
 
 | Need | How, with what is installed | Works on MySQL |
 |---|---|---|
-| Keyword search over dossiers and terms | Schema `fullText()` index + `whereFullText()`, branching per driver the way `KnowledgeBase::search` already does (natural-language mode on MySQL, `websearch` on Postgres) | Yes |
+| Keyword search over dossiers and terms | Schema `fullText()` index + `whereFullText()`, branching per driver the way `KnowledgeBase::search` already does (boolean prefix mode on MySQL, `LIKE` on SQLite) | Yes |
 | Names and nicknames | `comms_topic_aliases`: each nickname stored normalized (lowercase, accents and punctuation removed). Exact and prefix match in SQL, then PHP `levenshtein` over the user's alias list (hundreds of rows), then embeddings | Yes |
 | Embeddings | `ModelRouter::embed()` calls the Gemini embeddings endpoint over Laravel's HTTP client (no SDK); cached in `comms_embeddings` | Yes (vectors as JSON) |
 | Vector search | Not in v1 (implementation plan decision 9). Cosine in PHP over capped candidate lists. Revisit only if retriever p95 > 1.5 s | Yes |
@@ -169,7 +169,7 @@ Critical path: M0 → M1 → M2 → M3 → M4 → **M5 gate** → M6 → M7 → 
 | Item | Change |
 |---|---|
 | MySQL (production) | Migrations in section 4, written driver-neutral. `fullText` index on `comms_topic_search.document`. Before M3: confirm on Forge that the MySQL version is 8.0 or later and read `innodb_ft_min_token_size`. |
-| Postgres (local, tests) | Stays for now. A second test run on MySQL is added in M1 (section 8). Moving local development to MySQL too would remove the mismatch; it is the user's call. |
+| SQLite (local, tests) | Decided by the user on 2026-11-15. Local is `database/database.sqlite`; tests use SQLite in memory. SQLite has no full-text index, so search falls back to `LIKE` there, and the MySQL branches are only exercised by the MySQL check run (section 8, M1). Migrations carry a SQLite branch where they use triggers or full text. |
 | Redis | Settle-buffer timers do not live in Redis: the buffer is a projection (`comms_windows`) checked by `comms:tick`. Redis stays for locks and queues. |
 | Horizon queues | Add `comms-windows` (segment → route for one window; one at a time per user, it reads state) and `comms-nightly` (reconciler, history fetch, eval; low priority, long timeout 900 s). Keep `comms-ingest`, `comms-decide`, `comms-playbooks`, `comms-writes`. Model runs of one window (3 link, 3 match) are dispatched in parallel as a `Bus::batch` and joined before the router; they read state but do not write it. |
 | Scheduler (`routes/console.php`) | `comms:tick` (exists) also settles windows. New: `comms:reconcile-nightly` at `reconcile.time` in the user's zone; `comms:eval --weekly` Mondays 05:00; `comms:labels` nightly (B4 on new data); `comms:ask-patterns` monthly. Note: `comms:reconcile` already exists and is the 10-minute **poll** reconciliation; the nightly command needs a different name. |
@@ -409,7 +409,7 @@ Done when: every E-xx has a passing test; a day of production shows rejected-by-
 **Goal.** The tables, keys and plumbing every later delivery needs.
 
 Build:
-- Migrations: section 4.1 tables and 4.2 columns, driver-neutral (MySQL and Postgres).
+- Migrations: section 4.1 tables and 4.2 columns, driver-neutral (MySQL in production, SQLite locally and in tests).
 - `ModelRouter`: `run_index` in the key (backward compatible), provider per task (1.1), `runs(task)` helper that dispatches N calls and returns N `ModelAnswer`s, prompt layout with the shuffled block last.
 - `embed()`: Gemini embeddings over HTTP, cached in `comms_embeddings`. Replace `similar_text` in the duplicate check (`IntentStateMachine`) with cosine; keep `similar_text` as the fallback when the embeddings call fails.
 - `EventType` additions (4.4). `Projections` registers the new projections for replay.
@@ -418,7 +418,7 @@ Build:
 - MySQL triggers: the append-only triggers on `comms_events` need `SUPER` or `log_bin_trust_function_creators = 1` when binary logging is on (the MySQL 8 default). Production already ran this migration, so its database user is allowed to create triggers (most likely Forge's global privileges; to confirm). A new server or a restricted user would fail on it. The local MySQL service needs the flag.
 - Triage: remove any path where the model drops a message; CC-only becomes a flag (D1). Automated mail (`List-Unsubscribe`, `Precedence: bulk`, bot senders, notification mail from a source with its own connector) stays dropped by rule.
 
-Done when: replay of the existing phase fixtures still passes on Postgres and MySQL; a stored pre-M1 decision is still found by key; a message in an allow-listed channel with no mention is ingested; a CC-only human email reaches the matcher with `cc_only`; two near-identical `what` sentences score above the duplicate threshold by cosine.
+Done when: replay of the existing phase fixtures still passes on SQLite and on the MySQL check run; a stored pre-M1 decision is still found by key; a message in an allow-listed channel with no mention is ingested; a CC-only human email reaches the matcher with `cc_only`; two near-identical `what` sentences score above the duplicate threshold by cosine.
 
 ### M1a — Settings the user controls (M, in parallel with M2)
 
@@ -725,7 +725,7 @@ Surface use cases (proposal 7.8): 1, 2, 6, 7, 9, 11, 12 in M7; 3, 4, 5, 8, 10 in
 | Backfill topics are wrong on day one | `status = proposed`, user list review, reconciler `merge_topics` |
 | Switch loses an intent the user relies on | M6 lists old open intents not reproduced, once, as a batch |
 | Weaker models than the design assumed ("strongest tier") | 3-run agreement and the quote-checked critic do not depend on one model being right; M5 measures the result before the switch. `CLAUDE.md` still names Claude via Prism and should be updated to say DeepSeek and Gemini. |
-| Tests on Postgres, production on MySQL | Second test run on MySQL from M1; driver-neutral migrations; full-text code branches per driver like `KnowledgeBase` |
+| Tests on SQLite, production on MySQL | MySQL check run from M1 (Docker `mysql:8.0` with `--log-bin-trust-function-creators=1`); driver-neutral migrations; full-text code branches per driver like `KnowledgeBase` |
 | MySQL full text misses short terms and Spanish stems | Alias table and embeddings carry nicknames and meaning; retrieval measured alone in M3 |
 | Gemini embeddings unavailable | Fall back to today's string similarity; retrieval degrades, nothing fails |
 | Prompt drift | Prompts versioned; weekly eval; no bump that worsens a metric |

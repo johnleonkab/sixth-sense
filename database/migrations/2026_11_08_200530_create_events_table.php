@@ -56,6 +56,12 @@ return new class extends Migration
      */
     private function forbidChanges(string $table): void
     {
+        // SQLite rebuilds a table on every column change, which drops its
+        // triggers. They are created once the table has its final shape.
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (Schema::getConnection()->getDriverName() === 'mysql') {
             DB::unprepared('DROP TRIGGER IF EXISTS events_no_update');
             DB::unprepared('DROP TRIGGER IF EXISTS events_no_delete');
