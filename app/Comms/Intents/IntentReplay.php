@@ -3,6 +3,7 @@
 namespace App\Comms\Intents;
 
 use App\Comms\Context\ContextProjector;
+use App\Comms\Context\CorrectionRules;
 use App\Comms\Events\EventType;
 use App\Comms\Notify\Notifier;
 use App\Comms\People\PersonMerge;
@@ -33,6 +34,7 @@ class IntentReplay
         private ContextProjector $context,
         private PersonMerge $merges,
         private IntentCard $cards,
+        private CorrectionRules $corrections,
     ) {}
 
     public function apply(CommsEvent $event): void
@@ -56,6 +58,7 @@ class IntentReplay
     {
         $this->merges->apply($event);
         $this->machine->correct($event);
+        $this->corrections->learn($event);
     }
 
     private function sourced(CommsEvent $event): void

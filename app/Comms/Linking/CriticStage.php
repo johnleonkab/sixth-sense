@@ -25,6 +25,7 @@ class CriticStage
     public function __construct(
         private ModelRouter $router,
         private EventLog $log,
+        private Examples $examples,
     ) {}
 
     /**
@@ -62,7 +63,7 @@ class CriticStage
             $answer = $this->router->ask(
                 user: $user,
                 task: 'critic',
-                input: $this->input($user, $operation, $messages, $dossier),
+                input: $this->input($user, $segment, $operation, $messages, $dossier, $topicSubject),
                 schema: Schemas::critic(),
                 eventIds: $eventIds,
                 windowId: $segment->window_id,
@@ -108,7 +109,7 @@ class CriticStage
     /**
      * @param  Collection<int, CommsMessage>  $messages
      */
-    private function input(User $user, AgreedOperation $operation, Collection $messages, string $dossier): string
+    private function input(User $user, CommsSegment $segment, AgreedOperation $operation, Collection $messages, string $dossier, ?string $topic): string
     {
         $self = CommsPerson::query()->whereBelongsTo($user)->where('relation', Relation::Self)->first();
         $who = $self instanceof CommsPerson
@@ -136,6 +137,9 @@ class CriticStage
             '',
             'DOSSIER',
             $dossier === '' ? '(none)' : $this->plain($dossier),
+            '',
+            'PAST CORRECTIONS',
+            $this->examples->block($user, $segment, $messages, $topic),
         ]);
     }
 

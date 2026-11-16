@@ -30,6 +30,7 @@ class LinkStage
         private HardLinks $hardLinks,
         private ModelRouter $router,
         private EventLog $log,
+        private Examples $examples,
     ) {}
 
     public function run(CommsSegment $segment): LinkOutcome
@@ -110,7 +111,7 @@ class LinkStage
             '(none)',
             '',
             'PAST CORRECTIONS',
-            '(none)',
+            $this->examples->block($user, $segment, $messages, null),
         ]);
     }
 

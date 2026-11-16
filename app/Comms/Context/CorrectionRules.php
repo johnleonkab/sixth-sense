@@ -3,6 +3,7 @@
 namespace App\Comms\Context;
 
 use App\Models\Comms\CommsEvent;
+use App\Models\Comms\CommsGoldenLabel;
 use App\Models\Comms\CommsIntent;
 use Illuminate\Support\Str;
 
@@ -57,5 +58,39 @@ class CorrectionRules
             causation: $event,
             revision: "corrected:{$event->id}",
         );
+        $this->remember($event, $intent, (string) ($data['action'] ?? 'correction'), $sentence);
+    }
+
+    private function remember(CommsEvent $event, CommsIntent $intent, string $action, string $sentence): void
+    {
+        $exists = CommsGoldenLabel::query()
+            ->where('user_id', $event->user_id)
+            ->where('kind', 'correction')
+            ->where('source_event_id', $event->id)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        $people = $intent->participants
+            ->pluck('person_id')
+            ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+            ->map(fn (mixed $id): string => 'person:'.(int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $topic = $intent->topic_subject;
+
+        CommsGoldenLabel::query()->create([
+            'user_id' => $event->user_id,
+            'kind' => 'correction',
+            'label' => $action,
+            'expected' => ['text' => $sentence],
+            'evidence_event_ids' => [$event->id],
+            'people' => $people,
+            'topics' => is_string($topic) && $topic !== '' ? [$topic] : [],
+            'source_event_id' => $event->id,
+        ]);
     }
 }

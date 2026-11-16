@@ -24,6 +24,7 @@ class ExtractStage
     public function __construct(
         private ModelRouter $router,
         private Embeddings $embeddings,
+        private Examples $examples,
     ) {}
 
     /**
@@ -107,7 +108,7 @@ class ExtractStage
             '(none)',
             '',
             'PAST CORRECTIONS',
-            '(none)',
+            $this->examples->block($user, $segment, $messages, $outcome->topicSubject),
         ]);
     }
 
