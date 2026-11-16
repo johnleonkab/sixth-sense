@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'acknowledged_at',
     'settled_at',
     'last_activity_at',
+    'snoozed_until',
 ])]
 class CommsIntent extends Model
 {
@@ -60,6 +61,7 @@ class CommsIntent extends Model
             'acknowledged_at' => 'immutable_datetime',
             'settled_at' => 'immutable_datetime',
             'last_activity_at' => 'immutable_datetime',
+            'snoozed_until' => 'immutable_datetime',
         ];
     }
 
