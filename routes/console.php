@@ -15,6 +15,7 @@ Artisan::command('inspire', function () {
 Schedule::command('alerts:watch')->everyMinute()->withoutOverlapping(5);
 Schedule::command('comms:reconcile')->everyTenMinutes()->withoutOverlapping(20);
 Schedule::command('comms:metrics')->dailyAt('00:20')->withoutOverlapping(60);
+Schedule::command('comms:labels')->dailyAt('02:10')->withoutOverlapping(60);
 Schedule::command('comms:tick')->everyMinute()->withoutOverlapping(5);
 Schedule::command('alerts:check-replies')->everyTwoMinutes()->withoutOverlapping(10);
 Schedule::command('alerts:check-commitments')->everyTenMinutes()->withoutOverlapping(20);

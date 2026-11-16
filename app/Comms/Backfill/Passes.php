@@ -14,7 +14,7 @@ class Passes
      */
     public const ORDER = ['identity', 'labels', 'topics', 'patterns', 'sweep'];
 
-    public function __construct(private IdentityPass $identity) {}
+    public function __construct(private IdentityPass $identity, private LabelMiner $labels) {}
 
     /**
      * @return list<string>|null Null when the request names a pass that does not exist.
@@ -51,6 +51,10 @@ class Passes
     {
         if ($pass === 'identity') {
             return $this->identity->run($user);
+        }
+
+        if ($pass === 'labels') {
+            return $this->labels->run($user);
         }
 
         return [];
