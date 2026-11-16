@@ -21,7 +21,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\CommitsFullText;
 use Tests\Support\RecordingSceneText;
+
+uses(CommitsFullText::class);
 
 beforeEach(function () {
     Http::preventStrayRequests();

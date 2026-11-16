@@ -32,7 +32,10 @@ use App\Models\WingmanMeeting;
 use App\Voice\AssistantProfile;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\CommitsFullText;
 use Tests\Support\RecordingTextModel;
+
+uses(CommitsFullText::class);
 
 /**
  * A calendar whose week the test writes.

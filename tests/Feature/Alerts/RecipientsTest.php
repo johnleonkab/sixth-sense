@@ -17,6 +17,9 @@ use App\Models\ConnectedAccount;
 use App\Models\InboxItem;
 use App\Models\KnowledgeDocument;
 use App\Models\User;
+use Tests\Support\CommitsFullText;
+
+uses(CommitsFullText::class);
 
 beforeEach(function () {
     $this->app->instance(Chats::class, $this->chats = new class extends FakeChats
