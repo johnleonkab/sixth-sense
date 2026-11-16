@@ -227,6 +227,29 @@ final class Schemas
     }
 
     /**
+     * Task `ask_pattern`.
+     *
+     * @return array<string, mixed>
+     */
+    public static function askPattern(): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['patterns'],
+            'properties' => [
+                'patterns' => ['type' => 'array', 'items' => [
+                    'type' => 'object',
+                    'required' => ['text', 'example_message_ids'],
+                    'properties' => [
+                        'text' => ['type' => 'string'],
+                        'example_message_ids' => self::strings(),
+                    ],
+                ]],
+            ],
+        ];
+    }
+
+    /**
      * Task `identity_resolve`.
      *
      * @return array<string, mixed>
