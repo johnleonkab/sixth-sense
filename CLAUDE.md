@@ -358,3 +358,7 @@ Multiusuario y equipos, app móvil, palabra de activación ("Oye, sixth-sense"),
 - **Polling o webhooks** para Notion y Gmail según fiabilidad en la práctica.
 
 El orden de implementación está en `docs/PLAN.md`.
+
+## Pipeline de comunicaciones v2 (en construcción)
+
+El diseño decidido está en `docs/linking-intents-and-surface-proposal.md` (sección 1 manda), el plan en `docs/execution-plan.md` y **los tickets, en orden, en `docs/build-guide.md`**. Quien construya debe seguir esa guía ticket a ticket, en la rama `comms-v2`. La lógica de decisión de `app/Comms/Linking` y `app/Comms/Surface/BallHolder.php` es el contrato (con tests en `tests/Unit/Comms`): no se cambia sin el sí del usuario.

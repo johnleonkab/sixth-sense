@@ -1,7 +1,7 @@
 # Execution plan — comms pipeline, 0 to 1
 
 Status: approved by the user on 2026-11-15. M0 done except the production check (see M0).
-Audience: the user and the coding agent.
+Audience: the user and the coding agent. The ticket-by-ticket order is in [build-guide.md](build-guide.md).
 
 This plan turns the decided design into an ordered set of deliveries. It covers dependencies,
 infrastructure, data structure, backend, frontend, tests and the merge gate of every delivery.
