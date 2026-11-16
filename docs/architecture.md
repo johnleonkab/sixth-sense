@@ -11,8 +11,10 @@ implementation details (languages, hosting, exact providers).
 1. **State lives in code, judgment lives in models.** Intents, watchers, deadlines and permissions are
    stored and changed by deterministic code. Models read, classify, match, extract and draft. A model
    *proposes* a state change. Code validates it and applies it.
-2. **Cheap first, expensive only when needed.** Most messages are noise or simple updates. They should
-   never reach a large model. Escalate by need, not by default.
+2. **Cheap for machines, thorough for people.** Automated traffic is dropped by rules and never reaches a
+   model. Every human-written in-scope message is read by the strongest tier, three times, because
+   linking and intent detection must be right before they are cheap.
+   > Changed on 2026-11-15 (D1, D4). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
 3. **Everything external is a proposal.** Write actions go through one gate. The gate decides from a
    policy written in code, not from a model's opinion.
 4. **Reading leaves no trace.** Ingestion never marks things read, reacts, or resolves anything.
@@ -100,35 +102,31 @@ Emits time events into the same log, so time-based cases go through the same pip
 
 First stage for every message. Small, fast model plus rules.
 
-- **Rules first:** known automated senders, newsletters, CC-only, own messages to self, bots.
+- **Rules first:** known automated senders, newsletters, own messages to self, bots.
   Some automated messages are allow-listed as deliveries or asks (case 28).
-- **Model classifies** what is left into: noise / possible intent / possible signal / urgent / sensitive.
+  CC-only is not a rule. It is a feature passed to the matcher.
+  > Changed on 2026-11-15 (D1). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
+- **Model adds flags** to what is left: urgent, sensitive. It may not drop a human-written message.
+  > Changed on 2026-11-15 (D1). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
 - **Sensitive** (case 32) sets a flag that follows the message everywhere: restricted tools,
   no autonomy, no quoting into shared places.
 - **Urgent** (cases 21, 35, 45) skips batching and goes straight to the notifier after processing.
 
-Goal: drop most traffic here. Measure the drop rate and the miss rate.
+Goal: drop all automated traffic here and nothing written by a person. Measure the miss rate.
+> Changed on 2026-11-15 (D1). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
 
 ### 3.5 Intent matching & extraction
 
-For anything triage did not drop. Two steps:
+> Changed on 2026-11-15 (D2, D3, D4, D5, D7). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). Current design: [linking-intents-and-surface-proposal.md](linking-intents-and-surface-proposal.md) section 4 and [agent-definitions.md](agent-definitions.md) section 3.
 
-1. **Candidate retrieval (no model reasoning):** open intents and recently settled intents that share
-   participants, thread ids, linked tickets or pages, or are close in embedding space.
-   Keep it to a short list (around 10).
-2. **Match and extract (mid-size model, structured output):** given the message and the candidates,
-   return a list of operations:
-   - `attach(intent_id)` — continues an open intent
-   - `open(new intent)` — with what, requester, responder, deadline if stated
-   - `settle(intent_id, reason)`
-   - `reopen(intent_id)`
-   - `update(intent_id, fields)` — new deadline, new responder (delegation), etc.
-   - `signal(about intent_id or owned area)`
-   - `noise`
-   Each operation carries a confidence and the quote from the message that justifies it.
+In short: messages are read per conversation window and split into segments (D2). A segment is
+linked to a topic and then to an intent (D5) by three runs of the linker; disagreement attaches
+to the most likely and marks the link uncertain (D3, D4). Three runs of the extractor return the
+operations; a critic checks every `open`, `settle` and `reopen` (D7).
 
-Low confidence on a match → attach to the most likely intent, flag it as uncertain, show the
-correction option in the user surface. Merges and splits are user actions that become events.
+Unchanged from the original text: the operation set (`attach`, `open`, `settle`, `reopen`,
+`update`, `signal`, `noise`), the exact quote on every operation, the short candidate list
+(around 10), and that merges and splits only happen with the user's yes.
 
 ### 3.6 Intent state machine
 
@@ -256,8 +254,10 @@ Where the user sees and answers. Independent of the channels it tracks.
 
 - **Inbox of items:** questions, proposals, signals, with source links. Each item is answerable in one action:
   approve, edit, reject, choose an option, dictate a reply.
-- **Intent view:** open intents grouped as "waiting on me" / "I'm waiting on" / "stale".
+- **Home by who has the ball:** "Needs you" / "System working" / "Waiting on others" / "Done today",
+  plus a line for possible asks and uncertain links. Stale stays a batch. Topic view is secondary.
   Corrections: re-match, merge, split, close, change importance.
+  > Changed on 2026-11-15 (D10). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). Detail: proposal section 7.
 - **Digest:** start and end of day.
 - Every correction is an event. Corrections are the main training and evaluation signal.
 
@@ -293,8 +293,8 @@ needed before matching works well. Build it early.
 |---|---|---|
 | **Rules / no model** | dedupe, known senders, thread-id matching, policy, state transitions, watcher conditions that are exact | free and deterministic |
 | **Embeddings** | candidate retrieval for matching, search index, pattern detection (cases 20, 48) | cheap similarity |
-| **Small / fast** | triage, routing ambiguous cases, simple watcher conditions, short summaries | high volume, low stakes |
-| **Mid** | intent matching and extraction, action point extraction, context summaries for the user, most drafts | the core loop, needs reliability in structured output |
+| **Small / fast** | urgent and sensitive flags, routing ambiguous cases, simple watcher conditions, short summaries | high volume, low stakes |
+| **Mid** | segmenting a conversation window, dossier updates, action point extraction, context summaries for the user, most drafts | needs reliability in structured output |
 | **Large / reasoning** | answering from code and specs (1, 9, 40), contradictions and conflicts (17, 36, 56), transcript analysis (11), anything sent to others that states product facts | low volume, high stakes |
 
 ### 5.2 Harness rules
@@ -303,8 +303,10 @@ needed before matching works well. Build it early.
   tier and provider, with a fallback per task. Swapping providers is a config change.
 - **Structured outputs everywhere.** Every model call has a schema. Invalid output is retried once,
   then escalated a tier, then turned into a question for the user.
-- **Escalation by confidence.** A small or mid model that returns low confidence hands the same task
-  to the next tier, with its own output as a hint.
+- **Escalation by confidence** applies to small-tier tasks only (flags, routing, watcher checks): low
+  confidence hands the task to the next tier, with its own output as a hint. Linking and intent
+  extraction do not use model-reported confidence; they run three times and agreement decides.
+  > Changed on 2026-11-15 (D4). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
 - **Verification before external sends.** Drafts that state facts and go to other people are checked
   by a second pass (different model or different prompt): every claim must map to a cited source.
   Unsupported claims are removed or turned into questions for the user.
@@ -322,8 +324,9 @@ needed before matching works well. Build it early.
 ### 6.1 Incoming message
 
 1. Connector receives it → normalize → event log.
-2. Triage: drop noise, flag sensitive / urgent.
-3. Retrieve candidate intents → match & extract operations.
+2. Rules drop automated traffic. Flags: sensitive / urgent. Wait for the conversation window to settle.
+3. Segment the window → retrieve candidate topics and intents → link (3 runs) → extract operations (3 runs) → checks and critic.
+   > Changed on 2026-11-15 (D1, D2, D5). Original text moved to [superseded-2026-11-15.md](superseded-2026-11-15.md). 
 4. State machine applies valid operations, recomputes importance, emits state changes.
 5. Router picks playbooks for the state changes. If none, stop.
 6. Executor runs playbooks with context engine, produces questions / proposals / watchers.
