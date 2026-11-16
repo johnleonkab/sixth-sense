@@ -9,6 +9,7 @@ use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
+use App\Comms\Surface\IntentCard;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
 use App\Models\Comms\CommsEvent;
@@ -31,6 +32,7 @@ class IntentReplay
         private CloseTheLoop $close,
         private ContextProjector $context,
         private PersonMerge $merges,
+        private IntentCard $cards,
     ) {}
 
     public function apply(CommsEvent $event): void
@@ -45,6 +47,7 @@ class IntentReplay
             EventType::SourceChanged => $this->sourced($event),
             EventType::UserAnswered => $this->answered($event),
             EventType::ModelDecided => $this->playbooks->replayDecision($event),
+            EventType::UserViewed => $this->cards->apply($event),
             default => null,
         };
     }

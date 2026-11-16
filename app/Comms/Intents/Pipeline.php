@@ -20,6 +20,7 @@ use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
+use App\Comms\Surface\IntentCard;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
 use App\Comms\Windows\SettleBuffer;
@@ -59,6 +60,7 @@ class Pipeline
         private SettleBuffer $buffer,
         private PersonMerge $merges,
         private PipelineV2 $v2,
+        private IntentCard $cards,
     ) {}
 
     public function advance(CommsEvent $event): void
@@ -73,6 +75,7 @@ class Pipeline
             EventType::SourceChanged => $this->onSource($event),
             EventType::UserAnswered => $this->onAnswer($event),
             EventType::WindowSettled => $this->onWindow($event),
+            EventType::UserViewed => $this->cards->apply($event),
             default => null,
         };
     }
