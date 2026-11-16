@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'external_id',
     'channel_ref',
     'thread_ref',
+    'window_id',
     'author_person_id',
     'recipient_person_ids',
     'direction',
