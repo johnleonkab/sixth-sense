@@ -7,6 +7,7 @@ use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\People\Relation;
+use App\Comms\Windows\UrgentRules;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsOwnedArea;
 use App\Models\Comms\CommsPreference;
@@ -19,7 +20,12 @@ use Illuminate\Support\Str;
  */
 class Archive
 {
-    public function __construct(private EventLog $log, private PersonRef $people, private ContextProjector $context) {}
+    public function __construct(
+        private EventLog $log,
+        private PersonRef $people,
+        private ContextProjector $context,
+        private UrgentRules $rules,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $normalized
@@ -52,6 +58,7 @@ class Archive
             'person' => $this->person($event->user, $data),
             'area' => $this->area($event->user, $data),
             'preference' => $this->preference($event->user, $data),
+            'urgent_rule' => $this->rules->apply($event->user, $data),
             default => null,
         };
     }
@@ -120,9 +127,12 @@ class Archive
      */
     private function externalId(array $normalized): string
     {
+        $rule = is_array($normalized['rule'] ?? null) ? $normalized['rule'] : [];
+
         return match ($normalized['kind'] ?? '') {
             'person' => 'person:'.($normalized['person_ref'] ?? ''),
             'area' => 'area:'.($normalized['area_kind'] ?? 'product').':'.($normalized['ref'] ?? ''),
+            'urgent_rule' => 'urgent:'.($normalized['op'] ?? 'set').':'.($rule['kind'] ?? '').':'.($rule['ref'] ?? ''),
             default => 'preference',
         };
     }
