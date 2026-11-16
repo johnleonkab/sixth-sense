@@ -34,4 +34,14 @@ enum EventType: string
     case ActionFailed = 'action.failed';
     case Question = 'model.question';
     case NoDraft = 'model.no_draft';
+
+    // Linking by conversation window (docs/execution-plan.md 4.4).
+    case WindowSettled = 'window.settled';
+    case LinkDecided = 'link.decided';
+    case ReconcileDecided = 'reconcile.decided';
+    case HistoryFetched = 'history.fetched';
+    case BackfillCompleted = 'backfill.completed';
+    case UserGuided = 'user.guided';
+    case UserSnoozed = 'user.snoozed';
+    case UserViewed = 'user.viewed';
 }

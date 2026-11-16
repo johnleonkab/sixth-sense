@@ -2,6 +2,7 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Linking\Quote;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
@@ -726,27 +727,7 @@ class IntentStateMachine
 
     private function quoteInMessage(string $message, string $quote): bool
     {
-        if ($quote === '') {
-            return false;
-        }
-
-        if (str_contains($message, $quote)) {
-            return true;
-        }
-
-        $haystack = $this->normalizedForQuote($message);
-        $needle = $this->normalizedForQuote($quote);
-
-        return $needle !== '' && str_contains($haystack, $needle);
-    }
-
-    private function normalizedForQuote(string $text): string
-    {
-        $text = str_replace(["\r\n", "\r"], "\n", $text);
-        $text = (string) preg_replace('/^[ \t]*>+[ \t]?/mu', '', $text);
-        $text = (string) preg_replace('/\s+/u', ' ', $text);
-
-        return trim($text);
+        return Quote::in($message, $quote);
     }
 
     /**

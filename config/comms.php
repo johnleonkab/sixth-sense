@@ -37,6 +37,51 @@ return [
         'answer' => $task('large'),
         'contradiction' => $task('large'),
         'verify_claims' => $task('large'),
+
+        /*
+        | Linking by conversation window (docs/execution-plan.md 1.1). Each
+        | names its provider: DeepSeek reads, Gemini criticises, so the
+        | critic does not share the extractor's blind spots. `runs` is how
+        | many times the task runs on the same input; code compares them.
+        | `extract` is the "match v2" of the design documents.
+        */
+        'segment' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+        'link' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1, 'runs' => 3],
+        'extract' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1, 'runs' => 3],
+        'critic' => ['tier' => 'large', 'provider' => 'gemini', 'fallback' => 'deepseek', 'prompt' => 1],
+        'dossier_write' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+        'reconcile' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+        'topic_build' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+        'ask_pattern' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+        'identity_resolve' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
+    ],
+
+    /*
+    | Linking by conversation window. Off keeps today's per-message matcher.
+    | Every number here is a starting guess, tuned in the M5 evaluation.
+    */
+
+    'linking' => [
+        'v2' => (bool) env('COMMS_LINKING_V2', false),
+        'surface_v2' => (bool) env('COMMS_SURFACE_V2', false),
+        'reconciler' => (bool) env('COMMS_RECONCILER', false),
+    ],
+
+    'settle' => ['quiet_minutes' => 5, 'quiet_minutes_direct' => 2, 'max_minutes' => 20],
+
+    'window' => ['lookback_messages' => 30, 'lookback_hours' => 48],
+
+    'agreement' => ['what_similarity' => 0.85],
+
+    'examples' => ['max' => 5],
+
+    'backfill' => ['days' => 30, 'eval_split_day' => 21, 'label_reply_days' => 3, 'ask_pattern_min' => 20],
+
+    'reconcile' => ['time' => '03:00', 'auto' => ['confirm_link', 'relink_uncertain', 'settle_quoted']],
+
+    'embeddings' => [
+        'provider' => 'gemini',
+        'model' => env('GEMINI_EMBED_MODEL', 'gemini-embedding-001'),
     ],
 
     /*
@@ -65,6 +110,8 @@ return [
 
     'candidates' => [
         'max' => 10,
+        'topics_max' => 10,
+        'intents_max' => 10,
         'settled_window_days' => 14,
         'duplicate_similarity' => 92,
         'duplicate_similarity_same_channel' => 78,
@@ -147,6 +194,9 @@ return [
         'per_message' => 50_000,
         'per_run' => 200_000,
         'per_day' => 2_000_000,
+        // Measured in M5; logged, not enforced, until then.
+        'per_window' => 150_000,
+        'enforce_window' => false,
     ],
 
 ];
