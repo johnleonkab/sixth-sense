@@ -10,6 +10,7 @@ use App\Comms\Messages\Direction;
 use App\Comms\Messages\Message;
 use App\Comms\Messages\Party;
 use App\Comms\Models\CompletesTasks;
+use App\Comms\Models\Embeddings;
 use App\Comms\Models\FakeCompleter;
 use App\Comms\Models\ModelCompletion;
 use App\Comms\People\Relation;
@@ -94,6 +95,58 @@ test('self is not stored twice as responder and possible responder', function ()
 });
 
 test('a near duplicate ask in the same channel attaches instead of opening again', function () {
+    $user = importanceUser();
+    $first = '¿Puedes revisar el flujo de prepago?';
+    $second = '¿puedes revisar el flujo de prepago otra vez?';
+
+    importanceScript([
+        importanceHeard(),
+        importanceMatch([importanceOpen('Revisar el flujo de prepago', $first)]),
+    ]);
+    importanceSay($user, 's-1', $first, new Party('U-patricia', 'patricia@cm.com', 'Patricia'), CarbonImmutable::parse('2026-11-11T10:00:00Z'), channel: 'D9', thread: '100.1');
+
+    importanceScript([
+        importanceHeard(),
+        importanceMatch([importanceOpen('Revisar flujo prepago', $second)]),
+    ]);
+    importanceSay($user, 's-2', $second, new Party('U-patricia', 'patricia@cm.com', 'Patricia'), CarbonImmutable::parse('2026-11-11T10:02:00Z'), channel: 'D9', thread: '100.2');
+
+    expect(CommsIntent::query()->count())->toBe(1)
+        ->and(CommsConversationLink::query()->count())->toBe(2);
+});
+
+test('two near-identical asks attach instead of opening a second intent', function () {
+    $user = importanceUser();
+    $first = 'revisar flujo prepago viernes antes';
+    $second = 'antes viernes prepago flujo revisar';
+
+    importanceScript([
+        importanceHeard(),
+        importanceMatch([importanceOpen($first, $first)]),
+    ]);
+    importanceSay($user, 's-1', $first, new Party('U-patricia', 'patricia@cm.com', 'Patricia'), CarbonImmutable::parse('2026-11-11T10:00:00Z'), channel: 'C1', thread: '100.1');
+
+    importanceScript([
+        importanceHeard(),
+        importanceMatch([importanceOpen($second, $second)]),
+    ]);
+    importanceSay($user, 's-2', $second, new Party('U-patricia', 'patricia@cm.com', 'Patricia'), CarbonImmutable::parse('2026-11-11T10:02:00Z'), channel: 'C2', thread: '200.2');
+
+    expect(CommsIntent::query()->count())->toBe(1)
+        ->and(CommsConversationLink::query()->count())->toBe(2);
+});
+
+test('a failed embedding still attaches a near duplicate from the text', function () {
+    config([
+        'ai.providers.gemini.api_key' => 'test-key',
+        'ai.providers.gemini.base_url' => 'https://generativelanguage.googleapis.com',
+        'comms.embeddings.model' => 'gemini-embedding-001',
+    ]);
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response(['error' => 'down'], 503),
+    ]);
+    app()->instance(Embeddings::class, new Embeddings);
+
     $user = importanceUser();
     $first = '¿Puedes revisar el flujo de prepago?';
     $second = '¿puedes revisar el flujo de prepago otra vez?';

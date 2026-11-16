@@ -3,6 +3,7 @@
 namespace App\Comms\Intents;
 
 use App\Comms\Linking\Quote;
+use App\Comms\Models\Embeddings;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
@@ -22,6 +23,7 @@ class IntentStateMachine
     public function __construct(
         private PersonRef $people,
         private ImportanceCalculator $importance,
+        private Embeddings $embeddings,
     ) {}
 
     /**
@@ -365,11 +367,13 @@ class IntentStateMachine
     {
         $threshold = (float) config('comms.candidates.duplicate_similarity', 92);
         $sameChannelThreshold = (float) config('comms.candidates.duplicate_similarity_same_channel', 78);
+        $cosineThreshold = (float) config('comms.candidates.duplicate_cosine', 0.92);
         $wantedRequesters = collect($requesters)->pluck('id')->sort()->values()->all();
         $wantedResponders = collect($responders)->pluck('id')->sort()->values()->all();
+        $incoming = $this->embeddings->vector($what);
 
         return CommsIntent::query()->whereBelongsTo($user)->where('state', 'open')->with(['participants', 'links.message'])->get()
-            ->first(function (CommsIntent $intent) use ($message, $what, $threshold, $sameChannelThreshold, $wantedRequesters, $wantedResponders): bool {
+            ->first(function (CommsIntent $intent) use ($message, $what, $threshold, $sameChannelThreshold, $cosineThreshold, $wantedRequesters, $wantedResponders, $incoming): bool {
                 $requesters = $intent->participants->where('role', 'requester')->pluck('person_id')->sort()->values()->all();
                 $responders = $intent->participants->where('role', 'responder')->pluck('person_id')->sort()->values()->all();
 
@@ -377,9 +381,16 @@ class IntentStateMachine
                     return false;
                 }
 
-                similar_text(mb_strtolower($intent->what), mb_strtolower($what), $percent);
+                $stored = $this->embeddings->vector((string) $intent->what);
+                $cosine = $incoming !== null && $stored !== null ? Embeddings::cosine($incoming, $stored) : null;
 
-                if ($percent >= $threshold) {
+                if ($cosine !== null && $cosine >= $cosineThreshold) {
+                    return true;
+                }
+
+                similar_text(mb_strtolower((string) $intent->what), mb_strtolower($what), $percent);
+
+                if ($cosine === null && $percent >= $threshold) {
                     return true;
                 }
 

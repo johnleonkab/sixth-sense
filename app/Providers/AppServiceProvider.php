@@ -35,7 +35,9 @@ use App\Comms\Ingestion\FakeInboundFeed;
 use App\Comms\Ingestion\InboundFeed;
 use App\Comms\Jobs\Consuming;
 use App\Comms\Models\CompletesTasks;
+use App\Comms\Models\Embeddings;
 use App\Comms\Models\FakeCompleter;
+use App\Comms\Models\FakeEmbeddings;
 use App\Comms\Models\TextModelCompleter;
 use App\Connectors\Calendar\CalendarReader;
 use App\Connectors\Calendar\CalendarWriter;
@@ -112,6 +114,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ProviderKeys::class);
         $this->app->singleton(Consuming::class);
         $this->app->bind(CompletesTasks::class, $this->app->environment('testing') ? FakeCompleter::class : TextModelCompleter::class);
+        $this->app->bind(Embeddings::class, $this->app->environment('testing') ? FakeEmbeddings::class : Embeddings::class);
         $this->app->bind(InboundFeed::class, fn (): InboundFeed => config('connectors.demo')
             ? new FakeInboundFeed
             : $this->app->make(AccountInboundFeed::class));

@@ -3,6 +3,7 @@
 namespace App\Comms\Context;
 
 use App\Comms\Intents\PersonRef;
+use App\Comms\Models\Embeddings;
 use App\Knowledge\KnowledgeSource;
 use App\Models\Comms\CommsContextFact;
 use App\Models\Comms\CommsContextUse;
@@ -30,7 +31,7 @@ class ContextEngine
     /** Rules in a pack, at most. */
     public const RULES = 8;
 
-    public function __construct(private Precedence $precedence, private PersonRef $people) {}
+    public function __construct(private Precedence $precedence, private PersonRef $people, private Embeddings $embeddings) {}
 
     /**
      * Everything this audience may read: facts (subject first, then origin,
@@ -351,6 +352,7 @@ class ContextEngine
             fn (string $word): bool => mb_strlen($word) >= 4,
         ));
         $ranked = [];
+        $queryVector = $this->embeddings->vector($query);
 
         foreach ($this->corpus($user, $kinds, $words) as $document) {
             $haystack = mb_strtolower($document->title.' '.$document->body.' '.$document->terms);
@@ -362,7 +364,13 @@ class ContextEngine
                 }
             }
 
-            similar_text(mb_strtolower($query), mb_strtolower($document->title), $percent);
+            $titleVector = $queryVector === null ? null : $this->embeddings->vector($document->title);
+
+            if ($queryVector !== null && $titleVector !== null) {
+                $percent = Embeddings::cosine($queryVector, $titleVector) * 100;
+            } else {
+                similar_text(mb_strtolower($query), mb_strtolower($document->title), $percent);
+            }
 
             if ($hits === 0 && $percent < 85) {
                 continue;
