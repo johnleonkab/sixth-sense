@@ -211,10 +211,10 @@ El prototipo visual de referencia está en `docs/prototype.html`. Es la fuente d
 |---|---|
 | Backend | Laravel (última versión estable), PHP 8.3+ |
 | Frontend | Inertia + React + TypeScript, Vite, Tailwind |
-| Base de datos | PostgreSQL |
+| Base de datos | **MySQL 8** en producción (Laravel Forge). En local y tests aún PostgreSQL (`compose.yaml`, `phpunit.xml`). Todo el código y las migraciones deben funcionar en MySQL: nada exclusivo de Postgres (`jsonb`, `tsvector`, `ilike`, `pg_trgm`, funciones `plpgsql`); el SQL específico va detrás de `getDriverName()`, como en `KnowledgeBase::matching`. |
 | Colas y caché | Redis + Laravel Horizon |
 | Tiempo real | Laravel Reverb (WebSockets) + Laravel Echo en el cliente |
-| IA (cerebro) | Claude (Anthropic) mediante `prism-php/prism`, con llamadas a herramientas |
+| IA (cerebro) | **DeepSeek y Gemini**, con drivers propios en `app/Ai` (`TextModel`, `Drivers/OpenAiCompatibleDriver`, `Drivers/GeminiDriver`) y llamadas a herramientas. **No se usa `prism-php/prism` ni Anthropic** (coste). No añadir Prism ni otro SDK de IA. Embeddings: API de Gemini. |
 | Voz | Proveedor externo de transcripción en streaming + síntesis de voz, conectado **directamente desde el navegador** (WebRTC/WebSocket). Laravel solo emite un token temporal. Proveedor pendiente de decidir (ver "Decisiones abiertas"). |
 | OAuth | Laravel Socialite + SocialiteProviders (Slack, Atlassian, Notion); Google con Socialite |
 | APIs | `google/apiclient` para Google; cliente HTTP de Laravel para Slack, Jira y Notion |
@@ -233,7 +233,7 @@ Micrófono ─► Proveedor de voz (STT) ─► texto
                                         │
              Bucle rápido (local) ◄─────┤  órdenes sobre lo que hay en pantalla
                                         │
-                                        └─► POST /turns ─► Agente (Claude + tools)
+                                        └─► POST /turns ─► Agente (LLM + tools)
                                                               │
 Lienzo ◄── directivas de UI (JSON) ◄────────────────────────────┘
 TTS ◄── texto de respuesta
@@ -255,7 +255,7 @@ Si una frase no encaja con ninguna orden local, va al agente.
 ### 3. Agente (Laravel)
 - Endpoint `POST /turns` con `{ transcript, screen_context }`.
 - `screen_context` describe lo que está visible: lista de vistas con su número, tipo e ids (`[{index:1, view:"calendar.day", date:"2026-10-07"}, {index:2, view:"inbox.list", item_ids:[...]}]`). Así el agente resuelve "ese", "el segundo", "este email".
-- Llama a Claude con el catálogo de herramientas (ver abajo) y devuelve **directivas de UI**, nunca HTML.
+- Llama al modelo (DeepSeek o Gemini, vía `app/Ai`) con el catálogo de herramientas (ver abajo) y devuelve **directivas de UI**, nunca HTML.
 - Respuestas de herramientas de solo lectura: se ejecutan directamente.
 - Herramientas de escritura: **no ejecutan**; crean una `PendingAction` y devuelven una directiva `confirm`.
 
@@ -283,7 +283,7 @@ Cada servicio implementa una interfaz común en `app/Connectors/`:
 ```php
 interface Connector {
     public function source(): Source;            // enum: google, slack, jira, notion
-    public function tools(): array;              // herramientas Prism que expone
+    public function tools(): array;              // herramientas que expone al agente
     public function handleWebhook(Request $r): array; // normaliza a InboxCandidate[]
 }
 ```

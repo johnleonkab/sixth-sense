@@ -175,7 +175,10 @@ class KnowledgeBase
 
     /**
      * The database's full-text match on the title and the words: any of
-     * them, with Spanish stems on PostgreSQL and natural language on MySQL.
+     * them, with Spanish stems on PostgreSQL. MySQL has no stemming, so it
+     * uses boolean mode with a prefix per word ("reembolso" also finds
+     * "reembolsos"). Terms hold only letters, digits and spaces, so no
+     * boolean operator reaches the query.
      *
      * @param  Builder<KnowledgeDocument>  $documents
      * @param  list<string>  $terms
@@ -186,7 +189,11 @@ class KnowledgeBase
 
         match (DB::connection()->getDriverName()) {
             'pgsql' => $documents->whereFullText(['title', 'terms'], implode(' OR ', $words), ['language' => 'spanish', 'mode' => 'websearch']),
-            'mysql', 'mariadb' => $documents->whereFullText(['title', 'terms'], implode(' ', $words)),
+            'mysql', 'mariadb' => $documents->whereFullText(
+                ['title', 'terms'],
+                implode(' ', array_map(fn (string $word): string => implode('* ', explode(' ', $word)).'*', $words)),
+                ['mode' => 'boolean'],
+            ),
             default => $documents->where(function (Builder $any) use ($terms): void {
                 foreach ($terms as $term) {
                     $any->orWhereRaw('lower(terms) like ?', ['%'.$term.'%']);

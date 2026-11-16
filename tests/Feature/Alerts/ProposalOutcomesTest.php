@@ -45,7 +45,7 @@ test('editing the reply before sending sends the edit and records how much chang
     expect($this->chats->sent[0]->text)->toBe('Lo reviso esta tarde y te confirmo.')
         ->and($outcome->outcome)->toBe(ProposalOutcome::EDITED)
         ->and($outcome->edit_size)->toBe(11)
-        ->and($outcome->detail)->toBe(['proposed' => 'Lo reviso y te confirmo.', 'sent' => 'Lo reviso esta tarde y te confirmo.']);
+        ->and($outcome->detail)->toEqual(['proposed' => 'Lo reviso y te confirmo.', 'sent' => 'Lo reviso esta tarde y te confirmo.']);
 });
 
 test('undoing within the window records that it never went', function () {
@@ -103,7 +103,7 @@ test('a reply proposed by voice or by an agent to an alert is recorded against i
 
     expect($this->alert->outcomes()->sole())
         ->outcome->toBe(ProposalOutcome::EDITED)
-        ->detail->toBe(['proposed' => 'Lo reviso y te confirmo.', 'sent' => 'Mañana lo miro.']);
+        ->detail->toEqual(['proposed' => 'Lo reviso y te confirmo.', 'sent' => 'Mañana lo miro.']);
 });
 
 test('the size of an edit is counted in characters, also for long texts', function () {

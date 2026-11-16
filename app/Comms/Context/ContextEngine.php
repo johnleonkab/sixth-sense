@@ -53,10 +53,14 @@ class ContextEngine
                 return false;
             }
 
-            // A full name is one person. A first name alone may be any of them.
+            // Subjects keep the name as written ("person:marta ruiz"), so both
+            // sides are compared as slugs. A full name is one person. A first
+            // name alone may be any of them.
+            $person = Str::slug(Str::after($subject, 'person:'));
+
             return str_contains($about, '-')
-                ? $subject === 'person:'.$about
-                : in_array($about, explode('-', Str::after($subject, 'person:')), true);
+                ? $person === $about
+                : in_array($about, explode('-', $person), true);
         };
 
         $facts = $this->active($user)
