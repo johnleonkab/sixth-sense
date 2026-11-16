@@ -1,6 +1,6 @@
 # Execution plan — comms pipeline, 0 to 1
 
-Status: draft for the user's review, 2026-11-15.
+Status: approved by the user on 2026-11-15. M0 done except the production check (see M0).
 Audience: the user and the coding agent.
 
 This plan turns the decided design into an ordered set of deliveries. It covers dependencies,
@@ -98,7 +98,7 @@ a `.env` change.
 | `dossier_write`, `ask_pattern`, `identity_resolve` | 1 | DeepSeek · v4-pro | Gemini · flash | Structured output, low volume. |
 | `topic_build`, `reconcile` | 1 | DeepSeek · v4-pro | Gemini · flash | Long inputs, once per backfill or per night. |
 | Drafts and playbook tasks (`draft`, `answer`, `verify_claims`, …) | 1 | As today | As today | Not changed by this plan. `verify_claims` moves to Gemini for the same reason as the critic. |
-| Embeddings | — | **Gemini** embeddings API · `GEMINI_EMBED_MODEL` | none; on failure, string similarity as today | DeepSeek offers no embeddings endpoint. |
+| Embeddings | — | **Gemini** embeddings API · `GEMINI_EMBED_MODEL`, default `gemini-embedding-001` (cheapest: $0.15 per 1M tokens, $0.075 in batch; user's choice, 2026-11-15) | none; on failure, string similarity as today | DeepSeek offers no embeddings endpoint. |
 
 Two rules that keep the cost of 3 runs down:
 
@@ -403,6 +403,26 @@ Build:
 - Arch test: nothing in `App\Comms\Ingestion` depends on `App\Comms\Gate`.
 
 Done when: every E-xx has a passing test; a day of production shows rejected-by-quote < 3 % and user outgoing Slack messages > 0.
+
+Status 2026-11-15, checked against the code on branch `comms-v2`:
+
+| Id | State |
+|---|---|
+| E-01 | Fixed: `HomeFeed` resolves the intent through the proposal or question |
+| E-02 | Fixed: drafts keep sentences that match a sourced point (`matchesSourced`); questions are `digest`, ready proposals `now` |
+| E-03 | Fixed: calendar, Notion and email write tools call the real connectors; `ProposalEcho` echoes message classes only |
+| E-04 | Fixed: quotes compared after normalizing whitespace and `>` prefixes; `settle_reason` constrained in the schema |
+| E-05 | Fixed: thread replies fetched with `conversations.replies` |
+| E-06 | Half: the user is no longer both responder and possible responder. Flat importance remains until people have relations (Personas screen, M2b) |
+| E-07 | Fixed: Atlassian notification mail dropped by rule |
+| E-08 | Fixed: transient retries; the Slack retry no longer swallows the 429 wait (fixed in M0) |
+
+Also in M0: the 3 tests failing on every driver were fixed (a stale model in two reply tests; the Slack
+rate-limit regression above), the suite runs on SQLite (1 053 / 1 053), and `tests/Unit/CommsArchTest.php`
+holds the ingestion and playbook boundaries.
+
+Open: the production numbers. Run on Forge `php artisan comms:report {user} --date={a recent weekday}` and
+check rejected-by-quote < 3 % and outgoing Slack messages > 0.
 
 ### M1 — Foundations (M)
 
