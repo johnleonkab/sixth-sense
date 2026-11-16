@@ -4,9 +4,13 @@ namespace App\Comms\Context;
 
 use App\Comms\Events\EventType;
 use App\Comms\Intents\PersonRef;
+use App\Comms\Models\Embeddings;
 use App\Comms\People\Relation;
 use App\Models\Comms\CommsContextFact;
 use App\Models\Comms\CommsEvent;
+use App\Models\Comms\CommsPerson;
+use App\Models\Comms\CommsTopicAlias;
+use App\Models\Comms\CommsTopicSearch;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -38,7 +42,7 @@ class ContextProjector
         'moved',
     ];
 
-    public function __construct(private PersonRef $people) {}
+    public function __construct(private PersonRef $people, private Embeddings $embeddings) {}
 
     public function apply(CommsEvent $event): void
     {
@@ -156,10 +160,14 @@ class ContextProjector
 
     private function operations(CommsEvent $event, FactOrigin $origin): void
     {
+        $topics = [];
+
         foreach ($event->normalized['operations'] ?? [] as $operation) {
             if (! is_array($operation)) {
                 continue;
             }
+
+            $value = is_array($operation['value'] ?? null) ? $operation['value'] : ['text' => (string) ($operation['value'] ?? '')];
 
             $this->put(
                 $event,
@@ -167,7 +175,7 @@ class ContextProjector
                 (string) ($operation['kind'] ?? 'rule'),
                 (string) ($operation['subject'] ?? 'user'),
                 (string) ($operation['attribute'] ?? 'rule'),
-                is_array($operation['value'] ?? null) ? $operation['value'] : ['text' => (string) ($operation['value'] ?? '')],
+                $value,
                 (string) ($operation['op'] ?? 'set'),
                 is_array($operation['audiences'] ?? null) ? $operation['audiences'] : [],
                 (float) ($operation['confidence'] ?? 1),
@@ -175,6 +183,22 @@ class ContextProjector
                 (bool) ($operation['sensitive'] ?? false),
                 is_string($operation['status'] ?? null) ? $operation['status'] : null,
             );
+
+            $topic = $this->topicSubject((string) ($operation['kind'] ?? ''), (string) ($operation['subject'] ?? ''), $value);
+
+            if ($topic !== null) {
+                $topics[$topic] = true;
+            }
+        }
+
+        $user = $event->user;
+
+        if (! $user instanceof User) {
+            return;
+        }
+
+        foreach (array_keys($topics) as $topic) {
+            $this->projectTopic($user, $topic);
         }
     }
 
@@ -421,5 +445,232 @@ class ContextProjector
         }
 
         $person->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    private function topicSubject(string $kind, string $subject, array $value): ?string
+    {
+        if ($kind === 'workstream' && str_starts_with($subject, 'workstream:')) {
+            return $subject;
+        }
+
+        if ($kind !== 'term') {
+            return null;
+        }
+
+        $refers = $value['value'] ?? $value['refers_to'] ?? null;
+
+        return is_string($refers) && str_starts_with($refers, 'workstream:') ? $refers : null;
+    }
+
+    private function projectTopic(User $user, string $subject): void
+    {
+        $facts = $this->topicFacts($user, $subject);
+        $terms = $this->termFacts($user, $subject);
+        $name = $this->attributeText($facts, 'name');
+        $summary = $this->attributeText($facts, 'summary');
+
+        if ($name === '') {
+            $name = $this->nestedText($facts, 'name');
+        }
+
+        if ($summary === '') {
+            $summary = $this->nestedText($facts, 'what');
+        }
+
+        $nicknames = [];
+
+        foreach ($terms as $term) {
+            $written = trim($term->text());
+
+            if ($written !== '' && ! str_starts_with($written, 'workstream:')) {
+                $nicknames[] = $written;
+            }
+        }
+
+        $people = $this->peopleNames($user, $facts);
+        $parts = array_values(array_filter(
+            [$name, $summary, ...$nicknames, ...$people],
+            fn (string $part): bool => $part !== '',
+        ));
+        $document = implode("\n", $parts);
+
+        CommsTopicAlias::query()->whereBelongsTo($user)->where('topic_subject', $subject)->delete();
+
+        if ($document === '') {
+            CommsTopicSearch::query()->whereBelongsTo($user)->where('topic_subject', $subject)->delete();
+
+            return;
+        }
+
+        $embedded = mb_substr(trim($document), 0, 8000);
+        $vector = $this->embeddings->vector($document);
+
+        CommsTopicSearch::query()->updateOrCreate(
+            ['user_id' => $user->id, 'topic_subject' => $subject],
+            ['document' => $document, 'embedding_hash' => $vector === null ? null : sha1($embedded)],
+        );
+
+        $seen = [];
+
+        foreach ($terms as $term) {
+            $alias = trim($term->text());
+            $normalized = $this->normalizeAlias($alias);
+
+            if ($alias === '' || $normalized === '' || isset($seen[$normalized])) {
+                continue;
+            }
+
+            $seen[$normalized] = true;
+            CommsTopicAlias::query()->create([
+                'user_id' => $user->id,
+                'topic_subject' => $subject,
+                'alias' => $alias,
+                'alias_normalized' => Str::limit($normalized, 191, ''),
+            ]);
+        }
+    }
+
+    /**
+     * @return list<CommsContextFact>
+     */
+    private function topicFacts(User $user, string $subject): array
+    {
+        $facts = CommsContextFact::query()
+            ->whereBelongsTo($user)
+            ->where('kind', 'workstream')
+            ->where('subject', $subject)
+            ->whereIn('status', ['active', 'proposed'])
+            ->get()
+            ->all();
+
+        usort($facts, function (CommsContextFact $left, CommsContextFact $right): int {
+            $status = ($left->status === 'active' ? 0 : 1) <=> ($right->status === 'active' ? 0 : 1);
+
+            return $status !== 0 ? $status : $right->id <=> $left->id;
+        });
+
+        return $facts;
+    }
+
+    /**
+     * @return list<CommsContextFact>
+     */
+    private function termFacts(User $user, string $subject): array
+    {
+        return CommsContextFact::query()
+            ->whereBelongsTo($user)
+            ->where('kind', 'term')
+            ->whereIn('status', ['active', 'proposed'])
+            ->orderBy('id')
+            ->get()
+            ->filter(function (CommsContextFact $fact) use ($subject): bool {
+                $refers = $fact->value['value'] ?? $fact->value['refers_to'] ?? null;
+
+                return $refers === $subject;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<CommsContextFact>  $facts
+     */
+    private function attributeText(array $facts, string $attribute): string
+    {
+        foreach ($facts as $fact) {
+            if ($fact->attribute === $attribute) {
+                return trim($fact->text());
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  list<CommsContextFact>  $facts
+     */
+    private function nestedText(array $facts, string $key): string
+    {
+        foreach ($facts as $fact) {
+            $value = $fact->value[$key] ?? null;
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  list<CommsContextFact>  $facts
+     * @return list<string>
+     */
+    private function peopleNames(User $user, array $facts): array
+    {
+        $tokens = [];
+
+        foreach ($facts as $fact) {
+            if ($fact->attribute !== 'people' || ! is_array($fact->value['value'] ?? null)) {
+                continue;
+            }
+
+            foreach ($fact->value['value'] as $token) {
+                if (is_string($token) && trim($token) !== '') {
+                    $tokens[] = trim($token);
+                }
+            }
+
+            break;
+        }
+
+        if ($tokens === []) {
+            foreach ($facts as $fact) {
+                if (! is_array($fact->value['with'] ?? null)) {
+                    continue;
+                }
+
+                foreach ($fact->value['with'] as $token) {
+                    if (is_string($token) && trim($token) !== '') {
+                        $tokens[] = trim($token);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        $names = [];
+
+        foreach ($tokens as $token) {
+            if (preg_match('/^person:(\d+)$/', $token, $match) === 1) {
+                $person = CommsPerson::query()->whereBelongsTo($user)->find((int) $match[1]);
+                $name = $person === null ? '' : trim((string) $person->display_name);
+
+                if ($name !== '') {
+                    $names[] = $name;
+                }
+
+                continue;
+            }
+
+            $names[] = $token;
+        }
+
+        $names = array_values(array_unique($names));
+        sort($names);
+
+        return $names;
+    }
+
+    private function normalizeAlias(string $alias): string
+    {
+        $folded = Str::lower(Str::ascii($alias));
+        $folded = preg_replace('/[^a-z0-9]+/', ' ', $folded) ?? '';
+
+        return trim($folded);
     }
 }
