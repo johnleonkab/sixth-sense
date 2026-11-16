@@ -2,6 +2,7 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Gate\HeldSend;
 use App\Comms\Gate\ProposalStatus;
 use App\Comms\Gate\UncertainSource;
 use App\Comms\Linking\Quote;
@@ -519,6 +520,8 @@ class IntentStateMachine
         }
 
         if ($result['op'] === 'update') {
+            $previousDeadline = $intent->deadline?->toDateString();
+
             if (array_key_exists('deadline', $result) && $result['deadline'] !== null) {
                 $intent->deadline = $result['deadline'];
                 $intent->deadline_text = $result['deadline_text'] ?? $intent->deadline_text;
@@ -531,6 +534,13 @@ class IntentStateMachine
             if (is_array($result['flags'] ?? null)) {
                 $intent->flags = array_merge($intent->flags ?? [], $result['flags']);
             }
+
+            app(HeldSend::class)->after(
+                $user,
+                $intent->id,
+                $previousDeadline,
+                $intent->deadline?->toDateString(),
+            );
         }
 
         if ($result['op'] === 'acknowledge') {

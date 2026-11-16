@@ -108,10 +108,15 @@ class Confirmations
                 ],
             ];
             $sources = $this->uncertainSources($group);
+            $change = $this->change($group);
 
             if ($sources !== []) {
                 $card['uncertain_source_message_ids'] = $sources;
                 $card['notice'] = 'Este borrador se apoya en un enlace dudoso.';
+            }
+
+            if ($change !== null) {
+                $card['change'] = $change;
             }
 
             $cards[] = $card;
@@ -216,6 +221,22 @@ class Confirmations
         sort($ids);
 
         return $ids;
+    }
+
+    /**
+     * @param  list<CommsProposal>  $group
+     */
+    private function change(array $group): ?string
+    {
+        foreach ($group as $proposal) {
+            $change = $proposal->payload['change'] ?? null;
+
+            if (is_string($change) && $change !== '') {
+                return $change;
+            }
+        }
+
+        return null;
     }
 
     /**
