@@ -2,6 +2,8 @@
 
 namespace App\Comms\Intents;
 
+use App\Comms\Gate\ProposalStatus;
+use App\Comms\Gate\UncertainSource;
 use App\Comms\Linking\Quote;
 use App\Comms\Models\Embeddings;
 use App\Models\Comms\CommsConversationLink;
@@ -10,6 +12,7 @@ use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsIntentParticipant;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsPerson;
+use App\Models\Comms\CommsProposal;
 use App\Models\Comms\CommsSignal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -671,11 +674,42 @@ class IntentStateMachine
             return;
         }
 
-        CommsConversationLink::query()
+        $link = CommsConversationLink::query()
             ->whereBelongsTo($user)
             ->where('intent_id', $intent->id)
             ->whereKey((int) $id)
-            ->delete();
+            ->first();
+
+        if ($link === null) {
+            return;
+        }
+
+        $message = $link->message;
+        $link->delete();
+
+        if ($message !== null) {
+            $this->redraft($user, $message, null);
+        }
+    }
+
+    private function redraft(User $user, CommsMessage $message, ?CommsIntent $intent): void
+    {
+        $waiting = CommsProposal::query()
+            ->whereBelongsTo($user)
+            ->whereIn('status', [ProposalStatus::Pending, ProposalStatus::Edited])
+            ->orderBy('id')
+            ->get()
+            ->contains(function (CommsProposal $proposal) use ($message): bool {
+                $ids = $proposal->uncertain_source_message_ids;
+
+                return is_array($ids) && in_array($message->id, array_map(intval(...), $ids), true);
+            });
+
+        if (! $waiting) {
+            return;
+        }
+
+        app(UncertainSource::class)->moved($user, $message, $intent);
     }
 
     /**
@@ -898,6 +932,7 @@ class IntentStateMachine
 
         if ($occupied) {
             $current?->delete();
+            $this->redraft($user, $message, $to);
 
             return;
         }
@@ -912,6 +947,7 @@ class IntentStateMachine
                 'uncertain' => false,
                 'state_event_id' => $event->id,
             ]);
+            $this->redraft($user, $message, $to);
 
             return;
         }
@@ -920,6 +956,7 @@ class IntentStateMachine
         $current->uncertain = false;
         $current->state_event_id = $event->id;
         $current->save();
+        $this->redraft($user, $message, $to);
     }
 
     private function findIntent(User $user, mixed $key): ?CommsIntent

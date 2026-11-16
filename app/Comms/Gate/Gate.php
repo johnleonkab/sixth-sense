@@ -9,6 +9,7 @@ use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\Runs;
+use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsPolicy;
 use App\Models\Comms\CommsProposal;
@@ -61,6 +62,7 @@ class Gate
             'target' => $target,
             'payload' => $payload,
             'source_event_ids' => $sourceEventIds,
+            'uncertain_source_message_ids' => $this->uncertainSources($intent, $sourceEventIds),
             'verification' => $verification,
             'allows' => $allows,
             'states_product_facts' => $statesProductFacts,
@@ -93,7 +95,7 @@ class Gate
             return $this->deny($user, $proposal, 'policy', $notify);
         }
 
-        if ($outcome === PolicyOutcome::Allow) {
+        if ($outcome === PolicyOutcome::Allow && ! $this->hasUncertainSource($proposal)) {
             $proposal->status = ProposalStatus::Approved;
             $proposal->decided_at = now();
             $proposal->save();
@@ -270,6 +272,33 @@ class Gate
         }
 
         return $proposal->refresh();
+    }
+
+    /**
+     * @param  list<int>  $sourceEventIds
+     * @return list<int>
+     */
+    private function uncertainSources(?CommsIntent $intent, array $sourceEventIds): array
+    {
+        if ($intent === null || $sourceEventIds === []) {
+            return [];
+        }
+
+        return CommsConversationLink::query()
+            ->where('intent_id', $intent->id)
+            ->where('uncertain', true)
+            ->whereHas('message', fn ($query) => $query->whereIn('event_id', $sourceEventIds))
+            ->orderBy('message_id')
+            ->pluck('message_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function hasUncertainSource(CommsProposal $proposal): bool
+    {
+        return is_array($proposal->uncertain_source_message_ids) && $proposal->uncertain_source_message_ids !== [];
     }
 
     private function policy(User $user, ActionClass $class): PolicyOutcome

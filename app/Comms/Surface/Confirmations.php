@@ -93,7 +93,7 @@ class Confirmations
         $cards = [];
 
         foreach ($groups as $group) {
-            $cards[] = [
+            $card = [
                 'kind' => 'approve',
                 'proposal_ids' => array_map(fn (CommsProposal $proposal): int => $proposal->id, $group),
                 'previews' => array_map(
@@ -107,6 +107,14 @@ class Confirmations
                     ['id' => 'reject', 'label' => 'Rechazar'],
                 ],
             ];
+            $sources = $this->uncertainSources($group);
+
+            if ($sources !== []) {
+                $card['uncertain_source_message_ids'] = $sources;
+                $card['notice'] = 'Este borrador se apoya en un enlace dudoso.';
+            }
+
+            $cards[] = $card;
         }
 
         return $cards;
@@ -186,6 +194,28 @@ class Confirmations
                 ['id' => 'still_open', 'label' => 'Sigue abierto'],
             ],
         ];
+    }
+
+    /**
+     * @param  list<CommsProposal>  $group
+     * @return list<int>
+     */
+    private function uncertainSources(array $group): array
+    {
+        $ids = [];
+
+        foreach ($group as $proposal) {
+            foreach (is_array($proposal->uncertain_source_message_ids) ? $proposal->uncertain_source_message_ids : [] as $id) {
+                if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+                    $ids[] = (int) $id;
+                }
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
     }
 
     /**
