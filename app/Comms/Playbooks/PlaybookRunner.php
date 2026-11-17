@@ -23,6 +23,7 @@ class PlaybookRunner
         private AnswerFromSources $answers,
         private RebuildContext $rebuilds,
         private PrepareWork $prepare,
+        private ClarifyThenAnswer $clarify,
         private CloseTheLoop $close,
         private Propose $propose,
         private Notifier $notifier,
@@ -51,6 +52,7 @@ class PlaybookRunner
                     'answer_from_sources' => $this->answers->run($user, $intent, $message),
                     'rebuild_context' => $this->rebuilds->run($user, $intent, $message),
                     'prepare_work' => $this->prepare->run($user, $intent, $message),
+                    'clarify_then_answer' => $this->clarify->run($user, $intent, $message),
                     default => null,
                 };
             }
@@ -84,6 +86,12 @@ class PlaybookRunner
     public function answered(CommsEvent $event): void
     {
         $data = $event->normalized ?? [];
+
+        if (($data['kind'] ?? '') === 'commit') {
+            $this->clarify->committed($event);
+
+            return;
+        }
 
         if (($data['kind'] ?? '') !== 'choice' || $event->user === null || ! is_string($data['question_key'] ?? null)) {
             return;

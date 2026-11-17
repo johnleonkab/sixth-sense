@@ -6,6 +6,7 @@ use App\Comms\People\Relation;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsPerson;
+use App\Models\Comms\CommsPlaybookRun;
 use App\Models\User;
 
 /**
@@ -20,6 +21,10 @@ class RouteRules
     {
         if ($intent->possible_ask) {
             return [];
+        }
+
+        if ($this->shape($message->text) !== null || $this->clarifying($user, $intent)) {
+            return ['clarify_then_answer'];
         }
 
         $keys = [];
@@ -40,6 +45,40 @@ class RouteRules
         }
 
         return $keys;
+    }
+
+    /**
+     * Cases 2, 34 and 47. Null when the message is an ordinary ask.
+     */
+    public function shape(string $text): ?string
+    {
+        $haystack = mb_strtolower($text);
+
+        if (preg_match('/\b(cuándo estará|cuando estará|when will|estimaci[oó]n|para cuándo|para cuando)\b/u', $haystack) === 1) {
+            return 'estimate';
+        }
+
+        if (preg_match('/\b(funcionalidad|feature)\b/u', $haystack) === 1) {
+            return 'feature';
+        }
+
+        if (preg_match('/\b(call|llamada|reuni[oó]n)\b/u', $haystack) === 1
+            && preg_match('/\b(epic|algo|something)\b/u', $haystack) === 1
+            && preg_match('/\b[A-Z]{2,}-\d+\b/', $text) !== 1) {
+            return 'call';
+        }
+
+        return null;
+    }
+
+    private function clarifying(User $user, CommsIntent $intent): bool
+    {
+        return CommsPlaybookRun::query()
+            ->whereBelongsTo($user)
+            ->where('intent_id', $intent->id)
+            ->where('playbook', 'clarify_then_answer')
+            ->whereIn('step', ['subject', 'doubts'])
+            ->exists();
     }
 
     private function lateReply(User $user, CommsIntent $intent, CommsMessage $message): bool
