@@ -19,6 +19,7 @@ use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\Contradiction;
 use App\Comms\Playbooks\DependencyRisk;
+use App\Comms\Playbooks\Incident;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
@@ -115,6 +116,7 @@ class Pipeline
         }
 
         $message->load('author.identities');
+        app(Incident::class)->message($event->user, $message);
 
         if (config('comms.linking.v2')) {
             $window = $this->buffer->add($message);
@@ -265,6 +267,7 @@ class Pipeline
         app(DependencyRisk::class)->source($event);
         app(WatchAndFollowUp::class)->source($event);
         app(Contradiction::class)->source($event);
+        app(Incident::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void
