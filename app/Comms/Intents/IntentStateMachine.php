@@ -399,8 +399,14 @@ class IntentStateMachine
             'uncertain' => $uncertain,
         ];
 
-        if (in_array($operation['kind'] ?? '', ['question', 'review_comment', 'choice', 'prepare'], true)) {
-            $flags['kind'] = $operation['kind'];
+        $kind = $operation['kind'] ?? '';
+
+        if ($kind === 'decision_needed') {
+            $kind = 'choice';
+        }
+
+        if (in_array($kind, ['question', 'review_comment', 'choice', 'prepare'], true)) {
+            $flags['kind'] = $kind;
         }
 
         return $flags;

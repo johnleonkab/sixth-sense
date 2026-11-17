@@ -24,12 +24,14 @@ class RouteRules
 
         $keys = [];
         $kind = $intent->flags['kind'] ?? null;
+        $responder = $this->role($user, $intent, 'responder');
+        $work = $intent->deadline !== null || (is_array($intent->steps) && $intent->steps !== []);
 
-        if ($this->role($user, $intent, 'responder') && in_array($kind, ['question', 'review_comment', 'choice'], true)) {
+        if ($responder && in_array($kind, ['question', 'review_comment', 'choice'], true)) {
             $keys[] = 'answer_from_sources';
         }
 
-        if ($this->role($user, $intent, 'responder') && $kind === 'prepare') {
+        if ($responder && ($kind === 'prepare' || ($intent->kind === 'request' && $work))) {
             $keys[] = 'prepare_work';
         }
 
