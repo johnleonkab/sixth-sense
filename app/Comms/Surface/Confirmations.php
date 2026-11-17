@@ -27,6 +27,9 @@ class Confirmations
         'requesters' => '¿Quién lo pide?',
         'responders' => '¿Quién debería hacerlo?',
         'deadline' => '¿Para cuándo?',
+        'cost' => '¿Cuánto cuesta?',
+        'users' => '¿Quién lo usa?',
+        'due' => '¿Para cuándo vence?',
     ];
 
     public function __construct(

@@ -8,6 +8,7 @@ use App\Comms\Gate\ProposalExpiry;
 use App\Comms\Intents\ImportanceCalculator;
 use App\Comms\Nightly\ChangeList;
 use App\Comms\Notify\Notifier;
+use App\Comms\Playbooks\Away;
 use App\Comms\Playbooks\Briefing;
 use App\Comms\Playbooks\RecurringDraft;
 use App\Models\Comms\CommsEvent;
@@ -52,6 +53,12 @@ class ClockHandler
 
         if ($reason === 'report' || $reason === 'release') {
             app(RecurringDraft::class)->calendar($event);
+
+            return;
+        }
+
+        if ($reason === 'return') {
+            app(Away::class)->returned($event);
 
             return;
         }

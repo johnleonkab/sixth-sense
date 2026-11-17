@@ -6,6 +6,7 @@ use App\Comms\Calendar\FocusHours;
 use App\Comms\Gate\ActionClass;
 use App\Comms\People\Relation;
 use App\Comms\Pipeline;
+use App\Comms\Playbooks\Away;
 use App\Comms\Watchers\BusinessCalendar;
 use App\Events\CommsNotificationDelivered;
 use App\Events\CommsNotificationUpdated;
@@ -157,6 +158,10 @@ class Notifier
         string $key,
         array $sourceEventIds,
     ): CommsNotification {
+        if ($urgency === 'now' && app(Away::class)->covers($user)) {
+            $urgency = 'digest';
+        }
+
         if ($urgency === 'now' && ! $this->urgentSubject($subjectType, $subjectId) && $this->focus->covers($user, CarbonImmutable::now())) {
             $urgency = 'digest';
         }

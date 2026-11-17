@@ -5,6 +5,7 @@ namespace App\Comms\Watchers;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
+use App\Comms\Playbooks\Away;
 use App\Models\Comms\CommsCalendarEvent;
 use App\Models\Comms\CommsWatcher;
 use App\Models\User;
@@ -112,6 +113,16 @@ class Clock
 
             if ($local->format('H:i') !== '09:00') {
                 continue;
+            }
+
+            if ($meeting->kind === 'out_of_office'
+                && $meeting->ends_at !== null
+                && $meeting->ends_at->timezone($local->timezone)->isSameDay($local)
+                && app(Away::class)->mine($user, $meeting)) {
+                $count += $this->mark($user, EventType::ClockLookahead, 'lookahead:return:'.$meeting->id.':'.$local->toDateString(), $now, [
+                    'calendar_id' => $meeting->id,
+                    'reason' => 'return',
+                ]);
             }
 
             $ahead = $local->addDays((int) config('comms.calendar.planning_days', 2))->toDateString();

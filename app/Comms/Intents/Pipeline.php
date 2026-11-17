@@ -16,11 +16,14 @@ use App\Comms\Models\ModelAnswerKind;
 use App\Comms\Models\ModelRouter;
 use App\Comms\Notify\Notifier;
 use App\Comms\People\PersonMerge;
+use App\Comms\Playbooks\ApprovalRequest;
+use App\Comms\Playbooks\Away;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\Contradiction;
 use App\Comms\Playbooks\DependencyRisk;
 use App\Comms\Playbooks\DoWhatWasPromised;
 use App\Comms\Playbooks\Incident;
+use App\Comms\Playbooks\OnboardPerson;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\RecurringDraft;
 use App\Comms\Playbooks\Redirect;
@@ -276,6 +279,9 @@ class Pipeline
         app(RecurringDraft::class)->source($event);
         app(DoWhatWasPromised::class)->source($event);
         app(Redirect::class)->source($event);
+        app(Away::class)->source($event);
+        app(OnboardPerson::class)->source($event);
+        app(ApprovalRequest::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void
