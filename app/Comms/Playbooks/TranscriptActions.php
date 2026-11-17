@@ -2,6 +2,8 @@
 
 namespace App\Comms\Playbooks;
 
+use App\Comms\Gate\ActionClass;
+use App\Comms\Gate\Gate;
 use App\Comms\Models\ModelAnswerKind;
 use App\Comms\Models\ModelRouter;
 use App\Comms\People\Relation;
@@ -75,9 +77,20 @@ class TranscriptActions
             return;
         }
 
+        $actions = array_values(array_filter(
+            $answer->output['actions'] ?? [],
+            fn (mixed $action): bool => is_array($action) && is_string($action['what'] ?? null) && trim((string) $action['what']) !== '',
+        ));
+
+        if ($actions === []) {
+            $this->noOutcome($user, $event);
+
+            return;
+        }
+
         $quotes = [];
 
-        foreach (array_values($answer->output['actions'] ?? []) as $index => $action) {
+        foreach ($actions as $index => $action) {
             if (! is_array($action) || ! is_string($action['what'] ?? null)) {
                 continue;
             }
@@ -131,6 +144,22 @@ class TranscriptActions
         }
 
         $this->findings($user, $event, $quotes);
+    }
+
+    private function noOutcome(User $user, CommsEvent $event): void
+    {
+        $this->container->make(Gate::class)->submit(
+            user: $user,
+            class: ActionClass::SendSlack,
+            target: ['ref' => 'self', 'from_user' => true, 'channel' => 'C1'],
+            payload: [
+                'text' => 'La reunión no dejó decisiones ni tareas. ¿Retomo las preguntas que quedaron abiertas?',
+                'to' => 'C1',
+            ],
+            sourceEventIds: [$event->id],
+            statesProductFacts: false,
+            notify: false,
+        );
     }
 
     /**

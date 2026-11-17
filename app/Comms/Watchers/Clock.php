@@ -103,8 +103,11 @@ class Clock
                 continue;
             }
 
-            if ($meeting->kind === 'planning' && $starts->timezone($local->timezone)->toDateString() === $local->addDays((int) config('comms.calendar.planning_days', 2))->toDateString()) {
-                $count += $this->mark($user, EventType::ClockLookahead, 'lookahead:planning:'.$meeting->id.':'.$local->toDateString(), $now, [
+            $ahead = $local->addDays((int) config('comms.calendar.planning_days', 2))->toDateString();
+            $meetingDay = $starts->timezone($local->timezone)->toDateString();
+
+            if (in_array($meeting->kind, ['planning', 'demo'], true) && $meetingDay === $ahead) {
+                $count += $this->mark($user, EventType::ClockLookahead, 'lookahead:'.$meeting->kind.':'.$meeting->id.':'.$local->toDateString(), $now, [
                     'calendar_id' => $meeting->id,
                     'reason' => 'meeting',
                 ]);
