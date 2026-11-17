@@ -182,6 +182,7 @@ Route::middleware('auth')->group(function () {
         Route::put('context', [WorkContextController::class, 'update'])->name('context.update');
         Route::put('context/channels', [WorkContextController::class, 'channels'])->name('context.channels');
         Route::put('context/urgent', [WorkContextController::class, 'urgent'])->name('context.urgent');
+        Route::put('context/policies', [WorkContextController::class, 'updatePolicy'])->name('context.policies');
         Route::delete('context/urgent', [WorkContextController::class, 'removeUrgent'])->name('context.urgent.destroy');
         Route::get('context/urgent/preview', [WorkContextController::class, 'previewUrgent'])->name('context.urgent.preview');
         Route::post('context/build', [WorkContextController::class, 'build'])

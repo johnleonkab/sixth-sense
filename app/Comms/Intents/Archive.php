@@ -156,14 +156,31 @@ class Archive
             return;
         }
 
-        CommsPolicy::query()->updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'action_class' => $class,
-                'conditions' => $conditions,
-            ],
-            ['outcome' => PolicyOutcome::Allow],
-        );
+        $existing = CommsPolicy::query()
+            ->whereBelongsTo($user)
+            ->where('action_class', $class)
+            ->orderBy('id')
+            ->get()
+            ->first(function (CommsPolicy $policy) use ($conditions): bool {
+                $stored = is_array($policy->conditions) ? $policy->conditions : [];
+
+                return $stored === $conditions;
+            });
+        $outcome = PolicyOutcome::tryFrom((string) ($data['outcome'] ?? 'allow')) ?? PolicyOutcome::Allow;
+
+        if ($existing instanceof CommsPolicy) {
+            $existing->outcome = $outcome;
+            $existing->save();
+
+            return;
+        }
+
+        CommsPolicy::query()->create([
+            'user_id' => $user->id,
+            'action_class' => $class,
+            'conditions' => $conditions,
+            'outcome' => $outcome,
+        ]);
     }
 
     /**
@@ -178,6 +195,7 @@ class Archive
             'area' => 'area:'.($normalized['area_kind'] ?? 'product').':'.($normalized['ref'] ?? ''),
             'urgent_rule' => 'urgent:'.($normalized['op'] ?? 'set').':'.($rule['kind'] ?? '').':'.($rule['ref'] ?? ''),
             'scope' => 'scope',
+            'policy' => 'policy:'.($normalized['action_class'] ?? ''),
             default => 'preference',
         };
     }

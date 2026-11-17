@@ -6,7 +6,7 @@ import { Button, buttonClass } from '@/components/button';
 import Switch from '@/components/switch';
 import SettingsLayout from '@/layouts/settings-layout';
 
-type Tab = 'people' | 'topics' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent' | 'changes';
+type Tab = 'people' | 'topics' | 'areas' | 'known' | 'rules' | 'pending' | 'channels' | 'urgent' | 'changes' | 'policies';
 
 type Origin = 'user' | 'correction' | 'observed' | 'inferred';
 
@@ -127,6 +127,19 @@ type NightClass = { key: string; label: string; on: boolean };
 
 type NightChanges = { lines: NightLine[]; classes: NightClass[] };
 
+type PolicyException = { context: string; outcome: string };
+
+type PolicyClass = {
+    action_class: string;
+    label: string;
+    outcome: string;
+    exceptions: PolicyException[];
+};
+
+type PolicyDeny = { reason: string; label: string; locked: boolean };
+
+type Policies = { classes: PolicyClass[]; denies: PolicyDeny[] };
+
 type ContextProps = {
     tab: Tab;
     context: WorkContext;
@@ -148,6 +161,7 @@ type ContextProps = {
     channels: Channel[];
     urgent_rules: UrgentRule[];
     night_changes: NightChanges;
+    policies: Policies;
 };
 
 const tabs: { value: Tab; label: string }[] = [
@@ -160,6 +174,7 @@ const tabs: { value: Tab; label: string }[] = [
     { value: 'channels', label: 'Canales de Slack' },
     { value: 'urgent', label: 'Qué es urgente' },
     { value: 'changes', label: 'Cambios de la noche' },
+    { value: 'policies', label: 'Políticas' },
 ];
 
 const originLabel: Record<Origin, string> = {
@@ -1194,6 +1209,66 @@ function UrgentTab({ people, channels, rules }: { people: Person[]; channels: Ch
     );
 }
 
+const policyOutcomes = [
+    { value: 'ask', label: 'Preguntar' },
+    { value: 'allow', label: 'Hacer solo' },
+    { value: 'deny', label: 'Nunca' },
+] as const;
+
+function PoliciesTab({ policies }: { policies: Policies }) {
+    return (
+        <div className="flex flex-col gap-8">
+            <Section
+                id="context-policies"
+                title="Políticas"
+                description="Para cada acción: preguntar antes, hacerla sola o no hacerla nunca. «Hazlo siempre sin preguntar» en una tarjeta es esta misma elección, para ese caso."
+            >
+                <ul>
+                    {policies.classes.map((item) => (
+                        <li key={item.action_class} className="border-t border-line py-4">
+                            <p className="text-[14px] text-ink">{item.label}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {policyOutcomes.map((outcome) => (
+                                    <Button
+                                        key={outcome.value}
+                                        type="button"
+                                        size="small"
+                                        variant={item.outcome === outcome.value ? 'primary' : 'secondary'}
+                                        aria-pressed={item.outcome === outcome.value}
+                                        onClick={() =>
+                                            router.put(
+                                                '/settings/context/policies',
+                                                { action_class: item.action_class, outcome: outcome.value },
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        {outcome.label}
+                                    </Button>
+                                ))}
+                            </div>
+                            {item.exceptions.map((exception) => (
+                                <p key={`${exception.context}-${exception.outcome}`} className="mt-2 text-[13px] text-muted">
+                                    {exception.context}: {policyOutcomes.find((outcome) => outcome.value === exception.outcome)?.label ?? exception.outcome}
+                                </p>
+                            ))}
+                        </li>
+                    ))}
+                </ul>
+            </Section>
+            <Section id="context-policy-denies" title="Esto no se puede permitir" description="Aunque la política diga hacer solo, estas siguen parando el envío.">
+                <ul>
+                    {policies.denies.map((deny) => (
+                        <li key={deny.reason} aria-disabled="true" className="border-t border-line py-3 text-[13.5px] text-muted">
+                            {deny.label}
+                        </li>
+                    ))}
+                </ul>
+            </Section>
+        </div>
+    );
+}
+
 export default function Context(props: ContextProps) {
     const { tab, context, run_at: runAt } = props;
     const building = context.status === 'running';
@@ -1236,6 +1311,7 @@ export default function Context(props: ContextProps) {
             {tab === 'channels' && <ChannelsTab channels={props.channels} />}
             {tab === 'urgent' && <UrgentTab people={props.people} channels={props.channels} rules={props.urgent_rules} />}
             {tab === 'changes' && <ChangesTab night={props.night_changes ?? { lines: [], classes: [] }} />}
+            {tab === 'policies' && <PoliciesTab policies={props.policies ?? { classes: [], denies: [] }} />}
         </SettingsLayout>
     );
 }

@@ -41,7 +41,7 @@ export default function ActionMenu({
                     <SnoozePicker onSnooze={onSnooze} />
                     {canAlways && (
                         <Button type="button" size="small" onClick={onAlways}>
-                            Hazlo siempre
+                            Hazlo siempre sin preguntar
                         </Button>
                     )}
                     {canUndo && (

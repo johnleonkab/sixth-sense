@@ -9,6 +9,9 @@ use App\Comms\Context\ContextWriter;
 use App\Comms\Context\FactOrigin;
 use App\Comms\Context\InertiaReview;
 use App\Comms\Events\Source;
+use App\Comms\Gate\ActionClass;
+use App\Comms\Gate\PolicyCatalog;
+use App\Comms\Gate\PolicyOutcome;
 use App\Comms\Intents\Archive;
 use App\Comms\Intents\PersonRef;
 use App\Comms\Nightly\NightChanges;
@@ -39,7 +42,7 @@ use Throwable;
  */
 class WorkContextController extends Controller
 {
-    private const array TABS = ['people', 'topics', 'areas', 'known', 'rules', 'pending', 'channels', 'urgent', 'changes'];
+    private const array TABS = ['people', 'topics', 'areas', 'known', 'rules', 'pending', 'channels', 'urgent', 'changes', 'policies'];
 
     public function index(Request $request, KnowledgeBase $knowledge, ContextEngine $engine, InertiaReview $inertia, Chats $chats): Response
     {
@@ -81,6 +84,7 @@ class WorkContextController extends Controller
             'urgent_rules' => $tab === 'urgent' ? $this->listedUrgent($user, $channels) : [],
             'topics' => $tab === 'topics' ? app(TopicReview::class)->list($user) : [],
             'night_changes' => $tab === 'changes' ? app(NightChanges::class)->screen($user) : ['lines' => [], 'classes' => []],
+            'policies' => $tab === 'policies' ? app(PolicyCatalog::class)->for($user) : ['classes' => [], 'denies' => []],
         ]);
     }
 
@@ -97,6 +101,27 @@ class WorkContextController extends Controller
         $archive->record($request->user(), [
             'kind' => 'scope',
             'slack_channel_ids' => array_values($ids),
+        ]);
+
+        return back();
+    }
+
+    /**
+     * The blanket choice for one action. A card's "hazlo siempre" is the same
+     * event, with the context of that send.
+     */
+    public function updatePolicy(Request $request, Archive $archive): RedirectResponse
+    {
+        $data = $request->validate([
+            'action_class' => ['required', Rule::enum(ActionClass::class)],
+            'outcome' => ['required', Rule::enum(PolicyOutcome::class)],
+        ]);
+
+        $archive->record($request->user(), [
+            'kind' => 'policy',
+            'action_class' => $data['action_class'],
+            'context' => [],
+            'outcome' => $data['outcome'],
         ]);
 
         return back();
