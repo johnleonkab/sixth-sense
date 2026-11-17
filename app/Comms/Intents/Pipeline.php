@@ -22,6 +22,7 @@ use App\Comms\Playbooks\DependencyRisk;
 use App\Comms\Playbooks\Incident;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
+use App\Comms\Playbooks\SignalToDigest;
 use App\Comms\Playbooks\TranscriptActions;
 use App\Comms\Playbooks\WatchAndFollowUp;
 use App\Comms\Surface\IntentActions;
@@ -268,6 +269,7 @@ class Pipeline
         app(WatchAndFollowUp::class)->source($event);
         app(Contradiction::class)->source($event);
         app(Incident::class)->source($event);
+        app(SignalToDigest::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void
