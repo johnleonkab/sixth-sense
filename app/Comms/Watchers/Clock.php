@@ -99,6 +99,17 @@ class Clock
                 ]);
             }
 
+            if ($starts !== null
+                && in_array($meeting->kind, ['report', 'release'], true)
+                && ($meeting->kind === 'release' || $meeting->recurring)
+                && $starts->gte($now)
+                && $starts->lte($now->addHours(24))) {
+                $count += $this->mark($user, EventType::ClockLookahead, 'lookahead:'.$meeting->kind.':'.$meeting->id.':'.$starts->utc()->timestamp, $now, [
+                    'calendar_id' => $meeting->id,
+                    'reason' => $meeting->kind,
+                ]);
+            }
+
             if ($local->format('H:i') !== '09:00') {
                 continue;
             }

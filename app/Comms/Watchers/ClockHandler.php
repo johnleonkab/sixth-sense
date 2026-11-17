@@ -9,6 +9,7 @@ use App\Comms\Intents\ImportanceCalculator;
 use App\Comms\Nightly\ChangeList;
 use App\Comms\Notify\Notifier;
 use App\Comms\Playbooks\Briefing;
+use App\Comms\Playbooks\RecurringDraft;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsNotification;
@@ -40,9 +41,22 @@ class ClockHandler
             EventType::ClockDue => $this->due($event),
             EventType::ClockStale => $this->stale($event),
             EventType::ClockDigest => $this->digest($event),
-            EventType::ClockLookahead => $this->briefing->apply($event),
+            EventType::ClockLookahead => $this->ahead($event),
             default => null,
         };
+    }
+
+    private function ahead(CommsEvent $event): void
+    {
+        $reason = (string) ($event->normalized['reason'] ?? '');
+
+        if ($reason === 'report' || $reason === 'release') {
+            app(RecurringDraft::class)->calendar($event);
+
+            return;
+        }
+
+        $this->briefing->apply($event);
     }
 
     private function due(CommsEvent $event): void
