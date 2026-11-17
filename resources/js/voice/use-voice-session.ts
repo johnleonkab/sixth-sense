@@ -239,6 +239,7 @@ export function useVoiceSession({ onCanvas, onUtterance, screen }: VoiceSessionO
                 yes: 'La persona ha dicho que sí y la aplicación ya ha confirmado el borrador. Empieza la cuenta atrás para deshacer. No llames a ninguna herramienta, no crees otra propuesta y no vuelvas a describirla. Calla.',
                 no: 'La persona ha cancelado y la aplicación ya ha descartado el borrador. No llames a ninguna herramienta ni prepares otro. Calla.',
                 undo: 'La persona ha deshecho el cambio y la aplicación ya lo ha anulado. No llames a ninguna herramienta ni lo vuelvas a proponer. Calla.',
+                guide: 'La persona ha guiado el borrador y la aplicación ya lo ha reescrito. No lo envíes, no llames a ninguna herramienta y no crees otra propuesta. Calla.',
             };
 
             // Tools run in Laravel; the assistant waits for every response before speaking again.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Comms;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
+use App\Comms\Nightly\ChangeList;
 use App\Comms\Surface\Confirmations;
 use App\Comms\Surface\FocusedUtterance;
 use App\Comms\Surface\HomeBoard;
@@ -12,6 +13,7 @@ use App\Comms\Surface\IntentCard;
 use App\Http\Controllers\Controller;
 use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsIntent;
+use App\Models\Comms\CommsQuestion;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -130,6 +132,70 @@ class SurfaceController extends Controller
             'field' => ['sometimes', 'nullable', 'string'],
         ]);
         $confirmations->answer($request->user(), $intent, $data['kind'], $data['answer'], $data);
+
+        return response()->json([
+            'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),
+        ]);
+    }
+
+    public function briefing(Request $request): JsonResponse
+    {
+        $this->open();
+        $user = $request->user();
+        $board = HomeBoard::for($user);
+        $item = app(ChangeList::class)->item($user);
+
+        return response()->json([
+            'needs_you' => array_map(fn (array $row): array => [
+                'id' => $row['id'],
+                'what' => $row['what'],
+            ], $board['lists']['needs_you']),
+            'changes' => $item['lines'] ?? [],
+        ]);
+    }
+
+    public function pick(Request $request, EventLog $log, CommsIntent $intent, CommsQuestion $question): JsonResponse
+    {
+        $this->open();
+        abort_unless($intent->user_id === $request->user()->id, 404);
+        abort_unless($question->user_id === $request->user()->id && $question->intent_id === $intent->id, 404);
+        $data = $request->validate([
+            'option' => ['required', 'string'],
+        ]);
+        $option = $data['option'];
+        $known = [];
+
+        foreach (is_array($question->options) ? $question->options : [] as $choice) {
+            if (! is_array($choice)) {
+                continue;
+            }
+
+            $id = $choice['id'] ?? $choice['key'] ?? null;
+
+            if (is_string($id) && $id !== '') {
+                $known[] = $id;
+            }
+        }
+
+        abort_unless(in_array($option, $known, true), 422);
+        $event = $log->append(
+            user: $request->user(),
+            type: EventType::UserCorrected,
+            source: Source::User,
+            externalId: 'pick:'.$question->id,
+            payload: null,
+            normalized: [
+                'action' => 'pick',
+                'intent_key' => $intent->key,
+                'question_id' => $question->id,
+                'option' => $option,
+            ],
+            causation: null,
+            occurredAt: now(),
+        );
+        $question->answer = ['option' => $option];
+        $question->answered_event_id = $event->id;
+        $question->save();
 
         return response()->json([
             'card' => app(IntentCard::class)->show($request->user(), $intent->fresh()),

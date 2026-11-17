@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/proposals/{proposal}/edit', [ProposalController::class, 'edit'])->whereNumber('proposal')->name('comms.proposals.edit');
     Route::post('comms/proposals/{proposal}/undo', [ProposalController::class, 'undo'])->whereNumber('proposal')->name('comms.proposals.undo');
     Route::get('comms/home', [SurfaceController::class, 'home'])->name('comms.home');
+    Route::get('comms/briefing', [SurfaceController::class, 'briefing'])->name('comms.briefing');
     Route::get('comms/intents/{intent}', [SurfaceController::class, 'intent'])->whereNumber('intent')->name('comms.intents.show');
     Route::get('comms/topics/{subject}', [SurfaceController::class, 'topic'])->where('subject', '.*')->name('comms.topics.show');
     Route::post('comms/links/{link}/confirm', [SurfaceController::class, 'confirm'])->whereNumber('link')->name('comms.links.confirm');
@@ -130,6 +131,7 @@ Route::middleware('auth')->group(function () {
     Route::post('comms/intents/{intent}/importance', [SurfaceController::class, 'importance'])->whereNumber('intent')->name('comms.intents.importance');
     Route::post('comms/intents/{intent}/confirmations', [SurfaceController::class, 'confirmation'])->whereNumber('intent')->name('comms.intents.confirmations');
     Route::post('comms/intents/{intent}/voice', [SurfaceController::class, 'voice'])->whereNumber('intent')->name('comms.intents.voice');
+    Route::post('comms/intents/{intent}/questions/{question}', [SurfaceController::class, 'pick'])->whereNumber('intent')->whereNumber('question')->name('comms.intents.questions.pick');
     Route::post('comms/intents/{intent}/delegate', [SurfaceController::class, 'delegate'])->whereNumber('intent')->name('comms.intents.delegate');
     Route::post('comms/intents/{intent}/snooze', [SurfaceController::class, 'snooze'])->whereNumber('intent')->name('comms.intents.snooze');
     Route::post('comms/intents/{intent}/always', [SurfaceController::class, 'always'])->whereNumber('intent')->name('comms.intents.always');

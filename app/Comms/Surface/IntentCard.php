@@ -10,6 +10,7 @@ use App\Comms\People\Relation;
 use App\Models\Comms\CommsCardView;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
+use App\Models\Comms\CommsIntentParticipant;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsPlaybookRun;
 use App\Models\Comms\CommsProposal;
@@ -18,6 +19,7 @@ use App\Models\Comms\CommsWatcher;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 /**
  * One intent, collapsed for the list and open for the card (proposal 7.3).
@@ -140,6 +142,12 @@ class IntentCard
             ? $intent->changed_summary
             : null;
         $changedSince = is_string($changedSince) && $changedSince !== '' ? $changedSince : null;
+        $questions = $this->questions($intent);
+        $undo = CommsProposal::query()
+            ->where('intent_id', $intent->id)
+            ->where('status', ProposalStatus::Executed)
+            ->orderByDesc('id')
+            ->value('id');
 
         return [
             'collapsed' => [
@@ -149,7 +157,7 @@ class IntentCard
                 'channels' => $channels,
                 'who' => $this->who($unclear, $names['requester'], $names['responder'], $selfResponds),
                 'deadline' => $unclear['deadline'] ?? $intent->deadline?->toDateString(),
-                'pill' => $this->pill($intent, $now, $pending->count(), $changedAt, $seenAt, $selfResponds, $selfRequests),
+                'pill' => $this->pill($intent, $now, $pending->count(), count($questions), $changedAt, $seenAt, $selfResponds, $selfRequests),
             ],
             'open' => [
                 'what' => $intent->what,
@@ -161,6 +169,9 @@ class IntentCard
                 'changed_since' => $changedSince,
                 'plan' => $this->plan->for($intent),
                 'confirmations' => $this->confirmations->for($intent),
+                'questions' => $questions,
+                'handoff' => $this->handoff($participants),
+                'undo_proposal_id' => is_int($undo) || (is_string($undo) && ctype_digit($undo)) ? (int) $undo : null,
                 'actions' => $pending->map(fn (CommsProposal $proposal): array => [
                     'id' => $proposal->id,
                     'action' => $proposal->action_class->value,
@@ -295,6 +306,7 @@ class IntentCard
         CommsIntent $intent,
         CarbonImmutable $now,
         int $pending,
+        int $questions,
         ?CarbonImmutable $changedAt,
         ?CarbonImmutable $seenAt,
         bool $selfResponds,
@@ -303,11 +315,6 @@ class IntentCard
         if ($pending > 0) {
             return "Aprobar {$pending}";
         }
-
-        $questions = CommsQuestion::query()
-            ->where('intent_id', $intent->id)
-            ->whereNull('answered_event_id')
-            ->count();
 
         if ($questions > 0) {
             return 'Tu decisión';
@@ -336,6 +343,89 @@ class IntentCard
         ], $now);
 
         return $group->label();
+    }
+
+    /**
+     * @return list<array{id: int, text: string, context: string, options: list<array{id: string, label: string}>}>
+     */
+    private function questions(CommsIntent $intent): array
+    {
+        $rows = [];
+
+        $questions = CommsQuestion::query()
+            ->where('intent_id', $intent->id)
+            ->whereNull('answered_event_id')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($questions as $question) {
+            $context = is_array($question->context) ? $question->context : [];
+            $summary = $context['summary'] ?? $context['draft'] ?? '';
+            $rows[] = [
+                'id' => $question->id,
+                'text' => $question->text,
+                'context' => is_string($summary) ? $summary : '',
+                'options' => $this->questionOptions($question->options),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    private function questionOptions(mixed $options): array
+    {
+        if (! is_array($options)) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($options as $option) {
+            if (! is_array($option)) {
+                continue;
+            }
+
+            $id = $option['id'] ?? $option['key'] ?? null;
+            $label = $option['label'] ?? $option['key'] ?? null;
+
+            if (! is_string($id) || $id === '' || ! is_string($label) || $label === '') {
+                continue;
+            }
+
+            $rows[] = ['id' => $id, 'label' => $label];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  Collection<int, CommsIntentParticipant>  $participants
+     * @return list<array{id: int, name: string}>
+     */
+    private function handoff($participants): array
+    {
+        $people = [];
+
+        foreach ($participants as $participant) {
+            $person = $participant->person;
+
+            if ($person === null || $person->relation === Relation::Self) {
+                continue;
+            }
+
+            $name = $person->display_name;
+
+            if (! is_string($name) || $name === '' || isset($people[$person->id])) {
+                continue;
+            }
+
+            $people[$person->id] = ['id' => $person->id, 'name' => $name];
+        }
+
+        return array_values($people);
     }
 
     private function ago(CarbonImmutable $changedAt, CarbonImmutable $now): string

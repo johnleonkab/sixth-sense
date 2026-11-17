@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 import { answerIn, bareAnswer, type Answer } from '@/actions/answers';
 import AlertCenter from '@/alerts/alert-center';
@@ -16,8 +16,8 @@ import ListenToggle from '@/components/voice/listen-toggle';
 import VoiceDock from '@/components/voice/voice-dock';
 import Wordmark from '@/components/wordmark';
 import IntentBoard, { type IntentGroups } from '@/intents/intent-board';
-import HomeBoard from '@/intents/home-board';
-import type { HomePayload } from '@/intents/types';
+import HomeBoard, { type FocusedDraft } from '@/intents/home-board';
+import type { CardPayload, HomePayload } from '@/intents/types';
 import { echoConnection } from '@/lib/echo';
 import { postJson } from '@/lib/http';
 import { activityFor } from '@/voice/activity';
@@ -146,6 +146,10 @@ export default function Home({
     const wide = useMinWidth(768);
     // A confirmed change is acknowledged with a sound once the service really did it.
     const actions = useActions({ onExecuted: (action) => ring(['mail.send', 'chat.send'].includes(action.type) ? 'sent' : 'done') });
+    const focusRef = useRef<FocusedDraft | null>(null);
+    const rememberFocus = useCallback((focus: FocusedDraft | null) => {
+        focusRef.current = focus;
+    }, []);
 
     // One canvas, or two when the decision needs both. The second sits on the right.
     const [agent, setAgent] = useState<string | null>(null);
@@ -247,6 +251,25 @@ export default function Home({
             await (reply === 'yes' ? actions.confirm(action.id) : actions.cancel(action.id));
 
             return ownsTheTurn();
+        }
+
+        const focused = surfaceV2 ? focusRef.current : null;
+
+        if (focused && focused.proposalIds.length > 0) {
+            try {
+                const heard = await postJson<{ heard: string; card: CardPayload }>(`/comms/intents/${focused.intentId}/voice`, {
+                    transcript: text,
+                    proposal_ids: focused.proposalIds,
+                });
+
+                if (heard.heard === 'yes' || heard.heard === 'guidance') {
+                    focused.show(heard.card);
+
+                    return heard.heard === 'guidance' ? 'guide' : 'yes';
+                }
+            } catch {
+                return null;
+            }
         }
 
         const onScreen = commsProposalOnScreen(canvases);
@@ -452,7 +475,11 @@ export default function Home({
                         !opening &&
                         (showMine ? (
                             surfaceV2 && surface ? (
-                                <HomeBoard initial={surface} />
+                                <HomeBoard
+                                    initial={surface}
+                                    onFocus={rememberFocus}
+                                    onTell={(said) => void voice.tell(said, true)}
+                                />
                             ) : (
                                 <IntentBoard
                                     intents={intents}

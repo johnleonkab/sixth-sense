@@ -1,6 +1,6 @@
 import { Button } from '@/components/button';
 import IntentCard from '@/intents/intent-card';
-import type { TopicPayload } from '@/intents/types';
+import type { CardPayload, TopicPayload } from '@/intents/types';
 import { topicLabel } from '@/intents/types';
 
 /** One topic, with the cards that belong to it. */
@@ -13,6 +13,8 @@ export default function TopicView({
     onNotForMe,
     onStillOpen,
     onImportance,
+    onCard,
+    onRefresh,
 }: {
     topic: TopicPayload;
     openId: number | null;
@@ -22,6 +24,8 @@ export default function TopicView({
     onNotForMe: (id: number) => void;
     onStillOpen: (id: number) => void;
     onImportance: (id: number, importance: number) => void;
+    onCard?: (card: CardPayload) => void;
+    onRefresh?: () => void;
 }) {
     return (
         <section className="flex flex-col gap-3">
@@ -41,6 +45,8 @@ export default function TopicView({
                     onNotForMe={() => onNotForMe(card.collapsed.id)}
                     onStillOpen={() => onStillOpen(card.collapsed.id)}
                     onImportance={(importance) => onImportance(card.collapsed.id, importance)}
+                    onCard={onCard}
+                    onRefresh={onRefresh}
                 />
             ))}
         </section>

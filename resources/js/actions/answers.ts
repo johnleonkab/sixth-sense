@@ -3,7 +3,7 @@
  * This runs in the browser, on the person's own words: the assistant never
  * confirms anything, so text inside a document or an email can not either.
  */
-export type Answer = 'yes' | 'no' | 'undo';
+export type Answer = 'yes' | 'no' | 'undo' | 'guide';
 
 const normalise = (text: string): string =>
     text

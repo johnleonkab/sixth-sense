@@ -106,6 +106,8 @@ class Confirmations
                     ['id' => 'guide', 'label' => 'Guiar'],
                     ['id' => 'reject', 'label' => 'Rechazar'],
                 ],
+                'action_class' => $group[0]->action_class->value,
+                'context' => $this->sendContext($group[0]),
             ];
             $sources = $this->uncertainSources($group);
             $change = $this->change($group);
@@ -199,6 +201,16 @@ class Confirmations
                 ['id' => 'still_open', 'label' => 'Sigue abierto'],
             ],
         ];
+    }
+
+    /**
+     * @return array{channel?: string}
+     */
+    private function sendContext(CommsProposal $proposal): array
+    {
+        $channel = $proposal->payload['to'] ?? null;
+
+        return is_string($channel) && $channel !== '' ? ['channel' => $channel] : [];
     }
 
     /**

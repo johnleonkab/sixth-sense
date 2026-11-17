@@ -1,8 +1,12 @@
 import { ServiceIconFor } from '@/components/service-icon';
 import { Button } from '@/components/button';
 import EvidenceThread from '@/intents/evidence-thread';
-import type { CollapsedCard, OpenCard } from '@/intents/types';
+import ActionMenu from '@/intents/action-menu';
+import ConfirmationCard from '@/intents/confirmation-card';
+import PlanChecklist from '@/intents/plan-checklist';
+import type { CardPayload, CollapsedCard, Confirmation, OpenCard } from '@/intents/types';
 import { topicLabel } from '@/intents/types';
+import { postJson } from '@/lib/http';
 
 const levels = [
     { score: 70, label: 'Alta' },
@@ -28,6 +32,8 @@ export default function IntentCard({
     onNotForMe,
     onStillOpen,
     onImportance,
+    onCard,
+    onRefresh,
 }: {
     collapsed: CollapsedCard;
     open: OpenCard | null;
@@ -37,8 +43,22 @@ export default function IntentCard({
     onNotForMe: () => void;
     onStillOpen: () => void;
     onImportance: (importance: number) => void;
+    onCard?: (card: CardPayload) => void;
+    onRefresh?: () => void;
 }) {
     const deadline = open?.unclear.deadline ?? collapsed.deadline;
+    const approval = open?.confirmations?.find((card) => card.kind === 'approve');
+
+    const answer = (card: Confirmation, choice: string, extra?: { text?: string }) => {
+        void postJson<{ card: CardPayload }>(`/comms/intents/${collapsed.id}/confirmations`, {
+            kind: card.kind,
+            answer: choice,
+            proposal_ids: card.proposal_ids,
+            link_id: card.link_id,
+            field: card.field,
+            text: extra?.text,
+        }).then((payload) => onCard?.(payload.card));
+    };
 
     return (
         <article className="rounded-2xl border border-line bg-surface px-4 py-3">
@@ -80,18 +100,37 @@ export default function IntentCard({
                     </dl>
                     <div className="mt-4">
                         <h3 className="text-[13px] font-medium text-ink">Plan</h3>
-                        {open.plan.length === 0 ? (
-                            <p className="mt-1 text-[13px] text-muted">El plan aparecerá aquí.</p>
-                        ) : (
-                            <ol className="mt-2 flex flex-col gap-1">
-                                {open.plan.map((step, index) => (
-                                    <li key={step.id ?? index} className="text-[14px] text-ink">
-                                        {step.what}
-                                    </li>
-                                ))}
-                            </ol>
-                        )}
+                        <PlanChecklist plan={open.plan} />
                     </div>
+                    {(open.confirmations ?? []).length > 0 && (
+                        <div className="mt-4 flex flex-col gap-2">
+                            {(open.confirmations ?? []).map((card, index) => (
+                                <ConfirmationCard key={`${card.kind}-${index}`} card={card} onAnswer={(choice, extra) => answer(card, choice, extra)} />
+                            ))}
+                        </div>
+                    )}
+                    {(open.questions ?? []).map((question) => (
+                        <div key={question.id} className="mt-4 flex flex-col gap-2">
+                            <p className="text-[14px] text-ink">{question.text}</p>
+                            {question.context && <p className="text-[13px] text-muted">{question.context}</p>}
+                            <div className="flex flex-wrap gap-2">
+                                {question.options.map((option) => (
+                                    <Button
+                                        key={option.id}
+                                        type="button"
+                                        size="small"
+                                        onClick={() => {
+                                            void postJson<{ card: CardPayload }>(`/comms/intents/${collapsed.id}/questions/${question.id}`, {
+                                                option: option.id,
+                                            }).then((payload) => onCard?.(payload.card));
+                                        }}
+                                    >
+                                        {option.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
                     <EvidenceThread evidence={open.evidence} />
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <Button type="button" size="small" variant="primary" onClick={onDone}>
@@ -108,6 +147,37 @@ export default function IntentCard({
                                 {level.label}
                             </Button>
                         ))}
+                    </div>
+                    <div className="mt-3">
+                        <ActionMenu
+                            handoff={open.handoff ?? []}
+                            canAlways={Boolean(approval?.action_class)}
+                            canUndo={open.undo_proposal_id != null}
+                            onNotForMe={onNotForMe}
+                            onDelegate={(personId) => {
+                                void postJson<{ card: CardPayload }>(`/comms/intents/${collapsed.id}/delegate`, { person_id: personId }).then((payload) => onCard?.(payload.card));
+                            }}
+                            onSnooze={(until) => {
+                                void postJson<{ card: CardPayload }>(`/comms/intents/${collapsed.id}/snooze`, { until }).then((payload) => onCard?.(payload.card));
+                            }}
+                            onAlways={() => {
+                                if (!approval?.action_class) {
+                                    return;
+                                }
+
+                                void postJson(`/comms/intents/${collapsed.id}/always`, {
+                                    action_class: approval.action_class,
+                                    context: approval.context ?? {},
+                                }).then(() => onRefresh?.());
+                            }}
+                            onUndo={() => {
+                                if (open.undo_proposal_id == null) {
+                                    return;
+                                }
+
+                                void postJson(`/comms/proposals/${open.undo_proposal_id}/undo`, {}).then(() => onRefresh?.());
+                            }}
+                        />
                     </div>
                 </div>
             )}

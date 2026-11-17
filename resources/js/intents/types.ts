@@ -63,6 +63,58 @@ export type Evidence = {
     }[];
 };
 
+export type PlanStep = {
+    id: string;
+    text: string;
+    status: string;
+    channel: string | null;
+    preview: string | null;
+    waiting_on: { name: string; since: string } | null;
+};
+
+export type PlanGroup = {
+    after: string[];
+    steps: PlanStep[];
+};
+
+export type ConfirmationAnswer = {
+    id: string;
+    label: string;
+};
+
+export type Confirmation = {
+    kind: 'approve' | 'disambiguate' | 'outcome';
+    proposal_ids?: number[];
+    previews?: (string | null)[];
+    answers: ConfirmationAnswer[];
+    notice?: string;
+    change?: string;
+    uncertain_source_message_ids?: number[];
+    action_class?: string;
+    context?: Record<string, string>;
+    prompt?: string;
+    current?: string;
+    link_id?: number;
+    field?: string;
+};
+
+export type DecisionOption = {
+    id: string;
+    label: string;
+};
+
+export type Decision = {
+    id: number;
+    text: string;
+    context: string;
+    options: DecisionOption[];
+};
+
+export type Handoff = {
+    id: number;
+    name: string;
+};
+
 export type OpenCard = {
     what: string;
     requesters: string[];
@@ -71,9 +123,18 @@ export type OpenCard = {
     deadline: string | null;
     unclear: Record<string, string>;
     changed_since: string | null;
-    plan: { id?: string; what?: string; after?: string[] }[];
+    plan: PlanGroup[];
+    confirmations?: Confirmation[];
+    questions?: Decision[];
+    handoff?: Handoff[];
+    undo_proposal_id?: number | null;
     actions: { id: number; action: string; status: string }[];
     evidence: Evidence;
+};
+
+export type Briefing = {
+    needs_you: { id: number; what: string }[];
+    changes: { id: number; quote: string | null; why: string | null }[];
 };
 
 export type CardPayload = {

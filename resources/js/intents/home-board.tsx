@@ -1,14 +1,22 @@
 import { useHttp, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
+import { Button } from '@/components/button';
 import { echoConnection } from '@/lib/echo';
+import { getJson } from '@/lib/http';
 import IntentCard from '@/intents/intent-card';
 import PossibleAskRow from '@/intents/possible-ask-row';
 import TopicView from '@/intents/topic-view';
-import type { CardPayload, CollapsedCard, HomePayload, HomeRow, TopicPayload } from '@/intents/types';
+import type { Briefing, CardPayload, CollapsedCard, HomePayload, HomeRow, TopicPayload } from '@/intents/types';
 import { topicLabel } from '@/intents/types';
 import UncertainLinkRow from '@/intents/uncertain-link-row';
 import type { SharedData } from '@/types';
+
+export type FocusedDraft = {
+    intentId: number;
+    proposalIds: number[];
+    show: (card: CardPayload) => void;
+};
 
 const groups = [
     { key: 'needs_you', title: 'Te toca' },
@@ -42,12 +50,21 @@ function collapsedFrom(row: HomeRow, title: string): CollapsedCard {
 }
 
 /** The home by who has the ball. A live change reloads this board, and a card moves instead of appearing twice. */
-export default function HomeBoard({ initial }: { initial: HomePayload }) {
+export default function HomeBoard({
+    initial,
+    onFocus,
+    onTell,
+}: {
+    initial: HomePayload;
+    onFocus?: (focus: FocusedDraft | null) => void;
+    onTell?: (text: string) => void;
+}) {
     const { auth } = usePage<SharedData>().props;
     const [board, setBoard] = useState(initial);
     const [openId, setOpenId] = useState<number | null>(null);
     const [card, setCard] = useState<CardPayload | null>(null);
     const [topic, setTopic] = useState<TopicPayload | null>(null);
+    const [briefing, setBriefing] = useState<Briefing | null>(null);
     const home = useHttp<Record<string, never>, HomePayload>({});
     const cards = useHttp<Record<string, never>, CardPayload>({});
     const topics = useHttp<Record<string, never>, TopicPayload>({});
@@ -56,6 +73,32 @@ export default function HomeBoard({ initial }: { initial: HomePayload }) {
     useEffect(() => {
         setBoard(initial);
     }, [initial]);
+
+    useEffect(() => {
+        void getJson<Briefing>('/comms/briefing')
+            .then(setBriefing)
+            .catch(() => setBriefing(null));
+    }, [initial]);
+
+    useEffect(() => {
+        if (!onFocus) {
+            return;
+        }
+
+        const approval = card?.open.confirmations?.find((item) => item.kind === 'approve');
+
+        if (openId === null || card?.collapsed.id !== openId || !approval?.proposal_ids?.length) {
+            onFocus(null);
+
+            return;
+        }
+
+        onFocus({
+            intentId: openId,
+            proposalIds: approval.proposal_ids,
+            show: (next) => setCard(next),
+        });
+    }, [card, openId, onFocus]);
 
     const refresh = () => {
         void home.get('/comms/home', {
@@ -134,10 +177,59 @@ export default function HomeBoard({ initial }: { initial: HomePayload }) {
         });
     };
 
+    const replaceCard = (next: CardPayload) => {
+        setCard(next);
+        setTopic((current) =>
+            current
+                ? {
+                      ...current,
+                      intents: current.intents.map((item) => (item.collapsed.id === next.collapsed.id ? next : item)),
+                  }
+                : current,
+        );
+    };
+
     const shown = (row: HomeRow, title: string): CollapsedCard => (card?.collapsed.id === row.id ? card.collapsed : collapsedFrom(row, title));
+
+    const morning = () => {
+        if (!briefing || !onTell) {
+            return;
+        }
+
+        const needs = briefing.needs_you.map((row) => row.what).join('. ');
+        const changes = briefing.changes
+            .map((line) => line.quote)
+            .filter((quote): quote is string => quote !== null && quote !== '')
+            .join('. ');
+        const sentence = [needs && `Te toca: ${needs}.`, changes && `Esta noche: ${changes}.`].filter(Boolean).join(' ');
+
+        onTell(sentence === '' ? 'Nada nuevo esta mañana.' : sentence);
+    };
 
     return (
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8 pt-1 pb-8">
+            {briefing && (briefing.needs_you.length > 0 || briefing.changes.length > 0) && (
+                <section className="flex flex-col gap-2 rounded-2xl bg-soft px-4 py-3">
+                    <header className="flex items-center justify-between gap-3">
+                        <h2 className="text-[15px] font-medium text-ink">Esta mañana</h2>
+                        {onTell && (
+                            <Button type="button" size="small" onClick={morning}>
+                                Léemelo
+                            </Button>
+                        )}
+                    </header>
+                    {briefing.needs_you.map((row) => (
+                        <p key={row.id} className="text-[14px] text-ink">
+                            Te toca: {row.what}
+                        </p>
+                    ))}
+                    {briefing.changes.map((line) => (
+                        <p key={line.id} className="text-[14px] text-ink">
+                            {line.quote}
+                        </p>
+                    ))}
+                </section>
+            )}
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {groups.map((group) => (
                     <div key={group.key} className="rounded-2xl bg-soft px-3 py-2">
@@ -157,6 +249,8 @@ export default function HomeBoard({ initial }: { initial: HomePayload }) {
                     onNotForMe={(id) => act(id, 'not-for-me')}
                     onStillOpen={(id) => act(id, 'still-open')}
                     onImportance={(id, importance) => act(id, 'importance', importance)}
+                    onCard={replaceCard}
+                    onRefresh={refresh}
                 />
             ) : (
                 <>
@@ -177,6 +271,8 @@ export default function HomeBoard({ initial }: { initial: HomePayload }) {
                                     onNotForMe={() => act(row.id, 'not-for-me')}
                                     onStillOpen={() => act(row.id, 'still-open')}
                                     onImportance={(importance) => act(row.id, 'importance', importance)}
+                                    onCard={replaceCard}
+                                    onRefresh={refresh}
                                 />
                             ))}
                         </section>
