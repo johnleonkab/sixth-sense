@@ -35,7 +35,7 @@ return [
         'draft' => $task('mid'),
         'summarize' => $task('mid'),
         'answer' => $task('large'),
-        'contradiction' => $task('large'),
+        'contradiction' => ['tier' => 'large', 'provider' => $provider, 'fallback' => $fallback, 'prompt' => 2],
         'verify_claims' => $task('large'),
 
         /*
