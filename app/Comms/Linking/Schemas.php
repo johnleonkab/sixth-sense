@@ -105,6 +105,7 @@ final class Schemas
                     ],
                 ],
                 'expects' => ['type' => 'string', 'nullable' => true],
+                'depends_on' => self::strings(),
                 'settle_reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['delivery', 'decision', 'drop', 'taken_by_other']],
                 'summary' => ['type' => 'string', 'nullable' => true],
                 'flags' => self::strings(),

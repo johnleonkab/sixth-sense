@@ -59,6 +59,8 @@ class PlaybookRunner
                 $this->close->decision($user, $intent, $message, (string) ($result['quote'] ?? ''));
             }
         }
+
+        app(DependencyRisk::class)->applied($user, $applied);
     }
 
     public function copied(User $user, CommsMessage $message, CommsEvent $event): void

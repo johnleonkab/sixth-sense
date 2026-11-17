@@ -48,6 +48,23 @@ class BusinessCalendar
         return $this->atWorkEnd($user, $cursor);
     }
 
+    public function subDays(User $user, CarbonImmutable $from, int $days): CarbonImmutable
+    {
+        $cursor = $from->timezone($this->timezone($user));
+        $workDays = $this->workDays($user);
+        $removed = 0;
+
+        while ($removed < $days) {
+            $cursor = $cursor->subDay();
+
+            if (in_array($cursor->dayOfWeekIso, $workDays, true)) {
+                $removed++;
+            }
+        }
+
+        return $cursor->startOfDay();
+    }
+
     public function endOfWorkOn(User $user, CarbonImmutable $day): CarbonImmutable
     {
         return $this->atWorkEnd($user, $day->timezone($this->timezone($user)));

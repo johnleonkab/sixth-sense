@@ -219,6 +219,10 @@ class PipelineV2
 
             if (is_array($item)) {
                 $result['kind'] = is_string($item['prepared']['kind'] ?? null) ? $item['prepared']['kind'] : null;
+                $result['depends_on'] = array_values(array_filter(
+                    $item['prepared']['depends_on'] ?? [],
+                    fn (mixed $ref): bool => is_string($ref) && $ref !== '',
+                ));
                 $result['steps'] = is_array($item['prepared']['steps'] ?? null) && $item['prepared']['steps'] !== []
                     ? $item['prepared']['steps']
                     : null;

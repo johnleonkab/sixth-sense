@@ -17,6 +17,7 @@ use App\Comms\Models\ModelRouter;
 use App\Comms\Notify\Notifier;
 use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
+use App\Comms\Playbooks\DependencyRisk;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
@@ -259,6 +260,7 @@ class Pipeline
         $this->runs->resume($event);
         $this->transcripts->apply($event);
         $this->close->source($event);
+        app(DependencyRisk::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void

@@ -47,7 +47,7 @@ return [
         */
         'segment' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
         'link' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 2, 'runs' => 3],
-        'extract' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 2, 'runs' => 3],
+        'extract' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 3, 'runs' => 3],
         'critic' => ['tier' => 'large', 'provider' => 'gemini', 'fallback' => 'deepseek', 'prompt' => 1],
         'dossier_write' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
         'reconcile' => ['tier' => 'large', 'provider' => 'deepseek', 'fallback' => 'gemini', 'prompt' => 1],
