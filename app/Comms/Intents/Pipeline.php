@@ -21,6 +21,7 @@ use App\Comms\Playbooks\DependencyRisk;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\TranscriptActions;
+use App\Comms\Playbooks\WatchAndFollowUp;
 use App\Comms\Surface\IntentActions;
 use App\Comms\Surface\IntentCard;
 use App\Comms\Surface\SurfaceUpdates;
@@ -261,6 +262,7 @@ class Pipeline
         $this->transcripts->apply($event);
         $this->close->source($event);
         app(DependencyRisk::class)->source($event);
+        app(WatchAndFollowUp::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void
