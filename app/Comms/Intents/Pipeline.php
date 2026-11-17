@@ -19,9 +19,11 @@ use App\Comms\People\PersonMerge;
 use App\Comms\Playbooks\CloseTheLoop;
 use App\Comms\Playbooks\Contradiction;
 use App\Comms\Playbooks\DependencyRisk;
+use App\Comms\Playbooks\DoWhatWasPromised;
 use App\Comms\Playbooks\Incident;
 use App\Comms\Playbooks\PlaybookRunner;
 use App\Comms\Playbooks\RecurringDraft;
+use App\Comms\Playbooks\Redirect;
 use App\Comms\Playbooks\Runs;
 use App\Comms\Playbooks\SignalToDigest;
 use App\Comms\Playbooks\TranscriptActions;
@@ -272,6 +274,8 @@ class Pipeline
         app(Incident::class)->source($event);
         app(SignalToDigest::class)->source($event);
         app(RecurringDraft::class)->source($event);
+        app(DoWhatWasPromised::class)->source($event);
+        app(Redirect::class)->source($event);
     }
 
     private function onAnswer(CommsEvent $event): void
