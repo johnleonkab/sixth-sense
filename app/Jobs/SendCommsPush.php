@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Alerts\Push\AlertPush;
-use App\Comms\Cutover\CommsReview;
+use App\Comms\Cutover\HomeFeed;
 use App\Models\Comms\CommsNotification;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,7 +30,7 @@ class SendCommsPush implements ShouldBeUnique, ShouldQueue
         return 'comms:'.$this->notification->id;
     }
 
-    public function handle(AlertPush $push, CommsReview $review): void
+    public function handle(AlertPush $push, HomeFeed $feed): void
     {
         $notification = $this->notification->fresh();
 
@@ -38,7 +38,7 @@ class SendCommsPush implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $card = $review->alert($notification);
+        $card = $feed->card($notification);
 
         if ($card['status'] !== 'pending') {
             return;

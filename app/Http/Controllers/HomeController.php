@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Alerts\AlertFeed;
+use App\Comms\Cutover\HomeFeed;
 use App\Comms\Cutover\OpenItem;
 use App\Comms\Intents\IntentBoard;
-use App\Comms\Pipeline;
 use App\Comms\Surface\HomeBoard;
 use App\Jobs\WarmChats;
 use App\Models\InboxItem;
@@ -21,7 +20,7 @@ class HomeController extends Controller
      * assistant gets the chat workspaces ready, so the first names said in
      * the conversation are already known.
      */
-    public function __invoke(Request $request, AlertFeed $alerts, Pipeline $pipeline, OpenItem $open, IntentBoard $intents): Response|RedirectResponse
+    public function __invoke(Request $request, HomeFeed $home, OpenItem $open, IntentBoard $intents): Response|RedirectResponse
     {
         $user = $request->user();
         $alertId = $request->integer('alert');
@@ -54,10 +53,7 @@ class HomeController extends Controller
 
         return Inertia::render('home', [
             // What came in lately, and every alert waiting for an answer, until answered.
-            'alerts' => array_values(array_filter(
-                $alerts->for($user),
-                fn (array $alert): bool => ! $pipeline->enabled((string) $alert['source']),
-            )),
+            'alerts' => $home->items($user),
             'openAlert' => $openAlert,
             'openComms' => $open->for($user),
             'intents' => $intents->for($user),
