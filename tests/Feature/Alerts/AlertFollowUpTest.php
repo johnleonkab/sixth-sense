@@ -163,6 +163,7 @@ test('a message judged unimportant can be reviewed too', function () {
 });
 
 test('after reloading, the screen lists what came in lately and every alert still waiting for an answer', function () {
+    config(['comms.pipeline.slack' => false, 'comms.pipeline.gmail' => false]);
     $this->slack->close(AlertStatus::Resolved, 'replied');
     $old = InboxItem::factory()->for($this->user)->create(['received_at' => now()->subDays(5), 'title' => 'Antiguo pero pendiente']);
     InboxItem::factory()->for($this->user)->create(['received_at' => now()->subDays(5), 'status' => AlertStatus::Resolved]);

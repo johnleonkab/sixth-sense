@@ -146,6 +146,22 @@ La última es la más difícil y la más importante: las demás solo miden preci
 
 Hoy se calculan por semana y por tipo de acción en Configuración › Impacto («Cómo van los avisos»), a partir del resultado de cada propuesta. «Se escaparon» usa por ahora la detección de Slack (mensajes que el triaje no dio por suyos y luego sí lo eran); faltan reuniones y entregas. Los objetivos se fijarán tras dos semanas de datos.
 
+## Dónde queda cada pilar
+
+Slack y Gmail ya no pasan por el cerebro de avisos de este documento. Entran por el pipeline de comunicaciones. El cerebro viejo sigue solo si `COMMS_PIPELINE_SLACK` o `COMMS_PIPELINE_GMAIL` vale `false`. Jira, Notion y el resto de avisos no cambian.
+
+| Pilar | En v2 | Qué se retira para Slack y Gmail |
+| --- | --- | --- |
+| Principios | Nada se escribe sin un sí: la puerta deja la propuesta pendiente y hay 6 segundos para deshacer. La duda abre una tarjeta de confirmación. La respuesta cita la fuente. Un envío a alguien de fuera con datos internos se niega. | La autonomía «Hacer» de Slack, que enviaba sola, deja de ser el camino de estos dos canales. |
+| 0 · Clasificación | El mensaje se parte en petición, compromiso, pregunta o decisión. Una llamada vaga, una funcionalidad o una estimación siguen su propio flujo. | El clasificador de avisos (llamada, tarea, pregunta, solo responder) y su conjunto de 25 mensajes. |
+| 1 · Llamadas | Una llamada vaga pregunta el tema y las dudas, y luego propone quedar o contestar por escrito. Si no hay hueco, propone pedir más tiempo. | El selector de personas y los tres huecos para quien no tiene agenda. |
+| 2 · Tareas | Un encargo con plazo prepara el trabajo y vigila la entrega. Un compromiso propio abre una intención. Lo enviado o un ticket cerrado propone avisar a quien esperaba. | Los tres huecos en el calendario como parte del aviso viejo. |
+| 3 · Preguntas | La respuesta se redacta desde el archivo, Jira y Notion, con la fuente. Si no está, lo dice. Si el código y la especificación no coinciden, enseña los dos y no elige. | La marca de «la fuente lleva más de 14 días sin tocarse». |
+| 4 · Interacción | La tarjeta deja aprobar, editar, guiar o rechazar. Lo que no es para la persona se cierra. Lo urgente espera al resumen. Un «sí» confirma lo que está abierto; cualquier otra frase mientras hay una propuesta reescribe el borrador. | Descartar con motivo como lección del juez de avisos, y el resumen de las 9:30 y las 15:30 de ese cerebro. |
+| 5 · Aprender | Una corrección, una política de «hazlo siempre» y la lista de cambios de la noche son la señal. Las métricas del pipeline viven en `comms:report`. | Las lecciones por capa del cerebro de avisos y la página de Lecciones como aprendizaje de Slack y Gmail. |
+
+La tabla de abajo describe ese cerebro viejo. No es el comportamiento de Slack ni de Gmail con el corte encendido.
+
 ## Estado actual frente a los pilares
 
 **Lo urgente ya está corregido:** ninguna tarea, propia o con otros, llega al calendario sin el «sí».
@@ -177,6 +193,7 @@ Cada una lleva una propuesta para validar o cambiar.
 
 | Fecha | Cambio |
 | --- | --- |
+| 2026-11-17 | Slack y Gmail salen del cerebro de avisos. Cada pilar apunta al pipeline de comunicaciones, o se retira para esos dos canales. |
 | 2026-10-31 | Etapa 10: las seis métricas por semana y por tipo de acción en Configuración › Impacto; «se escaparon» desde la detección de Slack. Objetivos pendientes de dos semanas de datos. |
 | 2026-10-31 | Etapa 9: aprender de cada interacción. Pesos de las señales, lecciones por capa y persona escritas por un modelo ligero, que se sustituyen o caducan; casos de evaluación desde las correcciones; revisión de la inercia; página de Lecciones en Configuración. |
 | 2026-10-31 | Etapa 8: ciclo de vida. Caducidad cuando otro lo resuelve o la llamada ya pasó; orden por plazo y bloqueo; los avisos de baja urgencia no suenan y van a un resumen dos veces al día. |

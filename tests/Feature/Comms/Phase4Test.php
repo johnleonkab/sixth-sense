@@ -210,6 +210,7 @@ test('an email reply keeps the thread headers', function () {
 });
 
 test('the follow-up draft is editable and becomes a proposal', function () {
+    config(['comms.pipeline.slack' => false, 'comms.pipeline.gmail' => false]);
     $user = phase4User();
     $marta = phase4Marta($user);
     $intent = CommsIntent::factory()->create(['user_id' => $user->id, 'flags' => []]);

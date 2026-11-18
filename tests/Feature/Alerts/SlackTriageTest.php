@@ -110,6 +110,7 @@ test('a task becomes an agenda task and not a chat reply', function () {
 });
 
 test('a question in a channel she owns is triaged quietly and raised when it stays alone', function () {
+    config(['comms.pipeline.slack' => false]);
     $this->travelTo('2026-10-28 10:00:00');
     [$user, $recording, $account] = slackPerson();
     $now = now()->getTimestamp();

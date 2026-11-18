@@ -241,6 +241,7 @@ test('replay rebuilds watchers and notifications', function () {
 });
 
 test('the shadow tab shows a question and keeps the mark', function () {
+    config(['comms.pipeline.slack' => false, 'comms.pipeline.gmail' => false]);
     [$user] = phase3Waiting();
     $this->artisan('comms:tick')->assertSuccessful();
 

@@ -64,7 +64,7 @@ function fakeGmailHistory(array $messages, string $newHistoryId = '200', int $hi
 }
 
 beforeEach(function () {
-    config(['alerts.judge' => 'fake']);
+    config(['alerts.judge' => 'fake', 'comms.pipeline.gmail' => false]);
     $this->app->instance(RelevanceJudge::class, $this->judge = new FakeRelevanceJudge);
     $this->user = User::factory()->create(['name' => 'John León']);
     $this->account = ConnectedAccount::factory()->for($this->user)->create(['email' => 'jhon@work.com', 'watch_cursor' => '100']);

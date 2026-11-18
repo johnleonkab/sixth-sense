@@ -61,6 +61,7 @@ function slackMatch(string $ts, string $user, string $text, array $channel = ['i
 }
 
 beforeEach(function () {
+    config(['comms.pipeline.slack' => false]);
     $this->travelTo('2026-10-08 10:00:00');
     $this->app->instance(RelevanceJudge::class, $this->judge = new FakeRelevanceJudge);
     $this->app->instance(ReplyPlanner::class, $this->planner = new FakeReplyPlanner);

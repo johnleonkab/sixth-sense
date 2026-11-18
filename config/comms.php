@@ -131,13 +131,13 @@ return [
     */
 
     /*
-    | Per-source cutover. Off keeps the current alert brain. On, that source
-    | is ingested by the communications pipeline and leaves the shadow tab.
+    | Per-source cutover. Slack and Gmail use the communications pipeline.
+    | Set the env value to false to keep the old alert brain for that source.
     */
 
     'pipeline' => [
-        'slack' => (bool) env('COMMS_PIPELINE_SLACK', false),
-        'gmail' => (bool) env('COMMS_PIPELINE_GMAIL', false),
+        'slack' => (bool) env('COMMS_PIPELINE_SLACK', true),
+        'gmail' => (bool) env('COMMS_PIPELINE_GMAIL', true),
     ],
 
     'notify' => [
