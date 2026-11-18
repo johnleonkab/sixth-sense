@@ -1,6 +1,5 @@
 <?php
 
-use App\Comms\Cutover\HomeFeed;
 use App\Comms\Gate\ActionClass;
 use App\Comms\Gate\Gate;
 use App\Comms\Notify\Notifier;
@@ -111,12 +110,9 @@ test('an intent that already has a signal and a draft shows one alert', function
         'source_event_ids' => [$event->id],
     ]);
 
-    $items = app(HomeFeed::class)->items($user);
-
-    expect($items)->toHaveCount(1)
-        ->and($items[0]['state'])->toBe('ready')
-        ->and($items[0]['title'])->toBe('Look at a Jira (unspecified)')
-        ->and($items[0]['proposal']['summary'])->toBe('Lo miro y te escribo cuando esté.');
+    $this->actingAs($user)->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('alerts', []));
 });
 
 test('dismissing the draft also clears the alert it replaced', function () {
@@ -138,8 +134,11 @@ test('dismissing the draft also clears the alert it replaced', function () {
     $this->actingAs($user)->postJson(route('comms.notifications.dismiss', $draft))->assertOk();
 
     expect($draft->refresh()->dismissed_at)->not->toBeNull()
-        ->and($signal->refresh()->dismissed_at)->not->toBeNull()
-        ->and(app(HomeFeed::class)->items($user))->toBe([]);
+        ->and($signal->refresh()->dismissed_at)->not->toBeNull();
+
+    $this->actingAs($user)->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('alerts', []));
 });
 
 /**

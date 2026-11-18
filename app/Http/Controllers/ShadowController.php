@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\ActionStatus;
 use App\Comms\Context\ContextWriter;
-use App\Comms\Cutover\HomeFeed;
+use App\Comms\Cutover\CommsReview;
 use App\Comms\Events\EventLog;
 use App\Comms\Events\EventType;
 use App\Comms\Events\Source;
@@ -111,16 +111,16 @@ class ShadowController extends Controller
         return back();
     }
 
-    public function dismiss(Request $request, HomeFeed $feed, Notifier $notifier, CommsNotification $notification): JsonResponse
+    public function dismiss(Request $request, CommsReview $review, Notifier $notifier, CommsNotification $notification): JsonResponse
     {
         abort_unless($notification->user_id === $request->user()?->id, 404);
 
         $notifier->dismissGroup($request->user(), $notification);
 
-        return response()->json(['item' => $feed->card($notification->refresh())]);
+        return response()->json(['item' => $review->alert($notification->refresh())]);
     }
 
-    public function feedback(Request $request, EventLog $log, ContextWriter $context, HomeFeed $feed, CommsNotification $notification): RedirectResponse
+    public function feedback(Request $request, EventLog $log, ContextWriter $context, CommsReview $review, CommsNotification $notification): RedirectResponse
     {
         abort_unless($notification->user_id === $request->user()?->id, 404);
 
@@ -144,7 +144,8 @@ class ShadowController extends Controller
             revision: (string) Str::uuid(),
         );
 
-        $requester = $feed->actorFor($notification);
+        $actor = $review->alert($notification)['actor_name'] ?? null;
+        $requester = $actor === 'sixth-sense' ? null : $actor;
         $sentence = $requester === null ? null : match ($feedback) {
             'useful' => "Lo que pide {$requester} sí merece aviso.",
             'not_urgent' => "Lo que pide {$requester} no suele ser urgente: avisar sin interrumpir.",

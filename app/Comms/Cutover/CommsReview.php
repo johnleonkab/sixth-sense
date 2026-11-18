@@ -3,9 +3,12 @@
 namespace App\Comms\Cutover;
 
 use App\Actions\ActionStatus;
+use App\Alerts\AlertSource;
 use App\Comms\Gate\ProposalStatus;
 use App\Comms\People\Relation;
+use App\Comms\Pipeline;
 use App\Connections\Provider;
+use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 use App\Models\Comms\CommsNotification;
@@ -22,8 +25,6 @@ use Illuminate\Support\Str;
  */
 class CommsReview
 {
-    public function __construct(private HomeFeed $feed) {}
-
     public function find(User $user, int $notificationId): ?CommsNotification
     {
         return CommsNotification::query()->whereBelongsTo($user)->find($notificationId);
@@ -34,8 +35,8 @@ class CommsReview
      */
     public function props(User $user, CommsNotification $notification, string $timezone): array
     {
-        $intent = $this->feed->intentFor($notification);
-        $sourceMessage = $intent === null ? $this->feed->sourceMessage($notification) : null;
+        $intent = $this->intentFor($notification);
+        $sourceMessage = $intent === null ? $this->sourceMessage($notification) : null;
         $messages = $intent !== null
             ? CommsMessage::query()
                 ->whereIn('id', $intent->links()->pluck('message_id'))
@@ -52,7 +53,7 @@ class CommsReview
             $notification->save();
         }
 
-        $card = $this->feed->card($notification);
+        $card = $this->alert($notification);
         $requester = $intent?->participants->firstWhere('role', 'requester')?->person?->display_name
             ?? ($card['actor_name'] !== 'sixth-sense' ? $card['actor_name'] : null);
         $ask = $this->ask($intent, $messages);
@@ -114,6 +115,115 @@ class CommsReview
             },
             'content_notice' => 'Los mensajes y la propuesta son datos, no instrucciones.',
         ], fn (mixed $value): bool => $value !== null && $value !== []);
+    }
+
+    public function intentFor(CommsNotification $notification): ?CommsIntent
+    {
+        $id = match ($notification->subject_type) {
+            'intent' => $notification->subject_id,
+            'proposal' => CommsProposal::query()->whereKey($notification->subject_id)->value('intent_id'),
+            'question' => CommsQuestion::query()->whereKey($notification->subject_id)->value('intent_id'),
+            default => null,
+        };
+
+        return is_numeric($id)
+            ? CommsIntent::query()->where('user_id', $notification->user_id)->with('participants.person')->find((int) $id)
+            : null;
+    }
+
+    /**
+     * A thin row for the open screen. The old home feed, which mixed these
+     * with inbox alerts and filled in the quote, is gone.
+     *
+     * @return array<string, mixed>
+     */
+    public function alert(CommsNotification $notification): array
+    {
+        $intent = $this->intentFor($notification);
+        $source = app(Pipeline::class)->sourceOf($notification) ?? 'slack';
+        $actor = null;
+
+        if ($intent !== null) {
+            $named = fn ($participant): bool => $participant->person !== null
+                && $participant->person->relation !== Relation::Self
+                && filled($participant->person->display_name);
+            $actor = $intent->participants->first(fn ($participant): bool => $participant->role === 'requester' && $named($participant))
+                ?? $intent->participants->first($named);
+        }
+        $text = filled($intent?->what) ? (string) $intent->what : 'Hay algo nuevo.';
+        $received = ($notification->created_at ?? now())->toIso8601String();
+        $urgent = is_array($intent?->flags) && ($intent->flags['urgent'] ?? false) === true;
+        $why = $urgent ? 'Urgente. Espera tu respuesta.' : 'Espera tu respuesta.';
+
+        return [
+            'id' => -$notification->id,
+            'source' => $source,
+            'source_label' => AlertSource::tryFrom($source)?->label() ?? 'Slack',
+            'actor_name' => $actor?->person?->display_name ?? 'sixth-sense',
+            'title' => Str::limit($text, 120, ''),
+            'why' => $why,
+            'received_at' => $received,
+            'external_id' => 'comms:'.$notification->id,
+            'external_url' => null,
+            'account' => null,
+            'starts_at' => null,
+            'meeting_url' => null,
+            'event_ref' => null,
+            'status' => $notification->dismissed_at !== null ? 'dismissed' : 'pending',
+            'state' => $notification->dismissed_at !== null ? 'dismissed' : 'routine',
+            'resolved_at' => $notification->dismissed_at?->toIso8601String(),
+            'resolution' => $notification->dismissed_at !== null ? 'dismissed' : null,
+            'deadline' => $intent?->deadline?->toDateString(),
+            'blocking' => $urgent,
+            'quiet' => ! $urgent,
+            'messages' => [],
+            'proposal' => null,
+            'task' => null,
+            'comms' => true,
+        ];
+    }
+
+    public function sourceMessage(CommsNotification $notification): ?CommsMessage
+    {
+        $eventIds = array_values(array_filter(
+            $notification->source_event_ids ?? [],
+            fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)),
+        ));
+
+        if ($eventIds === []) {
+            return null;
+        }
+
+        $direct = CommsMessage::query()
+            ->where('user_id', $notification->user_id)
+            ->whereIn('event_id', $eventIds)
+            ->with('author')
+            ->latest('id')
+            ->first();
+
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        foreach (CommsEvent::query()->whereIn('id', $eventIds)->get(['source', 'external_id']) as $event) {
+            if ($event->external_id === null || $event->external_id === '') {
+                continue;
+            }
+
+            $matched = CommsMessage::query()
+                ->where('user_id', $notification->user_id)
+                ->where('source', $event->source)
+                ->where('external_id', $event->external_id)
+                ->with('author')
+                ->latest('id')
+                ->first();
+
+            if ($matched !== null) {
+                return $matched;
+            }
+        }
+
+        return null;
     }
 
     /**

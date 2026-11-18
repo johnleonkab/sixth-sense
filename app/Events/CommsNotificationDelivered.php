@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Comms\Cutover\HomeFeed;
+use App\Comms\Cutover\CommsReview;
 use App\Models\Comms\CommsNotification;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -38,6 +38,6 @@ class CommsNotificationDelivered implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return app(HomeFeed::class)->card($this->notification);
+        return app(CommsReview::class)->alert($this->notification);
     }
 }

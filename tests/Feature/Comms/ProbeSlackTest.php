@@ -1,7 +1,7 @@
 <?php
 
 use App\Alerts\Push\PushSender;
-use App\Comms\Cutover\HomeFeed;
+use App\Comms\Cutover\CommsReview;
 use App\Comms\Events\EventType;
 use App\Comms\Gate\ActionClass;
 use App\Comms\Gate\Gate;
@@ -230,7 +230,7 @@ test('an urgent comms alert reaches the device saying what the card says', funct
     $this->artisan('comms:probe-slack', ['user' => $user->id, 'text' => '¿Me revisas el PR de pagos?', '--from' => 'Marta Prueba', '--wait' => 1])->assertSuccessful();
 
     $notification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'intent')->where('urgency', 'now')->firstOrFail();
-    $card = app(HomeFeed::class)->card($notification);
+    $card = app(CommsReview::class)->alert($notification);
     $pushed = collect($sender->sent)->map(fn (array $sent): array => json_decode($sent['payload'], true)['notification']);
 
     expect($pushed)->not->toBeEmpty()
@@ -267,7 +267,7 @@ test('question and proposal notifications keep the requester and ask on the card
     app(Ask::class)->open($user, $intent, 'Falta concretar el encargo.', ['draft' => ''], [$message->event_id], 'now');
 
     $questionNotification = CommsNotification::query()->whereBelongsTo($user)->where('subject_type', 'question')->sole();
-    $questionCard = app(HomeFeed::class)->card($questionNotification);
+    $questionCard = app(CommsReview::class)->alert($questionNotification);
     $pushed = collect($sender->sent)->map(fn (array $sent): array => json_decode($sent['payload'], true)['notification']);
 
     expect($questionCard['actor_name'])->toBe('Patricia Corral')
@@ -296,7 +296,7 @@ test('question and proposal notifications keep the requester and ask on the card
         ->where('subject_type', 'proposal')
         ->orderBy('id')
         ->get()
-        ->map(fn (CommsNotification $row): array => app(HomeFeed::class)->card($row));
+        ->map(fn (CommsNotification $row): array => app(CommsReview::class)->alert($row));
 
     expect($proposalCards)->toHaveCount(2)
         ->and($proposalCards[0]['actor_name'])->toBe('Patricia Corral')
@@ -325,7 +325,7 @@ test('a signal notification without an intent shows the sender and signal summar
     )->assertSuccessful();
 
     $notification = CommsNotification::query()->whereBelongsTo($user)->where('kind', 'signal')->sole();
-    $card = app(HomeFeed::class)->card($notification);
+    $card = app(CommsReview::class)->alert($notification);
 
     expect($card['actor_name'])->toBe('David Montiel')
         ->and($card['title'])->toBe('CPD-7205 tiene bloqueos pendientes antes de cerrar.')

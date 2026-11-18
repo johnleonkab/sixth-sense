@@ -37,24 +37,20 @@ use App\Comms\Surface\SurfaceUpdates;
 use App\Comms\Watchers\ClockHandler;
 use App\Comms\Watchers\IntentWatcher;
 use App\Comms\Windows\SettleBuffer;
-use App\Events\IntentsUpdated;
-use App\Models\Comms\CommsConversationLink;
 use App\Models\Comms\CommsEvent;
 use App\Models\Comms\CommsIntent;
 use App\Models\Comms\CommsMessage;
 
 /**
- * Triage, then match, then the state machine. Stages that do not exist yet
- * are simply not called. Replay applies the stored results and does not
- * call a model.
+ * Triage, then the v2 linker when that flag is on. The v1 matcher is gone:
+ * with the flag off, a message is flagged and does not open an intent.
+ * Replay applies the stored results and does not call a model.
  */
 class Pipeline
 {
     public function __construct(
         private TriageRules $rules,
         private ModelRouter $router,
-        private CandidateRetriever $candidates,
-        private MatchStage $matcher,
         private IntentStateMachine $machine,
         private Archive $archive,
         private EventLog $log,
@@ -153,77 +149,6 @@ class Pipeline
 
         if ($triage->stops()) {
             return;
-        }
-
-        $found = $this->candidates->for($event->user, $message);
-        $decision = $this->matcher->match($event->user, $message, $event, $found);
-
-        if ($decision === null) {
-            return;
-        }
-
-        $results = $this->machine->decide(
-            $event->user,
-            $message,
-            array_values($decision['operations'] ?? []),
-            (float) ($decision['confidence'] ?? 0),
-            $found->first()?->key,
-            $triage,
-        );
-
-        foreach ($results as $index => $result) {
-            if (($result['status'] ?? '') === 'accepted') {
-                $results[$index] = $this->machine->effect($event->user, $message, $result, null, recompute: true);
-            }
-        }
-
-        $applied = $this->log->append(
-            user: $event->user,
-            type: EventType::StateApplied,
-            source: $event->source,
-            externalId: $message->external_id,
-            payload: null,
-            normalized: ['results' => $results],
-            causation: $event,
-            occurredAt: $event->occurred_at,
-        );
-
-        CommsConversationLink::query()
-            ->whereBelongsTo($event->user)
-            ->where('message_id', $message->id)
-            ->update(['state_event_id' => $applied->id]);
-
-        $changed = [];
-
-        foreach ($results as $result) {
-            if (($result['status'] ?? '') !== 'accepted' || ! is_string($result['intent_key'] ?? null)) {
-                continue;
-            }
-
-            $intent = CommsIntent::query()->whereBelongsTo($event->user)->where('key', $result['intent_key'])->first();
-
-            if ($intent === null) {
-                continue;
-            }
-
-            $intent->last_change_event_id = $applied->id;
-
-            if ($result['op'] === 'settle') {
-                $intent->settled_event_id = $applied->id;
-            }
-
-            $intent->save();
-            $this->watchers->sync($event->user, $intent);
-            $this->watchers->check($event->user, $intent);
-            $changed[] = $intent->id;
-        }
-
-        $this->notifier->onState($event->user, $applied);
-        $this->playbooks->afterApplied($event->user, $applied);
-
-        if (collect($results)->contains(fn (array $result): bool => ($result['status'] ?? '') === 'accepted')) {
-            IntentsUpdated::dispatch($event->user);
-            SurfaceUpdates::broadcast($event->user, ...$changed);
         }
     }
 
